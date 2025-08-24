@@ -43,30 +43,20 @@ class Test extends Model
     public function buildResponseFor(User $user)
     {
         $questions = $this->uncompletedQuestions()
+            ->with('skill.tracks.level', 'skill.links')
             ->take(config('app.questions_per_quiz'))
-            ->get()
-            ->map(function ($q) {
-                $track = $q->skill->tracks()->first();
-                $q->level = $track?->level?->name ?? '';
-                return $q;
-            });
-
-        $track = $questions->first()?->skill?->tracks()?->first();
-        $doneNess = $track ? $user->tracks()->where('tracks.id', $track->id)->first()?->pivot->doneNess ?? 0 : 0;
-
-        return response()->json([
+            ->get();
+     
+         return response()->json([
             'message' => 'Request executed successfully',
             'test' => $this->id,
             'questions' => $questions,
-            'track_doneness' => $doneNess,
             'lives' => $user->lives()->first()?->lives_remaining ?? 0,
             'kudos' => $this->kudos ?? 0,
             'maxile' => $user->maxile_level ?? 0,
             'code' => 201
         ]);
     }
-
-
 
     public function houses(){
         return $this->belongsToMany(Test::class)->withTimestamps();

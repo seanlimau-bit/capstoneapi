@@ -181,7 +181,6 @@ class AnswerController extends Controller
             }
 
             DB::commit();
-
             return $test->buildResponseFor($user);
 
         } catch (\Exception $e) {

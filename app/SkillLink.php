@@ -21,12 +21,17 @@ class SkillLink extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function skills(){
+    public function skill(){
     	return $this->belongsTo(Skill::class);
     }
 
     public function status(){
     	return $this->hasOne(Status::class);
+    }
+        // ✅ Accessor to return full URL for 'link'
+    public function getLinkAttribute($value)
+    {
+        return url($value);  // auto-prepend your app URL
     }
 
 }
