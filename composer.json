@@ -6,7 +6,6 @@
     "type": "project",
     "require": {
         "php": "^8.2",
-        "auth0/auth0-php": "^8.11",
         "guzzlehttp/guzzle": "^7.0.1",
         "illuminate/support": "11.6.0",
         "laravel/framework": "^11.0",

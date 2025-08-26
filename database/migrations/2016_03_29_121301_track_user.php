@@ -44,8 +44,8 @@ class TrackUser extends Migration
             $table->integer('skill_passed')->default(0);
             $table->integer('difficulty_passed')->default(0);
             $table->integer('noOfTries')->default(0);
-            $table->integer('noOfPasses')->default(0);
-            $table->integer('noOfFails')->default(0);
+            $table->integer('correct_streak')->default(0);
+            $table->integer('fail_streak')->default(0);
             $table->primary(['skill_id','user_id']);
             $table->timestamps();
         });
