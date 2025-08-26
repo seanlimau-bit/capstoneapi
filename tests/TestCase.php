@@ -1,5 +1,6 @@
 <?php
 
+<<<<<<< HEAD
 class TestCase extends Illuminate\Foundation\Testing\TestCase
 {
     /**
@@ -22,4 +23,13 @@ class TestCase extends Illuminate\Foundation\Testing\TestCase
 
         return $app;
     }
+=======
+namespace Tests;
+
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+
+abstract class TestCase extends BaseTestCase
+{
+    //
+>>>>>>> fb817a5faf451beaaa4d8d3bdfb03ed1cce36695
 }

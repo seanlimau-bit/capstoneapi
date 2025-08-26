@@ -1,5 +1,4 @@
 <?php
-
 use App\Http\Controllers\OTPController;
 use App\Http\Controllers\VisitorController;
 use App\Http\Controllers\Auth\AuthController;

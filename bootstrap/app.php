@@ -3,8 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Configuration\Exceptions;
-use App\Exceptions\Handler;
-use Illuminate\Contracts\Debug\ExceptionHandler;
+use App\Http\Middleware\Auth0Middleware;
+use App\Http\Middleware\CorsImageMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,6 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        apiPrefix: '/api',
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(
@@ -26,13 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->renderable(function (Throwable $e, $request) {
-            // optional: custom rendering
+            // Optional custom rendering
         });
 
-        // Properly bind your custom handler (only works if Laravel 11 is fully set up)
         $exceptions->reportable(function (Throwable $e) {
-            // logging or custom reporting logic
+            // Optional custom reporting
         });
     })
     ->create();
-
