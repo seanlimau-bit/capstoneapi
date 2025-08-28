@@ -52,18 +52,23 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|unique:users|email',
             'password' => 'required|string|min:6|regex:/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{6,}$/',
-
         ]);
+        
         if ($validator->fails()) {
             return response()->json(['message' => 'Signup is failed', 'data' => $validator->errors(), 'code' => 201]);
         }
-        $user = $request->all();
+        
         try {
-            $user['password'] = bcrypt($request->password);
-            User::create($user);
-            return response()->json(['message' => 'User correctly added', 'data' => $user, 'code' => 201]);
+            User::create([
+                'email' => $request->email,
+                'password' => bcrypt($request->password),
+                'is_admin' => false, // Explicitly set to false
+                // Add other required fields as needed
+            ]);
+            
+            return response()->json(['message' => 'User correctly added', 'code' => 201]);
         } catch (\Throwable $th) {
-            return response()->json(['message' => $th->getMessage(), 'data' => $user, 'code' => 200]);
+            return response()->json(['message' => $th->getMessage(), 'code' => 500]);
         }
     }
 

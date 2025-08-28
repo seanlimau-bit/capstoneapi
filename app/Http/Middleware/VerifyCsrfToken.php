@@ -14,6 +14,8 @@ class VerifyCsrfToken extends BaseVerifier
     protected $except = [
         'api/*',
 	'/opencourses',
-	'test/protected'
+	'test/protected',
+    'api/auth/request-otp',
+    'api/auth/verify-otp',
     ];
 }
