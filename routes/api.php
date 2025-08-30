@@ -1,12 +1,17 @@
 <?php
+
 use App\Http\Controllers\OTPController;
 use App\Http\Controllers\VisitorController;
-use App\Http\Controllers\Auth\AuthController;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
+
+// === User Info Route (Protected) ===
 Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
     $user = $request->user();
 
@@ -21,36 +26,56 @@ Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
     ]);
 });
 
-// === Public Routes (No Token Required) ===
+/*
+|--------------------------------------------------------------------------
+| Public Routes (No Authentication Required)
+|--------------------------------------------------------------------------
+*/
+
+// Authentication Routes
 Route::prefix('auth')->group(function () {
     Route::post('/request-otp', [OTPController::class, 'requestOtp']);
     Route::post('/verify-otp', [OTPController::class, 'verifyOtp']);
+    Route::post('/verify-email', [OTPController::class, 'verifyEmail']);
+    Route::post('/complete-registration', [OTPController::class, 'completeRegistration']);
 });
 
-// === Protected Routes (Require Sanctum Token) ===
+// Visitor Routes
+Route::post('/mastercode', [VisitorController::class, 'mastercode']);
+Route::post('/diagnostic', [VisitorController::class, 'diagnostic']);
+Route::post('/subscribe', [VisitorController::class, 'subscribe']);
+
+/*
+|--------------------------------------------------------------------------
+| Protected Routes (Require Sanctum Token)
+|--------------------------------------------------------------------------
+*/
+
 Route::middleware('auth:sanctum')->group(function () {
 
-    // Dashboard & QA
+    // === Dashboard & QA ===
     Route::get('/protected', [App\Http\Controllers\DashboardController::class, 'index']);
     Route::post('/qa', [App\Http\Controllers\CheckAnswerController::class, 'index']);
     Route::post('/qa/answer', [App\Http\Controllers\CheckAnswerController::class, 'answer']);
 
-    // Users
+    // === User Management ===
     Route::apiResource('users', App\Http\Controllers\UserController::class);
     Route::get('/users/{user}/reset', [App\Http\Controllers\UserController::class, 'reset']);
     Route::get('/users/{user}/performance', [App\Http\Controllers\UserController::class, 'performance']);
     Route::post('/users/{user}/diagnostic', [App\Http\Controllers\UserController::class, 'diagnostic']);
     Route::get('/users/{user}/report', [App\Http\Controllers\DiagnosticController::class, 'report']);
-  	Route::get('/users/subscription/status', [App\Http\Controllers\UserController::class, 'subscriptionStatus']);
+    Route::get('/users/subscription/status', [App\Http\Controllers\UserController::class, 'subscriptionStatus']);
+    Route::apiResource('users.tests', App\Http\Controllers\UserTestController::class);
+    Route::get('users/{username}/logs', [App\Http\Controllers\LogController::class, 'show']);
 
-    // Courses & Related
+    // === Course Management ===
     Route::apiResource('courses', App\Http\Controllers\CourseController::class);
     Route::post('courses/{course}', [App\Http\Controllers\CourseController::class, 'copy']);
     Route::apiResource('courses.houses', App\Http\Controllers\CourseHouseController::class);
     Route::apiResource('courses.users', App\Http\Controllers\CourseUserController::class);
     Route::apiResource('courses.tracks', App\Http\Controllers\CourseTrackController::class);
 
-    // Quizzes
+    // === Quiz Management ===
     Route::apiResource('quizzes', App\Http\Controllers\QuizController::class);
     Route::post('/quizzes/{quiz}/copy', [App\Http\Controllers\QuizController::class, 'copy']);
     Route::get('/quizzes/create', [App\Http\Controllers\QuizController::class, 'create']);
@@ -60,49 +85,58 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('quizzes/{quiz}/houses', [App\Http\Controllers\QuizHouseController::class, 'deleteHouses']);
     Route::delete('quizzes/{quiz}/skills', [App\Http\Controllers\QuizSkillController::class, 'deleteSkills']);
 
-    // Other Resources
-    Route::apiResources([
-        'difficulties'       => App\Http\Controllers\DifficultyController::class,
-        'fields'             => App\Http\Controllers\FieldController::class,
-        'houses'             => App\Http\Controllers\HouseController::class,
-        'levels'             => App\Http\Controllers\LevelController::class,
-        'permissions'        => App\Http\Controllers\PermissionController::class,
-        'roles'              => App\Http\Controllers\RoleController::class,
-        'units'              => App\Http\Controllers\UnitController::class,
-        'tracks'             => App\Http\Controllers\TrackController::class,
-        'tests'              => App\Http\Controllers\TestController::class,
-        'types'              => App\Http\Controllers\TypeController::class,
-        'skills'             => App\Http\Controllers\SkillController::class,
-        'questions'          => App\Http\Controllers\QuestionController::class,
-        'enrolments'         => App\Http\Controllers\EnrolmentController::class,
-        'users.tests'        => App\Http\Controllers\UserTestController::class,
-        'houses.users'       => App\Http\Controllers\HouseUserController::class,
-        'houses.tracks'      => App\Http\Controllers\HouseTrackController::class,
-        'skills.questions'   => App\Http\Controllers\SkillQuestionsController::class,
-        'tracks.questions'   => App\Http\Controllers\TrackQuestionsController::class,
-        'tracks.skills'      => App\Http\Controllers\TrackSkillController::class,
-    ]);
-
-    // Custom Routes
+    // === Skills Management ===
+    Route::apiResource('skills', App\Http\Controllers\SkillController::class);
     Route::post('skills/{skills}/copy', [App\Http\Controllers\SkillController::class, 'copy']);
     Route::get('skills/{skills}/passed', [App\Http\Controllers\SkillController::class, 'usersPassed']);
     Route::post('skills/search', [App\Http\Controllers\SkillController::class, 'search']);
+    Route::apiResource('skills.questions', App\Http\Controllers\SkillQuestionsController::class);
+
+    // === Track Management ===
+    Route::apiResource('tracks', App\Http\Controllers\TrackController::class);
+    Route::apiResource('tracks.questions', App\Http\Controllers\TrackQuestionsController::class);
+    Route::apiResource('tracks.skills', App\Http\Controllers\TrackSkillController::class);
     Route::get('skills/{skill}/tracks', [App\Http\Controllers\TrackSkillController::class, 'list_tracks']);
     Route::delete('skills/{skill}/tracks', [App\Http\Controllers\TrackSkillController::class, 'deleteTracks']);
     Route::delete('tracks/{track}/skills', [App\Http\Controllers\TrackSkillController::class, 'deleteSkills']);
 
-    // Logs
-    Route::get('users/{username}/logs', [App\Http\Controllers\LogController::class, 'show']);
-    Route::get('logs', [App\Http\Controllers\LogController::class, 'index']);
+    // === House Management ===
+    Route::apiResource('houses', App\Http\Controllers\HouseController::class);
+    Route::apiResource('houses.users', App\Http\Controllers\HouseUserController::class);
+    Route::apiResource('houses.tracks', App\Http\Controllers\HouseTrackController::class);
 
-    // Diagnostics & Visitors
+    // === Testing & Assessment ===
+    Route::apiResource('tests', App\Http\Controllers\TestController::class);
     Route::post('/test/protected/{type}', [App\Http\Controllers\DiagnosticController::class, 'index']);
     Route::post('/test/answers', [App\Http\Controllers\AnswerController::class, 'answer']);
     Route::get('/test/trackquestions/{track}', [App\Http\Controllers\FieldTrackQuestionController::class, 'index']);
-    Route::post('/mastercode', [VisitorController::class, 'mastercode']);
-    Route::post('/diagnostic', [VisitorController::class, 'diagnostic']);
-    Route::post('/subscribe', [VisitorController::class, 'subscribe']);
     Route::post('/loginInfo', [App\Http\Controllers\DiagnosticController::class, 'login']);
-	Route::post('/auth/logout', [AuthController::class, 'logout']);
-	Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
+
+    // === System Resources ===
+    Route::apiResources([
+        'difficulties'   => App\Http\Controllers\DifficultyController::class,
+        'fields'         => App\Http\Controllers\FieldController::class,
+        'levels'         => App\Http\Controllers\LevelController::class,
+        'permissions'    => App\Http\Controllers\PermissionController::class,
+        'roles'          => App\Http\Controllers\RoleController::class,
+        'units'          => App\Http\Controllers\UnitController::class,
+        'types'          => App\Http\Controllers\TypeController::class,
+        'questions'      => App\Http\Controllers\QuestionController::class,
+        'enrolments'     => App\Http\Controllers\EnrolmentController::class,
+    ]);
+
+    // == Partners Management ==
+  /*  Route::prefix('partners')->middleware('auth:sanctum')->group(function () {
+        Route::get('/', [PartnerController::class, 'index']);
+        Route::post('/', [PartnerController::class, 'store']);
+        Route::get('/{code}', [PartnerController::class, 'show']);
+        Route::put('/{partner}', [PartnerController::class, 'update']);
+        Route::delete('/{partner}', [PartnerController::class, 'destroy']);
+    });
+
+    Route::post('partner/{partnerCode}/webhook', [PartnerWebhookController::class, 'handleStatusUpdate']);
+*/
+    // === Logs ===
+    Route::get('logs', [App\Http\Controllers\LogController::class, 'index']);
+
 });

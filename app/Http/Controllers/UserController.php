@@ -53,11 +53,11 @@ class UserController extends Controller
             'email' => 'required|unique:users|email',
             'password' => 'required|string|min:6|regex:/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{6,}$/',
         ]);
+        return "HEllo";
         
         if ($validator->fails()) {
             return response()->json(['message' => 'Signup is failed', 'data' => $validator->errors(), 'code' => 201]);
         }
-        
         try {
             User::create([
                 'email' => $request->email,
