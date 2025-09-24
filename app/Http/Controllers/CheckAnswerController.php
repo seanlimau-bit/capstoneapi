@@ -6,10 +6,10 @@ use Illuminate\Http\Request;
 
 use App\Http\Requests;
 use Auth;
-use App\Question;
+use App\Models\Question;
 use App\Http\Requests\CreateQuizAnswersRequest;
 use DateTime;
-use App\User;
+use App\Models\User;
 
 class CheckAnswerController extends Controller
 {

@@ -1,0 +1,33 @@
+/* Auto-generated Theme CSS */
+/* Generated: 2025-09-21 01:30:29 */
+/* DO NOT EDIT MANUALLY */
+
+:root{
+  --primary-color: #960000;
+  --black-color: #121212;
+  --white-color: #EFEFEF;
+  --secondary-color: #FFBF66;
+  --tertiary-color: #50D200;
+  --success-color: #50D200;
+  --error-color: #D80000;
+  --warning-color: #FFBF66;
+  --info-color: #6D6D6D;
+
+  --primary-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --secondary-font: Georgia, "Times New Roman", Times, serif;
+  --body-font-size: 16px;
+  --h1-font-size: 32px;
+  --h2-font-size: 24px;
+  --h3-font-size: 20px;
+  --h4-font-size: 18px;
+  --h5-font-size: 15px;
+  --body-line-height: 1.5;
+  --heading_line_height: 1.2;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 600;
+
+  --border-radius: 8.56px;
+  --sidebar-width: 280px;
+  --content-max-width: 1400px;
+}

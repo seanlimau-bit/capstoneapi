@@ -1,8 +1,7 @@
 <?php
-
 namespace App\Services;
 
-class PartnerConfigService
+class LiveService  // Changed class name to match filename
 {
     /**
      * Get configuration for a specific partner and provider

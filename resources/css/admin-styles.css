@@ -1,0 +1,314 @@
+/* ==========================================================================
+   All Gifted Admin Styles - Dynamic Theme System
+   CSS custom properties are populated from database via blade template
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Design Tokens / CSS Variables (populated from database)
+   -------------------------------------------------------------------------- */
+   :root {
+    /* These will be overridden by database values in blade template */
+    /* Brand Palette */
+    --primary-color: #960000;      /* From configs.main_color */
+    --black-color: #121212;        /* From configs.black_color */
+    --white-color: #EFEFEF;        /* From configs.white_color */
+    --secondary-color: #FFBF66;    /* From configs.secondary_color */
+    --tertiary-color: #50D200;     /* From configs.tertiary_color */
+    --success-color: #50D200;      /* From configs.success_color */
+    --error-color: #D80000;        /* From configs.error_color */
+    --warning-color: #FFBF66;      /* From configs.warning_color */
+    --info-color: #6D6D6D;         /* From configs.info_color */
+
+    /* Typography - populated from database */
+    --primary-font: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    --secondary-font: 'Georgia, "Times New Roman", Times, serif';
+    --body-font-size: 16px;
+    --h1-font-size: 32px;
+    --h2-font-size: 24px;
+    --h3-font-size: 20px;
+    --h4-font-size: 18px;
+    --h5-font-size: 16px;
+    --body-line-height: 1.5;
+    --heading-line-height: 1.2;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 600;
+
+    /* Layout - populated from database */
+    --border-radius: 8.56px;
+    --sidebar-width: 280px;
+    --content-max-width: 1400px;
+
+    /* Computed colors */
+    --primary-dark: color-mix(in srgb, var(--primary-color) 80%, black);
+    --primary-light: color-mix(in srgb, var(--primary-color) 30%, white);
+    --on-primary: var(--white-color);
+
+    /* State Colors */
+    --success-dark: color-mix(in srgb, var(--success-color) 80%, black);
+    --success-light: color-mix(in srgb, var(--success-color) 30%, white);
+    --on-success: var(--white-color);
+
+    --error-dark: color-mix(in srgb, var(--error-color) 80%, black);
+    --error-light: color-mix(in srgb, var(--error-color) 30%, white);
+    --on-error: var(--white-color);
+
+    --warning-dark: color-mix(in srgb, var(--warning-color) 80%, black);
+    --warning-light: color-mix(in srgb, var(--warning-color) 30%, white);
+    --on-warning: var(--black-color);
+
+    --info-dark: color-mix(in srgb, var(--info-color) 80%, black);
+    --info-light: color-mix(in srgb, var(--info-color) 30%, white);
+    --on-info: var(--white-color);
+
+    /* Surfaces / Background */
+    --background-color: #eeeeee;
+    --surface-color: var(--white-color);
+    --surface-container: #EDEDED;
+    --surface-container-low: #D9D9D9;
+    --surface-container-high: #F8FAFC;
+    --surface-dim: #E2E8F0;
+    --on-surface: var(--black-color);
+    --on-surface-variant: var(--info-color);
+
+    /* Inputs */
+    --input-active: var(--primary-color);
+    --input-inactive: #E2E8F0;
+    --input-background: #F8FAFC;
+
+    /* Progress */
+    --progress-complete: var(--success-color);
+    --progress-active: var(--primary-color);
+    --progress-inactive: #D1D5DB;
+
+    /* Borders */
+    --outline: #D9D9D9;
+    --outline-variant: #EDEDED;
+
+    /* Layout */
+    --header-height: 60px;
+
+    /* Spacing (8dp grid) */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+
+    /* Radius variations */
+    --border-radius-xs: 4px;
+    --border-radius-sm: var(--border-radius);
+    --border-radius-lg: calc(var(--border-radius) * 2);
+    --border-radius-xl: calc(var(--border-radius) * 3);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(40, 40, 40, 0.12), 0 1px 2px rgba(40, 40, 40, 0.24);
+    --shadow:    0 3px 6px rgba(40, 40, 40, 0.16), 0 3px 6px rgba(40, 40, 40, 0.23);
+    --shadow-md: 0 10px 20px rgba(40, 40, 40, 0.19), 0 6px 6px rgba(40, 40, 40, 0.23);
+    --shadow-lg: 0 14px 28px rgba(40, 40, 40, 0.25), 0 10px 10px rgba(40, 40, 40, 0.22);
+
+    /* Motion */
+    --transition-fast: 150ms ease-out;
+    --transition: 300ms ease-out;
+    --transition-slow: 500ms ease-out;
+  }
+
+/* --------------------------------------------------------------------------
+   Base Typography - Using Database Values
+   -------------------------------------------------------------------------- */
+   body {
+    font-family: var(--primary-font);
+    font-size: var(--body-font-size);
+    line-height: var(--body-line-height);
+    color: var(--on-surface);
+    background-color: var(--background-color);
+    font-weight: var(--font-weight-normal);
+  }
+
+  h1, .h1 { font-size: var(--h1-font-size); line-height: var(--heading-line-height); font-weight: var(--font-weight-bold); }
+  h2, .h2 { font-size: var(--h2-font-size); line-height: var(--heading-line-height); font-weight: var(--font-weight-bold); }
+  h3, .h3 { font-size: var(--h3-font-size); line-height: var(--heading-line-height); font-weight: var(--font-weight-medium); }
+  h4, .h4 { font-size: var(--h4-font-size); line-height: var(--heading-line-height); font-weight: var(--font-weight-medium); }
+  h5, .h5 { font-size: var(--h5-font-size); line-height: var(--heading-line-height); font-weight: var(--font-weight-medium); }
+
+/* --------------------------------------------------------------------------
+   Logo Styling - Clean and Simple
+   -------------------------------------------------------------------------- */
+
+   /* Default logo sizing */
+   .site-logo,
+   .logo-svg-container svg {
+    height: 32px;
+    width: auto;
+    transition: all var(--transition);
+  }
+
+  /* Logo in sidebar - make it white */
+  .sidebar-header .site-logo,
+  .sidebar-header .logo-svg-container svg {
+    filter: brightness(0) invert(1);
+    height: 32px;
+    width: auto;
+  }
+
+  /* Logo icon fallback */
+  .sidebar-header .logo-icon {
+    color: var(--on-primary);
+    font-size: 24px;
+  }
+
+/* --------------------------------------------------------------------------
+   Layout: Sidebar, Header, Main
+   -------------------------------------------------------------------------- */
+   .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    width: var(--sidebar-width);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    z-index: 1000;
+    transition: all var(--transition);
+    overflow-y: auto;
+  }
+
+  /* Nuclear option - highest specificity */
+  .sidebar .sidebar-header .logo .logo-svg-container svg {
+    filter: brightness(0) invert(1) !important;
+    height: 32px !important;
+    width: auto !important;
+  }
+
+  .sidebar.collapsed { width: 70px; }
+
+  .sidebar-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+  }
+
+  .sidebar-header .logo {
+    color: var(--on-primary);
+    font-size: var(--h4-font-size);
+    font-weight: var(--font-weight-bold);
+    text-decoration: none;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    gap: var(--spacing-sm);
+  }
+
+  .sidebar-header .logo:hover { 
+    color: var(--on-primary); 
+    text-decoration: none;
+  }
+
+  .sidebar-nav { 
+    padding: var(--spacing-lg) 0; 
+  }
+
+  /* Main content with responsive width */
+  .main-content {
+    margin-left: var(--sidebar-width);
+    margin-top: var(--header-height);
+    padding: 2rem;
+    min-height: calc(100vh - var(--header-height));
+    transition: all var(--transition);
+    padding-left: 2.5rem;
+    max-width: calc(var(--content-max-width) + var(--sidebar-width));
+  }
+  .sidebar.collapsed ~ .main-content { margin-left: 70px; }
+
+/* --------------------------------------------------------------------------
+   Component Styles - Using Dynamic Colors
+   -------------------------------------------------------------------------- */
+
+   /* Buttons using dynamic colors */
+   .btn-primary {
+    background-color: var(--primary-color); 
+    color: var(--on-primary); 
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+  }
+  .btn-primary:hover {
+    background-color: var(--primary-dark); 
+    color: var(--on-primary); 
+    border-color: var(--primary-dark);
+    box-shadow: var(--shadow); 
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background-color: var(--secondary-color); 
+    color: var(--on-warning); 
+    border-color: var(--secondary-color);
+  }
+  .btn-secondary:hover {
+    background-color: var(--warning-dark); 
+    color: var(--on-warning); 
+    border-color: var(--warning-dark);
+  }
+
+  /* Utility classes using dynamic colors */
+  .text-primary   { color: var(--primary-color) !important; }
+  .text-secondary { color: var(--secondary-color) !important; }
+  .text-success   { color: var(--success-color) !important; }
+  .text-danger    { color: var(--error-color) !important; }
+  .text-warning   { color: var(--warning-color) !important; }
+  .text-info      { color: var(--info-color) !important; }
+
+  .bg-primary   { background-color: var(--primary-color) !important; color: var(--on-primary) !important; }
+  .bg-secondary { background-color: var(--secondary-color) !important; color: var(--on-warning) !important; }
+  .bg-success   { background-color: var(--success-color) !important; color: var(--on-success) !important; }
+  .bg-danger    { background-color: var(--error-color) !important; color: var(--on-error) !important; }
+
+  /* --------------------------------------------------------------------------
+   Option Card Styles (Modal Choices)
+   -------------------------------------------------------------------------- */
+.option-card {
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color var(--transition-fast), 
+              box-shadow var(--transition-fast), 
+              background-color var(--transition-fast);
+  background-color: var(--surface-color);
+  color: var(--on-surface);
+  text-align: left;
+}
+
+.option-card i {
+  color: var(--primary-color);
+}
+
+/* Hover and active states */
+.option-card:hover,
+.option-card.active {
+  background-color: var(--primary-light);
+  border-color: var(--primary-color);
+  color: var(--black-color) !important;
+  text-decoration: none;
+}
+
+.option-card .fw-bold,
+.option-card .small {
+  color: inherit !important;
+}
+
+/* Focus ring for accessibility */
+.option-card:focus {
+  outline: none;
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--primary-color) 25%, transparent);
+}
+
+/* Prevent Bootstrap btn-outline from forcing white text */
+.option-card.btn,
+.option-card.btn:hover,
+.option-card.btn.active {
+  color: inherit !important;
+}
+
+/* Icon animation on hover */
+.option-card:hover i {
+  transform: translateY(-2px);
+  transition: transform var(--transition-fast);
+}

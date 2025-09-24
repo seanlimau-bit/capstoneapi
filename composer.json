@@ -11,6 +11,7 @@
     "laravel/sanctum": "^4.0",
     "laravel/tinker": "^2.9",
     "nesbot/carbon": "^2.53.1",
+    "openai-php/laravel": "^0.16.0",
     "stripe/stripe-php": "^17.1",
     "twilio/sdk": "6.0"
   },

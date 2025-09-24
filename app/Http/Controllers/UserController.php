@@ -2,89 +2,504 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Models\Question;
+use App\Models\Plan;
+use App\Models\Quiz;
 use Illuminate\Http\Request;
-
-use App\Http\Requests;
-use App\Http\Controllers\Controller;
-use App\Http\Requests\CreateUserRequest;
-use App\User;
-use Auth;
-use App\Http\Requests\GameScoreRequest;
-use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use DB;
 
 class UserController extends Controller
 {
-    public function __construct()
-    {
-//        \Auth::login(User::find(2));
-    }
-
     /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
+     * Display a listing of users with statistics for admin interface
      */
-    public function index(): JsonResponse
+    public function index(Request $request)
     {
-        $user = Auth::guard('sanctum')->user();
-        if (!$user || !$user->is_admin) {
-            return response()->json([
-                'message' => 'Unauthorized: Admin access required.',
-                'code' => 401,
-            ], 401);
+        $query = User::query();
+        
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
         }
-
-        $users = User::with(['enrolledClasses.roles', 'logs'])->get();
-
-        return response()->json($users);
+        
+        // Apply role filter
+        if ($request->filled('role_id')) {
+            $query->whereHas('roles', function($q) use ($request) {
+                $q->where('role_id', $request->role_id);
+            });
+        }
+        
+        // Apply status filter using your actual 'status' field
+        if ($request->filled('status')) {
+            switch ($request->status) {
+                case 'active':
+                    $query->where('status', 'active');
+                    break;
+                case 'inactive':
+                    $query->where('status', 'inactive');
+                    break;
+                case 'suspended':
+                    $query->where('status', 'suspended');
+                    break;
+                case 'verified':
+                    $query->whereNotNull('email_verified_at');
+                    break;
+                case 'unverified':
+                    $query->whereNull('email_verified_at');
+                    break;
+            }
+        }
+        
+        // Order by latest first
+        $query->orderBy('created_at', 'desc');
+        
+        // Eager load relationships to avoid N+1 queries
+        $query->with(['role']);
+        
+        $users = $query->paginate(20);
+        
+        // Calculate statistics using your actual 'status' field
+        $totals = [
+            'total' => User::count(),
+            'active' => User::where('status', 'active')->count(),
+            'verified' => User::whereNotNull('email_verified_at')->count(),
+            'suspended' => User::where('status', 'suspended')->count(),
+        ];
+        
+        if ($request->expectsJson()) {
+            return response()->json([
+                'users' => $users->items(),
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+                'total' => $users->total(),
+                'per_page' => $users->perPage(),
+                'totals' => $totals
+            ]);
+        }
+        
+        // Get all roles for the filter dropdown - use 'role' column
+        $roles = collect(); // Empty collection by default
+        if (class_exists('\App\Models\Role')) {
+            try {
+                $roles = \App\Models\Role::orderBy('role')->get();
+            } catch (\Exception $e) {
+                $roles = collect();
+            }
+        }
+        
+        return view('admin.users.index', compact('users', 'roles', 'totals'));
     }
 
+    // Bulk operations using 'status' field
+    public function bulkActivate(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array',
+            'user_ids.*' => 'exists:users,id'
+        ]);
+        
+        try {
+            User::whereIn('id', $request->user_ids)->update(['status' => 'active']);
+            
+            return response()->json([
+                'success' => true,
+                'message' => count($request->user_ids) . ' users activated successfully'
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error activating users: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function bulkSuspend(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array',
+            'user_ids.*' => 'exists:users,id'
+        ]);
+        
+        try {
+            // Don't allow suspending the current user
+            $userIds = collect($request->user_ids)->filter(function($id) {
+                return $id != auth()->id();
+            });
+            
+            if ($userIds->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot suspend yourself or no valid users selected'
+                ]);
+            }
+            
+            User::whereIn('id', $userIds)->update(['status' => 'suspended']);
+            
+            return response()->json([
+                'success' => true,
+                'message' => count($userIds) . ' users suspended successfully'
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error suspending users: ' . $e->getMessage()
+            ], 500);
+        }
+    }
     /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Store a newly created user
      */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|unique:users|email',
-            'password' => 'required|string|min:6|regex:/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{6,}$/',
-        ]);
-        return "HEllo";
-        
-        if ($validator->fails()) {
-            return response()->json(['message' => 'Signup is failed', 'data' => $validator->errors(), 'code' => 201]);
+        $isApi = $request->expectsJson() || $request->wantsJson() || $request->is('api/*');
+
+        if ($request->has('date_of_birth') && !$request->has('date_of_birth')) {
+            $request->merge(['date_of_birth' => $request->input('date_of_birth')]);
         }
+
+        // Common rules (API + Web)
+        $baseRules = [
+            'name'          => ['required','string','max:255'],
+            'email'         => ['required','email','unique:users,email'],
+            'contact'       => ['required','string','regex:/^\+\d{1,3}(?:\s?\d{3,})+$/'],
+            'date_of_birth' => ['required','date','before:today'],
+            'role_id'       => ['nullable','integer','exists:roles,id'],
+            'status'        => ['nullable', Rule::in(['active','inactive','suspended'])],
+            'is_admin'      => ['sometimes','boolean'],
+            'is_active'     => ['sometimes','boolean'],
+            'email_verified'=> ['sometimes','boolean'],
+        ];
+
+        if ($isApi) {
+            $validator = Validator::make($request->all(), $baseRules);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                    'code'    => 422
+                ], 422);
+            }
+
+            try {
+                DB::beginTransaction();
+
+                $contact = preg_replace('/\s+/', '', $request->contact);
+
+                $user = User::create([
+                    'name'              => $request->name,
+                    'email'             => $request->email,
+                    'contact'           => $contact,
+                    'date_of_birth'     => $request->date_of_birth,   // <-- correct column
+                    'role_id'           => $request->role_id ?? null, // <-- single role_id
+                    'status'            => $request->status ?? 'active',
+                    'is_admin'          => (bool) ($request->is_admin ?? false),
+                    'is_active'         => array_key_exists('is_active', $request->all()) ? (bool)$request->is_active : true,
+                    'email_verified_at' => !empty($request->email_verified) ? now() : null,
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'message' => 'User created successfully',
+                    'user'    => $user,
+                    'code'    => 201,
+                ], 201);
+            } catch (\Throwable $e) {
+                DB::rollBack();
+                return response()->json(['message' => $e->getMessage(), 'code' => 500], 500);
+            }
+        }
+
+        // Web path
+        $validated = $request->validate($baseRules);
+
         try {
-            User::create([
-                'email' => $request->email,
-                'password' => bcrypt($request->password),
-                'is_admin' => false, // Explicitly set to false
-                // Add other required fields as needed
+            DB::beginTransaction();
+
+            $contact = preg_replace('/\s+/', '', $validated['contact']);
+
+            $user = User::create([
+                'name'              => $validated['name'],
+                'email'             => $validated['email'],
+                'contact'           => $contact,
+                'date_of_birth'     => $validated['date_of_birth'],  // <-- correct column
+                'role_id'           => $validated['role_id'] ?? null, // <-- single role_id
+                'status'            => $validated['status'] ?? 'active',
+                'is_admin'          => (bool)($validated['is_admin'] ?? false),
+                'is_active'         => array_key_exists('is_active', $validated) ? (bool)$validated['is_active'] : true,
+                'email_verified_at' => !empty($validated['email_verified']) ? now() : null,
             ]);
-            
-            return response()->json(['message' => 'User correctly added', 'code' => 201]);
-        } catch (\Throwable $th) {
-            return response()->json(['message' => $th->getMessage(), 'code' => 500]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            }
+            return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
+
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'User created successfully', 'user' => $user]);
+        }
+
+        return redirect()->route('admin.users.index')->with('success', 'User created successfully');
     }
 
     /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Display the specified user
+     */
+    public function show(User $user, Request $request)
+    {
+        // Load all the relationships you specified with correct pivot columns
+        $user->load([
+            // Basic relationships
+            'role',
+            'enrolledClasses',
+            
+            // Assessment relationships with pivot data
+            'tests' => function($query) {
+                $query->withPivot('test_completed', 'completed_date', 'result', 'attempts', 'kudos')
+                      ->orderBy('test_user.completed_date', 'desc');
+            },
+            
+            'quizzes' => function($query) {
+                $query->withPivot('quiz_completed', 'completed_date', 'result', 'attempts')
+                      ->orderBy('quiz_user.completed_date', 'desc');
+            },
+            
+            'myQuestions' => function($query) {
+                $query->withPivot('question_answered', 'answered_date', 'correct', 'attempts', 'test_id', 'quiz_id', 'assessment_type', 'kudos')
+                      ->orderBy('question_user.answered_date', 'desc')
+                      ->limit(100);
+            },
+            
+            // Performance tracking relationships
+            'testedTracks' => function($query) {
+                $query->withPivot('track_maxile', 'track_passed', 'track_test_date', 'doneNess')
+                      ->orderBy('track_user.track_test_date', 'desc');
+            },
+            'skill_user' => function($query) {
+                $query->withPivot([
+                    'skill_maxile', 'skill_test_date', 'skill_passed', 'difficulty_passed',
+                    'noOfTries', 'correct_streak', 'total_correct_attempts', 
+                    'total_incorrect_attempts', 'fail_streak'
+                ])->orderBy('skill_user.skill_test_date', 'desc');
+            },
+            'fields' => function($query) {
+                $query->withPivot('field_maxile', 'field_test_date', 'month_achieved')
+                      ->orderBy('field_user.field_test_date', 'desc');
+            },            
+            // Activity logs (limited for performance)
+            'logs' => function($query) {
+                $query->orderBy('created_at', 'desc')->limit(50);
+            }
+        ]);
+                
+
+
+    // Calculate some statistics
+        $stats = [
+            'total_questions_answered' => $user->myQuestions()->wherePivot('question_answered', true)->count(),
+            'correct_answers' => $user->myQuestions()->wherePivot('correct', true)->count(),
+            'accuracy_percentage' => $user->accuracy(),
+            'tests_completed' => $user->tests()->wherePivot('test_completed', true)->count(),
+            'quizzes_completed' => $user->quizzes()->wherePivot('quiz_completed', true)->count(),
+            'tracks_passed' => $user->testedTracks()->wherePivot('track_passed', true)->count(),
+            'skills_mastered' => $user->skill_user()->wherePivot('skill_passed', true)->count(),
+            'current_maxile' => $user->currentMaxile(),
+        ];
+
+        // API response
+        if ($request->expectsJson()) {
+            return response()->json([
+                'user' => $user,
+                'stats' => $stats,
+                'code' => 200
+            ], 200);
+        }
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true, 
+                'user' => $user,
+                'stats' => $stats
+            ]);
+        }
+
+        return view('admin.users.show', compact('user', 'stats'));
+    }
+
+    /**
+     * Update the specified user
+     */
+    public function update(Request $request, User $user)
+    {
+        // Base validation rules
+        $rules = [
+            'name' => 'sometimes|string|max:255',
+            'firstname' => 'sometimes|string|max:255',
+            'lastname' => 'sometimes|string|max:255', 
+            'phone_number' => 'sometimes|string|max:20|nullable',
+            'date_of_birth' => 'sometimes|date|nullable',
+            'status' => 'sometimes|in:active,inactive,suspended',
+            'role_id' => 'sometimes|exists:roles,id|nullable',
+            'maxile_level' => 'sometimes|numeric|nullable',
+            'game_level' => 'sometimes|numeric|nullable',
+        ];
+
+        // Don't allow email changes for security
+        $request->request->remove('email');
+
+        $validated = $request->validate($rules);
+        
+        // UPDATE THE USER - this was missing!
+        $user->update($validated);
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'User updated successfully', 'user' => $user]);
+        }
+
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'User updated successfully']);
+        }
+
+        return redirect()->route('admin.users.show', $user)->with('success', 'User updated successfully');
+    }
+
+    /**
+     * Remove the specified user
+     */
+    public function destroy(User $user, Request $request)
+    {
+
+        // Prevent deletion if user has enrolled classes
+        if ($user->enrolledClasses()->exists()) {
+            $message = 'User has existing classes and cannot be deleted';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 400);
+            }
+            return back()->withErrors($message);
+        }
+
+        $user->delete();
+
+        $message = 'User deleted successfully';
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()->route('admin.users.index')->with('success', $message);
+    }
+
+    /**
+     * Handle bulk actions for multiple users
+     */
+    public function bulkAction(Request $request)
+    {
+        $authUser = Auth::user();
+        if (!$authUser->is_admin) {
+            return response()->json(['message' => 'Unauthorized access'], 403);
+        }
+
+        $validated = $request->validate([
+            'user_ids' => 'required|array',
+            'user_ids.*' => 'exists:users,id',
+            'action' => 'required|in:activate,suspend,verify,delete'
+        ]);
+
+        $users = User::whereIn('id', $validated['user_ids'])->get();
+        $count = 0;
+
+        foreach ($users as $user) {
+            // Prevent actions on self
+            if ($user->id === $authUser->id) continue;
+
+            switch ($validated['action']) {
+                case 'activate':
+                    $user->update(['is_active' => true, 'is_suspended' => false]);
+                    $count++;
+                    break;
+                case 'suspend':
+                    $user->update(['is_suspended' => true, 'is_active' => false]);
+                    $count++;
+                    break;
+                case 'verify':
+                    $user->update(['email_verified_at' => now()]);
+                    $count++;
+                    break;
+                case 'delete':
+                    if (!$user->enrolledClasses()->exists()) {
+                        $user->delete();
+                        $count++;
+                    }
+                    break;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully {$validated['action']}d {$count} users"
+        ]);
+    }
+
+    /**
+     * Export users data
+     */
+    public function export()
+    {
+        $authUser = Auth::user();
+        if (!$authUser->is_admin) {
+            abort(403, 'Unauthorized access');
+        }
+
+        $users = User::select(['id', 'name', 'email', 'is_admin', 'is_active', 'email_verified_at', 'created_at'])
+            ->get()
+            ->map(function($user) {
+                return [
+                    'ID' => $user->id,
+                    'Name' => $user->name,
+                    'Email' => $user->email,
+                    'Role' => $user->is_admin ? 'Admin' : 'Student',
+                    'Status' => $user->is_active ? 'Active' : 'Inactive',
+                    'Verified' => $user->email_verified_at ? 'Yes' : 'No',
+                    'Joined' => $user->created_at?->format('Y-m-d'),
+                ];
+            });
+
+        $filename = 'users_export_' . now()->format('Y-m-d') . '.json';
+
+        return response()->json($users)
+            ->header('Content-Type', 'application/json')
+            ->header('Content-Disposition', "attachment; filename={$filename}");
+    }
+
+    /**
+     * Reset user's progress and data
      */
     public function reset($id)
     {
-        $logon_user = Auth::user();
-        if ($logon_user->id && !$logon_user->is_admin) {
-            return response()->json(['message' => 'You have no access rights to reset user','code'=>401], 401);
-        }
-        $user = User::findorfail($id);
+        $user = User::findOrFail($id);
+        
+        // Reset user relationships and data
         $user->myQuestions()->detach();
         $user->testedTracks()->detach();
         $user->fields()->detach();
@@ -92,182 +507,124 @@ class UserController extends Controller
         $user->tests()->detach();
         $user->quizzes()->detach();
         $user->tests()->delete();
-        $user->maxile_level = 0;
-        $user->diagnostic = TRUE;
-        $user->save();
-        return response()->json(['message' => 'Reset for '.$user->name.' is done. There is no more record of activity of student. The game_level of '.$user->game_level .' is maintained.', 'data' => $user, 'code' => 200]);
+        
+        $user->update([
+            'maxile_level' => 0,
+            'diagnostic' => true
+        ]);
+
+        return response()->json([
+            'message' => "Reset complete for {$user->name}. Game level {$user->game_level} maintained.",
+            'user' => $user,
+            'code' => 200
+        ]);
     }
 
-
     /**
-     * Mark so that the next test for the user will be the diagnostic test.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Toggle diagnostic mode for user
      */
     public function diagnostic($id)
     {
-        $logon_user = Auth::user();
-        if ($logon_user->id && !$logon_user->is_admin) {
-            return response()->json(['message' => 'You have no access rights to set user to do diagnostic','code'=>401], 401);
+        $authUser = Auth::user();
+        if (!$authUser->is_admin) {
+            return response()->json(['message' => 'Unauthorized access', 'code' => 401], 401);
         }
-        $user = User::findorfail($id);
-        $user->diagnostic = $user->diagnostic ? FALSE: TRUE;
-        $user->save();
-        return response()->json(['message' => 'Set Diagnostic for '.$user->name.' is done.', 'data' => $user, 'code' => 200]);
+
+        $user = User::findOrFail($id);
+        $user->update(['diagnostic' => !$user->diagnostic]);
+
+        return response()->json([
+            'message' => "Diagnostic mode " . ($user->diagnostic ? 'enabled' : 'disabled') . " for {$user->name}",
+            'user' => $user,
+            'code' => 200
+        ]);
     }
 
     /**
-     * Make an existing user an administrator.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Toggle administrator status
      */
     public function administrator($id)
     {
-        $logon_user = Auth::user();
-        if ($logon_user->id && !$logon_user->is_admin) {
-            return response()->json(['message' => 'You have no access rights to set user to be an admin','code'=>401], 401);
-        }
-        $user = User::findorfail($id);
-        $user->is_admin = $user->is_admin ? TRUE:FALSE;
-        $user->save();
-        return response()->json(['message' => 'Set Administrator for '.$user->name.' is done.', 'data' => $user, 'code' => 200]);
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show(User $user)
-    {
-        $logon_user = Auth::user();
-        if ($logon_user->id != $user->id && !$logon_user->is_admin) {
-            return response()->json(['message' => 'You have no access rights to view user','code'=>401], 401);
-        }
-        return response()->json(['user'=>$user, 'code'=>201], 201);
-    }
-
-    /**
-     * 2025/04/22 - updated for Flutter 
-     Update the specified resource in storage. 
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, User $user) {
-        $authUser = Auth::guard('sanctum')->user();
-
-        // Authorization check
-        if ($authUser->id !== $user->id && !$authUser->is_admin) {
-            return response()->json([
-                'message' => 'You do not have permission to update this user.',
-            ], 403);
-        }
-
-        // Optional: prevent unauthorized field updates
+        $authUser = Auth::user();
         if (!$authUser->is_admin) {
-            $request->request->remove('email');
-            $request->request->remove('maxile_level');
-            $request->request->remove('game_level');
+            return response()->json(['message' => 'Unauthorized access', 'code' => 401], 401);
         }
 
-        // Handle profile image update
-        if ($request->hasFile('image')) {
-            if ($user->image && file_exists(public_path(parse_url($user->image, PHP_URL_PATH)))) {
-                unlink(public_path(parse_url($user->image, PHP_URL_PATH)));
-            }
-
-            $filename = time() . '.png';
-            $request->file('image')->move(public_path('images/profiles'), $filename);
-            $user->image = url('/images/profiles/' . $filename);
-        }
-
-        // ✅ Capture pre-filled state
-        $wasMissingFirstnameAndDob = is_null($user->firstname) || is_null($user->date_of_birth);
-        $user->fill($request->except('image'));
-
-        // ✅ Check AFTER filling, using original state
-        if ($request->filled(['firstname', 'date_of_birth']) && $wasMissingFirstnameAndDob && is_null($user->lives)) {
-            $freePlan = Plan::find(1);
-            if ($freePlan && !is_null($freePlan->default_lives)) {
-                $user->lives = $freePlan->default_lives;
-            }
-        }
-
-        $user->save();
+        $user = User::findOrFail($id);
+        $user->update(['is_admin' => !$user->is_admin]);
 
         return response()->json([
-            'message' => 'User info updated successfully.',
+            'message' => "Administrator status " . ($user->is_admin ? 'granted' : 'revoked') . " for {$user->name}",
             'user' => $user,
-        ], 200);
+            'code' => 200
+        ]);
     }
-
 
     /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-  .   * @return \Illuminate\Http\Response
+     * Get user performance data
      */
-    public function destroy($id)
+    public function performance($id)
     {
-        $users = User::findorfail($id);
-        $logon_user = Auth::user();
-        if (!$logon_user->is_admin) {
-            return response()->json(['message' => 'You have no access rights to delete user', 'data'=>$user, 'code'=>401], 500);
-        }
-        if (count($users->enrolledClasses)>0) {
-            return response()->json(['message'=>'User has existing classes and cannot be deleted.'], 400);
-        }
-        $users->delete();
-        return response()->json(['message'=>'User has been deleted.'], 200);
+        return response()->json([
+            'message' => 'User performance retrieved',
+            'performance' => User::whereId($id)
+                ->with(['tracksPassed', 'completedTests', 'fieldMaxile', 'tracksFailed', 'incompletetests'])
+                ->first(),
+            'code' => 200
+        ]);
     }
 
-    public function game_score(GameScoreRequest $request)
+    /**
+     * Update game score
+     */
+    public function gameScore(Request $request)
     {
+        $validated = $request->validate([
+            'old_game_level' => 'required|integer',
+            'new_game_level' => 'required|integer'
+        ]);
+
         $user = Auth::user();
-        if ($request->old_game_level != $user->game_level) {
-            return response()->json(['message'=>'Old game score is incorrect. Cannot update new score', 'code'=>500], 500);
+        
+        if ($validated['old_game_level'] !== $user->game_level) {
+            return response()->json(['message' => 'Old game score mismatch', 'code' => 400], 400);
         }
-        $user->game_level = $request->new_game_level;
-        $user->save();
+
+        $user->update(['game_level' => $validated['new_game_level']]);
+
         return User::profile($user->id);
     }
 
-    public function performance($id)
-    {
-        return response()->json(['message'=>'User performance retrieved',
-            'performance'=>User::whereId($id)->with('tracksPassed','completedTests','fieldMaxile','tracksFailed','incompletetests')->get(),'code'=>200
-    ], 200);
-    }
-
-    public function subscriptionStatus(Request $request)
+    /**
+     * Get subscription status
+     */
+    public function subscriptionStatus()
     {
         $user = Auth::guard('sanctum')->user();
-
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
-        // Check if user has any valid enrolment (non-expired class)
+
         $activeEnrolments = $user->enrolledClasses()->exists();
-        $tracksData = App\Track::with([
-            'skills' => function ($query) {
-                $query->select('skills.*'); // Select only the columns from skills table
-            },
-            'users' => function ($query) {
-                $query->where('users.id', $this->user->id)->withPivot('doneNess');
-            }
-        ])->whereIn('id', $tracks->pluck('id'))->get();
-     
-         return response()->json([
+        
+        return response()->json([
             'active' => $activeEnrolments,
-            'tracks' => $trackData,
             'user' => $user,
         ]);
     }
 
+    /**
+     * Handle profile image upload
+     */
+    private function handleImageUpload(Request $request, User $user)
+    {
+        // Delete old image
+        if ($user->image && file_exists(public_path(parse_url($user->image, PHP_URL_PATH)))) {
+            unlink(public_path(parse_url($user->image, PHP_URL_PATH)));
+        }
+
+        $filename = time() . '.png';
+        $request->file('image')->move(public_path('images/profiles'), $filename);
+        $user->update(['image' => url('/images/profiles/' . $filename)]);
+    }
 }

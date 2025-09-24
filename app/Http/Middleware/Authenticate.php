@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Middleware;
-
 use Closure;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -19,15 +17,13 @@ class Authenticate
     public function handle($request, Closure $next, $guard = null)
     {
         if (Auth::guard($guard)->guest()) {
-            // 🧠 Return JSON if it's an API call
+            // Return JSON if it's an API call
             if ($request->expectsJson() || Str::startsWith($request->path(), 'api')) {
                 return response()->json(['message' => 'Unauthorized'], 401);
             }
-
-            // Default fallback (not needed for API-only, but harmless)
-            return redirect()->guest('login');
+            // Redirect to login route
+            return redirect()->guest(route('login'));
         }
-
         return $next($request);
     }
 }

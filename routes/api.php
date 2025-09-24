@@ -86,10 +86,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('quizzes/{quiz}/skills', [App\Http\Controllers\QuizSkillController::class, 'deleteSkills']);
 
     // === Skills Management ===
-    Route::apiResource('skills', App\Http\Controllers\SkillController::class);
-    Route::post('skills/{skills}/copy', [App\Http\Controllers\SkillController::class, 'copy']);
-    Route::get('skills/{skills}/passed', [App\Http\Controllers\SkillController::class, 'usersPassed']);
-    Route::post('skills/search', [App\Http\Controllers\SkillController::class, 'search']);
+  //  Route::apiResource('skills', App\Http\Controllers\SkillController::class);
+   // Route::post('skills/{skills}/copy', [App\Http\Controllers\SkillController::class, 'copy']);
+   // Route::get('skills/{skills}/passed', [App\Http\Controllers\SkillController::class, 'usersPassed']);
+//    Route::post('skills/search', [App\Http\Controllers\SkillController::class, 'search']);
     Route::apiResource('skills.questions', App\Http\Controllers\SkillQuestionsController::class);
 
     // === Track Management ===
@@ -113,23 +113,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loginInfo', [App\Http\Controllers\DiagnosticController::class, 'login']);
 
     // === System Resources ===
-    Route::apiResources([
-        'difficulties'   => App\Http\Controllers\DifficultyController::class,
-        'fields'         => App\Http\Controllers\FieldController::class,
-        'levels'         => App\Http\Controllers\LevelController::class,
-        'permissions'    => App\Http\Controllers\PermissionController::class,
-        'roles'          => App\Http\Controllers\RoleController::class,
-        'units'          => App\Http\Controllers\UnitController::class,
-        'types'          => App\Http\Controllers\TypeController::class,
-        'questions'      => App\Http\Controllers\QuestionController::class,
-        'enrolments'     => App\Http\Controllers\EnrolmentController::class,
-    ]);
+//    Route::apiResources([
+//        'difficulties'   => App\Http\Controllers\DifficultyController::class,
+//        'fields'         => App\Http\Controllers\FieldController::class,
+ //       'levels'         => App\Http\Controllers\LevelController::class,
+  //      'permissions'    => App\Http\Controllers\PermissionController::class,
+   //     'roles'          => App\Http\Controllers\RoleController::class,
+//        'units'          => App\Http\Controllers\UnitController::class,
+  //      'types'          => App\Http\Controllers\TypeController::class,
+  //      'questions'      => App\Http\Controllers\QuestionController::class,
+    //    'enrolments'     => App\Http\Controllers\EnrolmentController::class,
+    //]);
 
     // == Partners Management ==
   /*  Route::prefix('partners')->middleware('auth:sanctum')->group(function () {
         Route::get('/', [PartnerController::class, 'index']);
         Route::post('/', [PartnerController::class, 'store']);
-        Route::get('/{code}', [PartnerController::class, 'show']);
+        Route::('/{code}', [PartnerController::class, 'show']);
         Route::put('/{partner}', [PartnerController::class, 'update']);
         Route::delete('/{partner}', [PartnerController::class, 'destroy']);
     });
@@ -137,6 +137,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('partner/{partnerCode}/webhook', [PartnerWebhookController::class, 'handleStatusUpdate']);
 */
     // === Logs ===
-    Route::get('logs', [App\Http\Controllers\LogController::class, 'index']);
+ //   Route::get('logs', [App\Http\Controllers\LogController::class, 'index']);
 
 });

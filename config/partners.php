@@ -1,28 +1,36 @@
 <?php
-namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class Partner extends Model
-{
-    protected $fillable = [
-        'code', 'name', 'phone_prefixes', 'access_type', 'billing_method',
-        'default_lives', 'trial_duration_days', 'features', 'verification_required',
-        'auto_activate', 'api_key', 'webhook_secret', 'status_sync_url',
-        'is_active', 'config'
-    ];
-
-    protected $casts = [
-        'phone_prefixes' => 'array',
-        'features' => 'array',
-        'config' => 'array',
-        'verification_required' => 'boolean',
-        'auto_activate' => 'boolean',
-        'is_active' => 'boolean',
-    ];
-
-    public function users()
-    {
-        return $this->hasMany(User::class);
-    }
-}
+return [
+    'default' => [
+        'lives' => [
+            'enabled' => true,
+            'max_lives' => 3
+        ],
+        'features' => [
+            'show_correct_answers' => true,
+            'unlimited_retakes' => false
+        ],
+        'kudos' => [
+            'correct_base' => 1,
+            'correct_difficulty_multiplier' => 1,
+            'incorrect_consolation' => 0,
+            'streak_bonus_enabled' => false,
+            'streak_bonus_multiplier' => 0.1,
+            'time_bonus_enabled' => false,
+            'time_bonus_multiplier' => 0.2,
+            'time_bonus_threshold' => 60
+        ]
+    ],
+    
+    'telco' => [
+        'default' => [
+            'lives' => ['enabled' => true, 'max_lives' => 5]
+        ]
+    ],
+    
+    'schools' => [
+        'default' => [
+            'lives' => ['enabled' => false]
+        ]
+    ]
+];

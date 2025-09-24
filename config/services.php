@@ -24,5 +24,8 @@ return [
         'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
         'redirect' => env('FACEBOOK_REDIRECT_URI', 'http://localhost:8000/callback'),
     ],
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+    ],
 
 ];

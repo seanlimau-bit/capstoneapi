@@ -9,7 +9,7 @@ class KudosService
      */
     public static function calculateKudos($user, $question, $correct, $timeTaken = null, $streakCount = 0)
     {
-        $config = PartnerConfigService::getConfig($user);
+        $config = LiveService::getConfig($user); // Changed from PartnerConfigService
         $kudosConfig = $config['kudos'];
         
         if (!$correct) {
@@ -76,7 +76,7 @@ class KudosService
      */
     public static function getKudosConfig($user)
     {
-        $config = PartnerConfigService::getConfig($user);
+        $config = LiveService::getConfig($user); // Changed from PartnerConfigService
         return $config['kudos'] ?? [];
     }
     
@@ -112,7 +112,7 @@ class KudosService
      */
     public static function calculatePotentialKudos($user, $question, $streakCount = 0)
     {
-        $config = PartnerConfigService::getConfig($user);
+        $config = LiveService::getConfig($user); // Changed from PartnerConfigService
         $kudosConfig = $config['kudos'];
         
         $baseKudos = $kudosConfig['correct_base'] ?? 1;
@@ -149,7 +149,7 @@ class KudosService
      */
     public static function getKudosBreakdown($user, $question, $correct, $timeTaken = null, $streakCount = 0)
     {
-        $config = PartnerConfigService::getConfig($user);
+        $config = LiveService::getConfig($user); // Changed from PartnerConfigService
         $kudosConfig = $config['kudos'];
         
         if (!$correct) {

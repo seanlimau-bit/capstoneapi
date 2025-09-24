@@ -9,7 +9,6 @@ use App\QuestionUser;
 use App\Test;
 use App\TestUser;
 use App\Level;
-use App\Services\PartnerConfigService;
 use App\Services\LivesService;
 use App\Services\KudosService;
 use DateTime;
@@ -289,7 +288,7 @@ class AnswerController extends Controller
      */
     private function getPartnerInfo($user)
     {
-        $config = PartnerConfigService::getConfig($user);
+        $config = LiveService::getConfig($user);  // Changed from PartnerConfigService
         
         return [
             'lives_enabled' => $config['lives']['enabled'],
