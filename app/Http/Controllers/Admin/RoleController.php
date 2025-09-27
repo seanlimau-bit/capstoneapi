@@ -2,92 +2,169 @@
 
 namespace App\Http\Controllers\Admin;
 
-use Illuminate\Http\Request;
-
-use App\Http\Requests;
 use App\Http\Controllers\Controller;
-use App\Role;
-use App\Http\Requests\CreateRoleRequest;
-use Auth;
-
+use Illuminate\Http\Request;
+// If your Role model lives in App\Role, change this import accordingly:
+use App\Models\Role;
 
 class RoleController extends Controller
 {
     /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
+     * List roles (Blade by default; JSON for XHR).
      */
-    public function index()
+    public function index(Request $request)
     {
-        $user = Auth::user();
-        return response()-> json(['message' => 'Request executed successfully', 'roles'=>Role::all()],200);
+        $roles = Role::withCount('users')->orderBy('id')->get();
 
-        //return response()->json(['levels'=>$levels],200);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\CreateRoleRequest  $role
-     * @return \Illuminate\Http\Response
-     */
-    public function store(CreateRoleRequest $request)
-    {
-        $user = Auth::user();
-        if (!$user->is_admin){
-            return response()->json(['message'=>'Only administrators can create a new role', 'code'=>403],403);
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Roles retrieved successfully.',
+                'data'    => $roles,
+            ], 200);
         }
-        $values = $request->all();
 
-        $role = Role::create($values);
-
-        return response()->json(['message'=>'Role is now added','code'=>201, 'role' => $role], 201);
+        // If roles are shown on your configuration page, you likely render that page elsewhere.
+        return view('admin.roles.index', compact('roles'));
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  Role $role
-     * @return \Illuminate\Http\Response
+     * Show create form (optional if you add via modal/AJAX).
      */
-    public function show(Role $role)
+    public function create()
     {
-        return response()->json(['message' =>'Successful retrieval of role.', 'role'=>$role, 'code'=>201], 201);
+        return view('admin.roles.create');
     }
 
- /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  Role  $role
-     * @return \Illuminate\Http\Response
+    /**
+     * Store role. Authorization handled by route middleware (auth + admin).
+     * If you have a FormRequest (CreateRoleRequest), swap it in and use ->validated().
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'role'        => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $role = Role::create($validated);
+
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Role created successfully.',
+                'data'    => $role,
+            ], 201);
+        }
+
+        return redirect()->route('admin.roles.index')->with('success', 'Role created successfully.');
+    }
+
+    /**
+     * Show single role.
+     */
+    public function show(Request $request, Role $role)
+    {
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Role retrieved successfully.',
+                'data'    => $role,
+            ], 200);
+        }
+
+        return view('admin.roles.show', compact('role'));
+    }
+
+    /**
+     * Edit form (optional).
+     */
+    public function edit(Role $role)
+    {
+        return view('admin.roles.edit', compact('role'));
+    }
+
+    /**
+     * Update role.
      */
     public function update(Request $request, Role $role)
-    {   
-        $logon_user = Auth::user();
-        if ($logon_user->id != $role->user_id && !$logon_user->is_admin) {            
-            return response()->json(['message' => 'You have no access rights to update role','code'=>401], 401);     
+    {
+        $validated = $request->validate([
+            'role'        => ['sometimes', 'required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $role->fill($validated)->save();
+
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Role updated successfully.',
+                'data'    => $role->refresh(),
+            ], 200);
         }
 
-        $role->fill($request->all())->save();
-
-        return response()->json(['message'=>'Role updated','role' => $role, 201], 201);
+        return redirect()->route('admin.roles.index')->with('success', 'Role updated successfully.');
     }
 
-     /**
-     * Remove the specified resource from storage.
-     *
-     * @param  Role  $role
-     * @return \Illuminate\Http\Response
+    /**
+     * Delete role.
      */
-    public function destroy(Role $role)
+    public function destroy(Request $request, Role $role)
     {
-        $logon_user = Auth::user();
-        if (!$logon_user->is_admin) {            
-            return response()->json(['message' => 'You have no access rights to delete role','code'=>401], 401);
-        } 
         $role->delete();
-        return response()->json(['message'=>'This role has been deleted','code'=>201], 201);
+
+        if ($this->wantsJson($request)) {
+            return response()->json(null, 204);
+        }
+
+        return redirect()->route('admin.roles.index')->with('success', 'Role deleted successfully.');
+    }
+
+    /**
+     * GET /admin/roles/{role}/permissions
+     * Your Blade calls this to load the checkboxes.
+     * Return an array of permission strings the role currently has.
+     */
+    public function permissions(Request $request, Role $role)
+    {
+        // Adjust to your storage: e.g., $role->permissions()->pluck('name')->toArray()
+        $perms = method_exists($role, 'permissions')
+            ? $role->permissions()->pluck('name')->toArray()
+            : (array) ($role->permissions ?? []); // if stored as JSON column
+
+        return response()->json([
+            'permissions' => $perms,
+        ], 200);
+    }
+
+    /**
+     * POST /admin/roles/{role}/permissions
+     * Save selected permissions coming from your modal.
+     */
+    public function savePermissions(Request $request, Role $role)
+    {
+        $permissions = (array) $request->input('permissions', []);
+
+        // Persist according to your design:
+        // - via pivot: sync permission IDs by mapping names->ids
+        // - or JSON column on roles: $role->permissions = $permissions;
+        if (method_exists($role, 'permissions')) {
+            // Example if you have a Permission model with 'name' field:
+            // $ids = \App\Models\Permission::whereIn('name', $permissions)->pluck('id')->toArray();
+            // $role->permissions()->sync($ids);
+            // For now, stub to avoid breaking:
+            $role->setAttribute('permissions', $permissions);
+        } else {
+            $role->setAttribute('permissions', $permissions);
+        }
+
+        $role->save();
+
+        return response()->json(['message' => 'Permissions updated.'], 200);
+    }
+
+    /**
+     * Helper to decide JSON vs Blade.
+     */
+    protected function wantsJson(Request $request): bool
+    {
+        return $request->expectsJson() || $request->ajax();
     }
 }

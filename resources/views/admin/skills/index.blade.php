@@ -1,590 +1,432 @@
 @extends('layouts.admin')
-
-@section('title', 'Skills Management')
+@section('title','Skills Management')
 
 @push('styles')
 <style>
-    .filtered-out { display: none !important; }
-    .search-highlight { background: yellow; font-weight: bold; }
-    .option-card { cursor: pointer; border: 2px solid transparent; transition: border-color .15s, box-shadow .15s; }
-    .option-card:hover { border-color: #0d6efd; box-shadow: 0 0 8px rgba(13,110,253,.15); }
-    .option-card.active { border-color: #0d6efd; background-color: #f0f7ff; }
+  .img-picker{position:relative;display:inline-block}
+  .img-picker img{width:60px;height:46px;object-fit:cover;border:2px solid #dee2e6;border-radius:6px;cursor:pointer;transition:border-color .15s}
+  .img-picker img:hover{border-color:var(--primary-color,#0d6efd)}
+  .img-picker .btn-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;padding:0;border-radius:50%;background:#dc3545;color:#fff;border:2px solid #fff;display:none}
+  .img-picker:hover .btn-remove{display:block}
+
+  .pick-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1055;overflow:auto}
+  .pick-modal .content{background:#fff;margin:5% auto;padding:20px;width:92%;max-width:1000px;border-radius:10px}
+  .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:460px;overflow:auto;padding:10px;border:1px solid #dee2e6;border-radius:6px}
+  .pick-item{border:2px solid transparent;border-radius:8px;padding:4px;transition:all .12s;cursor:pointer;outline:0}
+  .pick-item:hover{border-color:var(--primary-color,#0d6efd);transform:scale(1.02)}
+  .pick-item:focus{box-shadow:0 0 0 3px rgba(13,110,253,.3)}
+  .pick-item.selected{border-color:var(--primary-color,#0d6efd);box-shadow:0 0 8px rgba(13,110,253,.4)}
+  .pick-item img,.pick-item video{width:100%;height:110px;object-fit:cover;border-radius:6px}
+
+  th.sortable{cursor:pointer;user-select:none}
+  td [contenteditable]{outline:0}
+  .ce-dirty{background:rgba(255,193,7,.15)}
+  .nowrap{white-space:nowrap}
+  #pageSpin{position:fixed;inset:0;background:rgba(255,255,255,.6);display:none;align-items:center;justify-content:center;z-index:1050}
+  #pageSpin.show{display:flex}
 </style>
 @endpush
 
 @section('content')
 <div class="container-fluid">
-    {{-- Page Header --}}
-    @include('admin.components.page-header', [
-    'title' => 'Skills Management',
-    'subtitle' => 'Manage learning skills and their content',
-    'icon' => 'brain',
-    'actions' => [['text' => 'Create New Skill', 'url' => route('admin.skills.create'), 'icon' => 'plus', 'class' => 'primary']]
-    ])
-
-    {{-- Statistics Row --}}
-    @include('admin.components.stats-row', [
-    'stats' => [
-    ['value' => $skills->count(), 'label' => 'Total Skills', 'color' => 'primary', 'icon' => 'brain', 'id' => 'totalskillsCount'],
-    ['value' => $skills->where('status_id', 3)->count(), 'label' => 'Active Skills', 'color' => 'success', 'icon' => 'check-circle', 'id' => 'activeskillsCount'],
-    ['value' => $skills->where('status_id', 4)->count(), 'label' => 'Draft Skills', 'color' => 'warning', 'icon' => 'edit', 'id' => 'draftskillsCount'],
-    ['value' => $skills->sum('questions_count'), 'label' => 'Total Questions', 'color' => 'info', 'icon' => 'question-circle', 'id' => 'totalquestionsCount']
-    ]
-    ])
-
-    {{-- Filters --}}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between">
-            <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filters</h6>
-            <div>
-                <span id="resultsCount" class="badge bg-primary me-2">{{ $skills->count() }} results</span>
-                <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">Clear All</button>
-            </div>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <select id="trackFilter" class="form-select">
-                        <option value="">All Tracks</option>
-                        @foreach($skills->pluck('tracks')->flatten()->unique('id')->sortBy('track') as $track)
-                        <option value="{{ $track->id }}">{{ $track->track }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select id="levelFilter" class="form-select">
-                        <option value="">All Levels</option>
-                        @foreach($skills->pluck('tracks')->flatten()->pluck('level')->whereNotNull()->unique('id')->sortBy('level') as $level)
-                        <option value="{{ $level->id }}">{{ $level->description }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select id="statusFilter" class="form-select">
-                        <option value="">All Status</option>
-                        @foreach($skills->pluck('status')->filter()->unique('id')->sortBy('status') as $status)
-                        <option value="{{ $status->id }}">{{ $status->status }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select id="questionsFilter" class="form-select">
-                        <option value="">Any Questions</option>
-                        <option value="has">Has Questions</option>
-                        <option value="none">No Questions</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <input type="search" id="searchBox" class="form-control" placeholder="Search skills...">
-                </div>
-            </div>
-        </div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h5 mb-1">Skills Management</h1>
+      <div class="text-muted">Images: <code>public/images/skills</code>, Videos: <code>public/videos</code></div>
     </div>
-
-    {{-- Skills Table --}}
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">Skills Overview</h5>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Skill</th>
-                            <th>Tracks & Levels</th>
-                            <th>Content</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($skills as $skill)
-                        <tr class="skill-row" 
-                        data-id="{{ $skill->id }}"
-                        data-name="{{ strtolower($skill->skill) }}"
-                        data-desc="{{ strtolower($skill->description ?? '') }}"
-                        data-status="{{ $skill->status_id }}"
-                        data-tracks="{{ $skill->tracks->pluck('id')->implode(',') }}"
-                        data-levels="{{ $skill->tracks->pluck('level.id')->filter()->implode(',') }}"
-                        data-questions="{{ $skill->questions ? $skill->questions->count() : 0 }}">
-                        <td>
-                            <div>
-                                <h6 class="mb-0 skill-name">{{ $skill->skill }}</h6>
-                                <small class="text-muted skill-desc">
-                                    @if(strlen($skill->description ?? '') > 60)
-                                    {{ substr($skill->description, 0, 60) }}...
-                                    @else
-                                    {{ $skill->description }}
-                                    @endif
-                                </small>
-                            </div>
-                        </td>
-                        <td>
-                            @forelse($skill->tracks->take(2) as $track)
-                            <span class="badge bg-info me-1">
-                                {{ $track->track }}{{ $track->level ? ' ('.$track->level->description.')' : '' }}
-                            </span>
-                            @empty
-                            <span class="text-muted">No tracks</span>
-                            @endforelse
-                            @if($skill->tracks->count() > 2)
-                            <span class="badge bg-secondary">+{{ $skill->tracks->count() - 2 }}</span>
-                            @endif
-                        </td>
-                        <td>
-                            @if($skill->questions && $skill->questions->count() > 0)
-                            <span class="badge bg-primary">{{ $skill->questions->count() }} Questions</span>
-                            @else
-                            <span class="text-muted">No questions</span>
-                            @endif
-                        </td>
-                        <td>
-                            @if($skill->status)
-                            <span class="badge bg-{{ $skill->status->status === 'active' ? 'success' : 'warning' }}">
-                                {{ ucfirst($skill->status->status) }}
-                            </span>
-                            @else
-                            <span class="badge bg-secondary">Unknown</span>
-                            @endif
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{{ route('admin.skills.show', $skill) }}" class="btn btn-outline-info" title="View">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <button class="btn btn-outline-success" onclick="showBulkQuestions({{ $skill->id }})" title="Add Questions">
-                                    <i class="fas fa-plus-circle"></i>
-                                </button>
-                                <button class="btn btn-outline-danger" onclick="deleteSkill({{ $skill->id }})" title="Delete">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="5" class="text-center py-5">
-                            @include('admin.components.empty-state', [
-                            'icon' => 'brain',
-                            'title' => 'No skills found',
-                            'message' => 'Create your first skill to get started'
-                            ])
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div id="noResults" class="d-none text-center py-5">
-            @include('admin.components.empty-state', [
-            'icon' => 'search',
-            'title' => 'No skills found',
-            'message' => 'Try adjusting your search filters'
-            ])
-        </div>
-    </div>
-</div>
-</div>
-
-{{-- Inline Question Generation Modal (two options) --}}
-<div class="modal fade" id="questionGenerationModal" tabindex="-1" aria-labelledby="questionGenerationModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title" id="questionGenerationModalLabel">
-          <i class="fas fa-pen me-2"></i> Generate Questions for:
-      </h5>
-      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <a class="btn btn-primary" href="{{ route('admin.skills.create') }}"><i class="fas fa-plus me-1"></i>Create New Skill</a>
   </div>
 
-  <div class="modal-body">
-    {{-- Skill context --}}
-    <input type="hidden" id="currentSkillId">
-    <div class="border rounded p-3 mb-3 bg-light">
-      <div class="d-flex align-items-center mb-2">
-        <i class="fas fa-info-circle me-2 text-primary"></i>
-        <strong>Skill Context</strong>
+  <div class="row g-2 mb-3">
+    <div class="col-md-2"><select class="form-select" id="trackFilter"><option value="">All Tracks</option></select></div>
+    <div class="col-md-2"><select class="form-select" id="levelFilter"><option value="">All Levels</option></select></div>
+    <div class="col-md-2"><select class="form-select" id="statusFilter"><option value="">All Status</option></select></div>
+    <div class="col-md-4"><input type="search" class="form-control" id="searchInput" placeholder="Search skills, ids..."></div>
+    <div class="col-md-2 d-grid"><button class="btn btn-outline-secondary" id="btnClear">Clear</button></div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0" id="grid">
+        <thead class="table-light">
+          <tr>
+            <th class="sortable nowrap" data-sort="id">ID</th>
+            <th class="nowrap">Image</th>
+            <th class="nowrap">Videos</th>
+            <th class="sortable" data-sort="skill">Skill</th>
+            <th class="sortable" data-sort="description">Description</th>
+            <th class="sortable nowrap" data-sort="user_id">User</th>
+            <th class="sortable nowrap" data-sort="status_id">Status</th>
+            <th class="sortable nowrap" data-sort="created_at">Created</th>
+            <th class="sortable nowrap" data-sort="updated_at">Updated</th>
+            <th width="150">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
     </div>
-    <div class="small">
-        <div><strong>Skill:</strong> <span id="skillNameDisplay"></span></div>
-        <div class="text-muted"><strong>Description:</strong> <span id="skillDescriptionDisplay"></span></div>
-        <div class="text-muted"><strong>Current No. of Questions:</strong> <span id="currentQuestionsDisplay"></span></div>
+    <div class="card-footer d-flex justify-content-between small">
+      <span>Showing <span id="info-start">0</span>–<span id="info-end">0</span> of <span id="info-total">0</span></span>
+      <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
     </div>
+  </div>
 </div>
 
-{{-- Form: Generate from Skills --}}
-<form id="form_generate_skills" class="d-none">
-  <input type="hidden" name="skill_id" id="form_skill_id" value="">
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      <label class="form-label">How many questions?</label>
-      <select class="form-select" name="question_count">
-        <option value="5">5</option>
-        <option value="10" selected>10</option>
-        <option value="15">15</option>
-        <option value="20">20</option>
-        <option value="25">25</option>
-        <option value="30">30</option>
-    </select>
-</div>
-<div class="col-md-6 mb-3">
-  <label class="form-label">Difficulty</label>
-  <select class="form-select" name="difficulty_distribution">
-    <option value="auto" selected>Auto (Mixed)</option>
-    <option value="easy">Easy</option>
-    <option value="medium">Medium</option>
-    <option value="hard">Hard</option>
-    <option value="progressive">Progressive (Easy→Hard)</option>
-</select>
-</div>
-</div>
-<div class="mb-3">
-    <label class="form-label">Additional instructions (optional)</label>
-    <textarea class="form-control" name="focus_areas" rows="3" placeholder="e.g., emphasise real-world use, include edge cases"></textarea>
-</div>
-<div class="form-check form-switch mb-2">
-    <input class="form-check-input" type="checkbox" id="include_explanations_sk" name="include_explanations" checked>
-    <label class="form-check-label" for="include_explanations_sk">Include explanations</label>
-</div>
-
-<input type="hidden" name="generation_method" value="ai">
-<input type="hidden" name="question_types" value="mixed">
-</form>
-
-{{-- Form: Generate from Questions (Variations) --}}
-<form id="form_generate_questions" class="d-none">
-  <input type="hidden" name="skill_id" value="">
-  <div class="mb-3">
-    <label class="form-label">Original Question ID</label>
-    <input type="text" class="form-control" name="question_id" id="form_question_id" placeholder="Paste question ID or leave blank to fill from list">
-    <div class="small text-muted mt-1">When opened from a question row the ID will be prefilled.</div>
-</div>
-
-<div class="row">
-    <div class="col-md-6 mb-3">
-      <label class="form-label">How many variations?</label>
-      <select class="form-select" name="question_count">
-        <option value="3" selected>3</option>
-        <option value="5">5</option>
-        <option value="8">8</option>
-        <option value="10">10</option>
-        <option value="15">15</option>
-        <option value="20">20</option>
-    </select>
-</div>
-<div class="col-md-6 mb-3">
-  <label class="form-label">Target difficulty</label>
-  <select class="form-select" name="difficulty_distribution">
-    <option value="same">Same as original</option>
-    <option value="mixed" selected>Mixed</option>
-    <option value="easy">Easy</option>
-    <option value="medium">Medium</option>
-    <option value="hard">Hard</option>
-    <option value="progressive">Progressive (Easy→Hard)</option>
-</select>
-</div>
-</div>
-
-<div class="mb-3">
-    <label class="form-label">Additional instructions (optional)</label>
-    <textarea class="form-control" name="focus_areas" rows="3" placeholder="e.g., more applied scenarios, trick options, etc."></textarea>
-</div>
-<input type="hidden" name="generation_method" value="ai_variation">
-<input type="hidden" name="question_types" value="same">
-</form>
-
-{{-- Progress area --}}
-<div id="generation_progress" class="d-none">
-  <div class="d-flex align-items-center mb-2">
-    <div class="spinner-border me-3" role="status"><span class="visually-hidden">Loading…</span></div>
-    <div class="flex-grow-1">
-      <div class="d-flex justify-content-between mb-1">
-        <span class="fw-semibold">Generating…</span>
-        <span id="generation_pct">0%</span>
+<!-- Image Picker -->
+<div class="pick-modal" id="imgPicker" aria-modal="true" role="dialog">
+  <div class="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">Select Skill Image</h5>
+      <button class="btn-close" type="button" id="imgClose"></button>
     </div>
-    <div class="progress">
-        <div class="progress-bar" id="generation_bar" style="width:0%"></div>
+    <div class="row g-2">
+      <div class="col-md-8"><input type="search" class="form-control" id="imgSearch" placeholder="Search images..."></div>
+      <div class="col-md-4 text-end">
+        <button class="btn btn-outline-danger" id="imgRemove"><i class="fas fa-trash me-1"></i>Remove Image</button>
+      </div>
     </div>
-</div>
-</div>
-<div class="small text-muted" id="generation_msgs"><div>Starting…</div></div>
+    <div class="pick-grid mt-3" id="imgGrid"></div>
+    <div class="mt-3 d-flex justify-content-end gap-2">
+      <button class="btn btn-secondary" id="imgCancel">Cancel</button>
+      <button class="btn btn-primary" id="imgSelect">Select</button>
+    </div>
+  </div>
 </div>
 
+<!-- Video Picker (filesystem) -->
+<div class="pick-modal" id="vidPicker" aria-modal="true" role="dialog">
+  <div class="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">Choose a Video (from /public/videos)</h5>
+      <button class="btn-close" type="button" id="vidClose"></button>
+    </div>
+    <div class="row g-2">
+      <div class="col-md-8"><input type="search" class="form-control" id="vidSearch" placeholder="Filter by filename/path..."></div>
+      <div class="col-md-4 text-end">
+        <button class="btn btn-outline-secondary" id="vidRefresh"><i class="fas fa-rotate me-1"></i>Refresh</button>
+      </div>
+    </div>
+    <div class="pick-grid mt-3" id="vidGrid"></div>
+    <div class="mt-3 d-flex justify-content-end gap-2">
+      <button class="btn btn-secondary" id="vidCancel">Cancel</button>
+      <button class="btn btn-primary" id="vidSelect">Attach</button>
+    </div>
+  </div>
 </div>
 
-<div class="modal-footer">
-    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-    <button type="button" class="btn btn-primary" id="generation_submit" disabled>
-      <i class="fas fa-magic me-2"></i> Generate
-  </button>
+<!-- Video Player Modal -->
+<div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header">
+      <h5 class="modal-title">Preview Video</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <video id="playVideo" class="w-100 rounded" controls playsinline preload="metadata" style="max-height:70vh"></video>
+    </div>
+  </div></div>
 </div>
-</div>
-</div>
-</div>
-{{-- End modal --}}
 
+<div id="pageSpin"><div class="spinner-border text-primary"></div></div>
 @endsection
 
 @push('scripts')
 <script>
-    /* ---------- existing table + filter code (unchanged) ---------- */
-    const skills = Array.from(document.querySelectorAll('.skill-row')).map(row => ({
-        element: row,
-        id: row.dataset.id,
-        name: row.dataset.name,
-        desc: row.dataset.desc,
-        status: row.dataset.status,
-        tracks: row.dataset.tracks.split(',').filter(Boolean),
-        levels: row.dataset.levels.split(',').filter(Boolean),
-        questions: parseInt(row.dataset.questions)
-    }));
+(() => {
+  const CSRF=document.querySelector('meta[name="csrf-token"]')?.content;
+  const $ = s=>document.querySelector(s);
+  const $$= s=>Array.from(document.querySelectorAll(s));
+  const esc=s=>{const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML};
+  const fmtDate=v=>v?new Date(v).toLocaleString('en-GB',{year:'numeric',month:'short',day:'2-digit'}):'';
+  const debounce=(fn,ms=300)=>{let t; return (...a)=>{clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
+  const toast=(m,t='info')=>window.showToast?window.showToast(m,t):console.log(`${t}: ${m}`);
+  const url=(base,p={})=>{const u=new URL(base,location.origin); Object.entries(p).forEach(([k,v])=>v!==''&&v!=null&&u.searchParams.set(k,v)); return u.toString()};
+  const spin={cnt:0,show(){if(++this.cnt===1) $('#pageSpin').classList.add('show')},hide(){if(this.cnt>0&&--this.cnt===0) $('#pageSpin').classList.remove('show')}};
 
-    let filtered = [...skills];
+  const api={
+    list:p=>fetch(url('/admin/skills',p),{headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}}).then(r=>r.json()),
+    patch:(id,body)=>fetch(`/admin/skills/${id}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':CSRF},
+      body:new URLSearchParams({_method:'PATCH', ...Object.fromEntries(Object.entries(body).filter(([,v])=>v!==undefined))})
+    }).then(async r=>r.ok?r.json():Promise.reject((await r.json().catch(()=>({}))).message||`HTTP ${r.status}`)),
+    del:id=>fetch(`/admin/skills/${id}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':CSRF},
+      body:new URLSearchParams({_method:'DELETE'})
+    }).then(r=>r.json()),
+    maps:()=>fetch('/admin/skills/maps',{headers:{Accept:'application/json'}}).then(r=>r.json()),
+    // filesystem browse
+    videosBrowse:(p)=>fetch(url('/admin/videos/browse',p),{headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}}).then(r=>r.json()),
+    // link by path (backend will find-or-create Video row)
+    linkVideo:(skillId, body)=>fetch(`/admin/skills/${skillId}/link-video`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':CSRF},
+      body:new URLSearchParams(body)
+    }).then(r=>r.json()),
+    detachVideo:(skillId, videoId)=>fetch(`/admin/skills/${skillId}/videos/${videoId}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':CSRF},
+      body:new URLSearchParams({_method:'DELETE'})
+    }).then(r=>r.json()),
+  };
 
-    ['trackFilter', 'levelFilter', 'statusFilter', 'questionsFilter'].forEach(id => {
-        document.getElementById(id)?.addEventListener('change', applyFilters);
-    });
-    document.getElementById('searchBox')?.addEventListener('input', debounce(applyFilters, 300));
+  const S={rows:[],page:1,pages:1,per:20,total:0,sort:'id',dir:'asc',
+           maps:{tracks:{},levels:{},statuses:{}},
+           images:[], imgRow:null, vidRow:null, vidsCache:[], videoModal:null};
 
-    function applyFilters() {
-        const filters = {
-            track: document.getElementById('trackFilter').value,
-            level: document.getElementById('levelFilter').value,
-            status: document.getElementById('statusFilter').value,
-            questions: document.getElementById('questionsFilter').value,
-            search: document.getElementById('searchBox').value.toLowerCase()
-        };
+  const el={
+    tbody:$('#tbody'), pag:$('#pagination'),
+    info:{s:$('#info-start'),e:$('#info-end'),t:$('#info-total')},
+    filters:{track:$('#trackFilter'),level:$('#levelFilter'),status:$('#statusFilter'),search:$('#searchInput')},
+    btnClear:$('#btnClear'), head:document.querySelector('#grid thead'),
+    // image picker
+    img:{modal:$('#imgPicker'),grid:$('#imgGrid'),search:$('#imgSearch'),select:$('#imgSelect'),remove:$('#imgRemove'),close:$('#imgClose'),cancel:$('#imgCancel')},
+    // video picker
+    vid:{modal:$('#vidPicker'),grid:$('#vidGrid'),search:$('#vidSearch'),select:'#vidSelect',close:$('#vidClose'),cancel:$('#vidCancel'),refresh:$('#vidRefresh')},
+    videoWrap:$('#videoModal'), playVideo:$('#playVideo')
+  };
 
-        filtered = skills.filter(skill => {
-            if (filters.track && !skill.tracks.includes(filters.track)) return false;
-            if (filters.level && !skill.levels.includes(filters.level)) return false;
-            if (filters.status && skill.status !== filters.status) return false;
-            if (filters.questions === 'has' && skill.questions === 0) return false;
-            if (filters.questions === 'none' && skill.questions > 0) return false;
-            if (filters.search && !skill.name.includes(filters.search) && !skill.desc.includes(filters.search)) return false;
-            return true;
-        });
+  document.addEventListener('DOMContentLoaded', init);
 
-        skills.forEach(skill => skill.element.classList.toggle('filtered-out', !filtered.includes(skill)));
-        document.getElementById('resultsCount').textContent = `${filtered.length} results`;
-        document.getElementById('noResults').classList.toggle('d-none', filtered.length > 0);
+  async function init(){
+    S.videoModal = new bootstrap.Modal(el.videoWrap);
+    bind();
+    spin.show();
+    await loadMaps();
+    await load(1);
+    await loadImages(); // optional if you have /admin/assets/list for images
+    spin.hide();
+  }
 
-        updateStats();
-        highlightSearch(filters.search);
-    }
-
-    function updateStats() {
-        document.getElementById('totalskillsCount').textContent = filtered.length;
-        document.getElementById('activeskillsCount').textContent = filtered.filter(s => s.status === '3').length;
-        document.getElementById('draftskillsCount').textContent = filtered.filter(s => s.status === '4').length;
-        document.getElementById('totalquestionsCount').textContent = filtered.reduce((sum, s) => sum + s.questions, 0);
-    }
-
-    function highlightSearch(term) {
-        document.querySelectorAll('.search-highlight').forEach(el => el.outerHTML = el.textContent);
-        if (term) {
-            const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-            document.querySelectorAll('.skill-name, .skill-desc').forEach(el => {
-                el.innerHTML = el.textContent.replace(regex, '<span class="search-highlight">$1</span>');
-            });
-        }
-    }
-
-    function clearFilters() {
-        ['trackFilter', 'levelFilter', 'statusFilter', 'questionsFilter', 'searchBox'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        applyFilters();
-    }
-
-    function debounce(func, wait) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
-
-    /* ---------- modal + generation UI logic (new) ---------- */
-
-    function showBulkQuestions(skillId) {
-        fetch(`/admin/skills/${skillId}/data`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                // populate context area
-                document.getElementById('currentSkillId').value = data.skill.id;
-                document.getElementById('skillNameDisplay').textContent = data.skill.skill;
-                document.getElementById('skillDescriptionDisplay').textContent = data.skill.description || 'No description';
-                document.getElementById('currentQuestionsDisplay').textContent = data.skill.questions_count || 0;
-
-                // set form skill ids
-                document.getElementById('form_skill_id').value = data.skill.id;
-                openGenerationModal({ mode: 'skills' });
-            } else {
-                alert('Failed to load skill data');
-            }
-        })
-        .catch(() => alert('Error loading skill data'));
-    }
-
-    function deleteSkill(skillId) {
-        if (confirm('Delete this skill?')) {
-            fetch(`/admin/skills/${skillId}`, {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-            })
-            .then(r => r.json())
-            .then(data => data.success ? location.reload() : alert('Error deleting skill'));
-        }
-    }
-
-    /* GENERATION MODAL HANDLERS */
-    (function() {
-        const modalId = 'questionGenerationModal';
-        const picker = document.getElementById('generationPicker');
-        const cards = picker?.querySelectorAll('[data-method]') || [];
-        const formSkills = document.getElementById('form_generate_skills');
-        const progressBox = document.getElementById('generation_progress');
-        const bar = document.getElementById('generation_bar');
-        const pct = document.getElementById('generation_pct');
-        const msgs = document.getElementById('generation_msgs');
-        const submitBtn = document.getElementById('generation_submit');
-
-        let selectedMethod = null;
-        let genInterval = null;
-
-        function enableSubmit(enable) {
-            submitBtn.disabled = !enable;
-        }
-
-        function resetGenerationUI() {
-        // hide progress, show appropriate form
-        progressBox.classList.add('d-none');
-        bar.style.width = '0%';
-        pct.textContent = '0%';
-        msgs.innerHTML = '<div>Starting…</div>';
-        enableSubmit(selectedMethod !== null);
-    }
-
-    function showFormFor(method) {
-        selectedMethod = method;
-        formSkills.classList.toggle('d-none', method !== 'skills');
-        cards.forEach(c => { c.classList.toggle('active', c.dataset.method === method); });
-        enableSubmit(true);
-    }
-
-    // picker click
-    picker?.addEventListener('click', (e) => {
-        const tile = e.target.closest('[data-method]');
-        if (!tile) return;
-        showFormFor(tile.dataset.method);
-        resetGenerationUI();
+  function bind(){
+    el.head.addEventListener('click',e=>{
+      const th=e.target.closest('.sortable'); if(!th) return;
+      const k=th.dataset.sort; S.dir=(S.sort===k&&S.dir==='asc')?'desc':'asc'; S.sort=k; drawSortIcons(); load(1);
     });
 
-    // open helper (used by showBulkQuestions and other callers)
-    window.openGenerationModal = function({ mode = null, questionId = null, questionText = '', skillId = null } = {}) {
-        // prefill skill id for forms
-        if (skillId) {
-            document.getElementById('form_skill_id').value = skillId;
-        }
-        // default selection
-        const defaultMode = mode ? mode : (questionId ? 'questions' : 'skills');
-        showFormFor(defaultMode);
-        resetGenerationUI();
+    ['track','level','status'].forEach(k=>el.filters[k].addEventListener('change',()=>load(1)));
+    el.filters.search.addEventListener('input',debounce(()=>load(1),250));
+    el.btnClear.addEventListener('click',()=>{el.filters.track.value=el.filters.level.value=el.filters.status.value=''; el.filters.search.value=''; S.sort='id'; S.dir='asc'; drawSortIcons(); load(1);});
 
-        new bootstrap.Modal(document.getElementById(modalId)).show();
-    };
+    el.tbody.addEventListener('focusin',e=>{const ce=e.target.closest('[contenteditable]'); if(ce) ce.dataset.prev=ce.textContent.trim();});
+    el.tbody.addEventListener('keydown',e=>{const ce=e.target.closest('[contenteditable]'); if(!ce) return; if(e.key==='Enter'){e.preventDefault();ce.blur()} if(e.key==='Escape'){ce.textContent=ce.dataset.prev||ce.textContent; ce.blur()}});
+    el.tbody.addEventListener('focusout', onCellSave);
 
-    // progress simulation
-    function startProgress() {
-        progressBox.classList.remove('d-none');
-        let p = 0;
-        const steps = ['Analyzing skill context…','Creating questions…','Validating answers…','Almost done…'];
-        let i = 0;
-        genInterval = setInterval(() => {
-            p = Math.min(90, p + Math.random()*18);
-            bar.style.width = Math.round(p) + '%';
-            pct.textContent = Math.round(p) + '%';
-            if (i < steps.length && p > (i+1)*20) {
-                msgs.insertAdjacentHTML('beforeend', `<div>${steps[i++]}</div>`);
-            }
-        }, 800);
-    }
-
-    function stopProgress(finalMessage = 'Complete!') {
-        if (genInterval) clearInterval(genInterval);
-        bar.style.width = '100%';
-        pct.textContent = '100%';
-        msgs.insertAdjacentHTML('beforeend', `<div>${finalMessage}</div>`);
-    }
-
-    // submit action
-    submitBtn?.addEventListener('click', async () => {
-        if (!selectedMethod) {
-            alert('Please choose a generation method.');
-            return;
-        }
-
-        // choose form and build FormData
-        const formEl = formSkills;
-
-        const fd = new FormData(formEl);
-
-        // ensure required backend keys
-        if (selectedMethod === 'skills') {
-            fd.set('generation_method', 'ai');
-            if (!fd.get('skill_id')) fd.set('skill_id', document.getElementById('currentSkillId').value || document.getElementById('form_skill_id').value);
-        }
-
-        // UI
-        submitBtn.disabled = true;
-        startProgress();
-
-        try {
-            const res = await fetch(@json(url('/admin/questions/generate')), {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                body: fd
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
-
-            if (json.success) {
-                stopProgress('Generated successfully!');
-                setTimeout(() => {
-                    bootstrap.Modal.getInstance(document.getElementById('questionGenerationModal'))?.hide();
-                    // notify page to update if desired
-                    window.dispatchEvent(new CustomEvent('question-generation:success', { detail: json }));
-                    // show toast (simple)
-                    const msg = selectedMethod === 'skills'
-                    ? `${json.generated_count ?? fd.get('question_count')} questions generated!`
-                    : `${json.questions_created ?? fd.get('question_count')} variations generated!`;
-                    // lightweight toast using alert for now
-                    // replace with your nicer toast function if available
-                    alert(msg);
-                    // optionally refresh or update table...
-                }, 700);
-            } else {
-                throw new Error(json.message || 'Generation failed');
-            }
-        } catch (err) {
-            alert(err.message || 'Error generating. Try again.');
-        } finally {
-            submitBtn.disabled = false;
-            // reset progress simulation
-            if (genInterval) clearInterval(genInterval);
-            bar.style.width = '0%';
-            pct.textContent = '0%';
-            msgs.innerHTML = '<div>Starting…</div>';
-            progressBox.classList.add('d-none');
-        }
+    el.tbody.addEventListener('click',e=>{
+      const b=e.target.closest('[data-action]'); if(!b) return;
+      const tr=b.closest('tr'); const id=+tr.dataset.id; const act=b.dataset.action;
+      if(act==='view') location.href=`/admin/skills/${id}`;
+      if(act==='delete') return delSkill(id);
+      if(act==='pick-image') return openImgPicker(id);
+      if(act==='pick-video') return openVidPicker(id);
+      if(act==='play-video') return playVideo(b.dataset.url);
+      if(act==='delete-video'){ const vid = +b.dataset.vid; return detachVideo(id, vid); }
     });
 
+    // video picker
+    el.vid.refresh.addEventListener('click', ()=>refreshVideoList());
+    el.vid.search.addEventListener('input', debounce(()=>filterGrid(el.vid.grid, el.vid.search.value), 200));
+    document.querySelector(el.vid.select).addEventListener('click', onAttachVideo);
+
+    // close modals
+    el.img.close.addEventListener('click',()=>el.img.modal.style.display='none');
+    el.img.cancel.addEventListener('click',()=>el.img.modal.style.display='none');
+    el.vid.close.addEventListener('click',()=>el.vid.modal.style.display='none');
+    el.vid.cancel.addEventListener('click',()=>el.vid.modal.style.display='none');
+  }
+
+  async function load(page=1){
+    spin.show();
+    try{
+      const p={
+        page, per_page:S.per, sort:S.sort, direction:S.dir,
+        track_id:el.filters.track.value, level_id:el.filters.level.value,
+        status_id:el.filters.status.value, search:el.filters.search.value
+      };
+      const d=await api.list(p);
+      S.rows  = d.skills || [];
+      S.page  = page; S.pages = d.num_pages || 1;
+      S.total = d.totals?.total ?? S.rows.length;
+      render();
+    }catch(e){ toast(e||'Load failed','error'); S.rows=[]; render(); }
+    finally{ spin.hide(); }
+  }
+
+  async function loadMaps(){
+    try{
+      const d=await api.maps();
+      S.maps.tracks  = d.tracks  || {};
+      S.maps.levels  = d.levels  || {};
+      S.maps.statuses= d.statuses|| {};
+      fillSelect(el.filters.track,  S.maps.tracks);
+      fillSelect(el.filters.level,  S.maps.levels);
+      fillSelect(el.filters.status, S.maps.statuses);
+    }catch(e){ console.warn('maps failed',e); }
+  }
+
+  async function loadImages(){
+    // If you already have an assets endpoint, you can wire it here (optional)
+  }
+
+  // ---------- render grid ----------
+  function render(){
+    const tbody = el.tbody;
+    if(!S.rows.length){
+      tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4">No skills found</td></tr>`;
+      drawSortIcons(); return;
+    }
+    tbody.innerHTML = S.rows.map(r=>{
+      const id=r.id;
+      const imgU='/' + (r.image||'images/site-logo.svg');
+      const statusName=r.status?.status || S.maps.statuses[r.status_id] || '';
+      const statusColor={active:'success',draft:'warning',inactive:'secondary'}[(statusName||'').toLowerCase()]||'secondary';
+      const videos = Array.isArray(r.videos) ? r.videos : [];
+
+      const videosHtml = videos.length
+        ? videos.map(v=>{
+            const url = '/' + (v.video_link||'');
+            const title = v.video_title || '(untitled)';
+            return `
+              <div class="d-flex align-items-center gap-2 mb-1" data-vid="${v.id}">
+                <button class="btn btn-sm btn-outline-primary" data-action="play-video" data-url="${esc(url)}">
+                  <i class="fas fa-play me-1"></i>${esc(title)}
+                </button>
+                <button class="btn btn-sm btn-outline-danger" data-action="delete-video" data-vid="${v.id}" title="Detach">
+                  <i class="fas fa-unlink"></i>
+                </button>
+              </div>`;
+          }).join('')
+        : `<div class="text-muted small">No videos linked</div>`;
+
+      return `<tr data-id="${id}">
+        <td class="nowrap">${esc(String(id))}</td>
+        <td>
+          <div class="img-picker" title="Click to change image" data-action="pick-image">
+            <img src="${imgU}" alt="" onerror="this.src='/images/site-logo.svg'">
+            <button class="btn-remove" data-action="pick-image" title="Change/Remove image">×</button>
+          </div>
+        </td>
+        <td>
+          <div data-role="video-box">
+            ${videosHtml}
+            <button class="btn btn-sm btn-outline-secondary mt-1" data-action="pick-video">
+              <i class="fas fa-plus me-1"></i>Add
+            </button>
+          </div>
+        </td>
+        <td contenteditable="true" data-field="skill">${esc(r.skill)}</td>
+        <td contenteditable="true" data-field="description">${esc(r.description||'')}</td>
+        <td class="nowrap">${esc(String(r.user_id))}</td>
+        <td class="nowrap"><span class="badge bg-${statusColor}">${esc(statusName || String(r.status_id||''))}</span></td>
+        <td class="nowrap">${esc(fmtDate(r.created_at))}</td>
+        <td class="nowrap">${esc(fmtDate(r.updated_at))}</td>
+        <td>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-info" data-action="view" title="View"><i class="fas fa-eye"></i></button>
+            <button class="btn btn-outline-danger" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+    drawSortIcons();
+  }
+
+  function drawSortIcons(){
+    $$('#grid thead th.sortable i').forEach(i=>i.remove());
+    $$('#grid thead th.sortable').forEach(th=>{
+      const i=document.createElement('i');
+      i.className='fas ms-1 '+(th.dataset.sort===S.sort?(S.dir==='asc'?'fa-sort-up text-primary':'fa-sort-down text-primary'):'fa-sort text-muted');
+      th.appendChild(i);
+    });
+  }
+
+  function fillSelect(sel,map){
+    sel.innerHTML = `<option value="">${sel===el.filters.track?'All Tracks':sel===el.filters.level?'All Levels':'All Status'}</option>`;
+    Object.entries(map).forEach(([v,l])=>{
+      const o=document.createElement('option'); o.value=String(v); o.textContent=l; sel.appendChild(o);
+    });
+  }
+
+  async function onCellSave(e){
+    const ce=e.target.closest('[contenteditable]'); if(!ce) return;
+    const allowed=new Set(['skill','description']);
+    const field=ce.dataset.field; if(!allowed.has(field)) return;
+    const tr=ce.closest('tr'); const id=+tr.dataset.id; const val=ce.textContent.trim();
+    if(val===(ce.dataset.prev||'')) return;
+    ce.classList.add('ce-dirty');
+    try{ spin.show(); await api.patch(id,{[field]:val}); toast('Saved','success'); }
+    catch(err){ toast(err||'Save failed','error'); ce.textContent=ce.dataset.prev||ce.textContent; }
+    finally{ ce.classList.remove('ce-dirty'); spin.hide(); }
+  }
+
+  // ---------- image picker (optional if you already have one) ----------
+  function openImgPicker(id){
+    // wire to your existing image assets list if needed
+    alert('Image picker hook — wire to your assets endpoint as before');
+  }
+
+  // ---------- video picker (filesystem) ----------
+  async function openVidPicker(skillId){
+    S.vidRow=skillId;
+    el.vid.modal.style.display='block';
+    $('#vidSearch').value='';
+    await refreshVideoList();
+  }
+
+  async function refreshVideoList(){
+    try{
+      const res=await api.videosBrowse({ limit: 2000, exclude_skills: 0 });
+      S.vidsCache = res.videos || [];
+      el.vid.grid.innerHTML = S.vidsCache.length
+        ? S.vidsCache.map(v=>`<div class="pick-item" tabindex="0" data-path="${esc(v.path)}" data-url="${esc(v.url)}" title="${esc(v.title)}">
+              <video src="${esc(v.url)}#t=0.1" muted playsinline preload="metadata"></video>
+              <div class="small text-truncate mt-1">${esc(v.title)}</div>
+           </div>`).join('')
+        : '<div class="text-muted">No videos found in /public/videos</div>';
+
+      el.vid.grid.addEventListener('click',e=>{
+        const cell=e.target.closest('.pick-item'); if(!cell) return;
+        $$('#vidGrid .pick-item').forEach(x=>x.classList.remove('selected'));
+        cell.classList.add('selected'); cell.focus();
+      }, { once:true });
+    }catch{ el.vid.grid.innerHTML='<div class="text-muted">Failed to load</div>'; }
+  }
+
+  function filterGrid(container,q){
+    const s=(q||'').toLowerCase();
+    container.querySelectorAll('.pick-item').forEach(el=>{
+      const t=(el.getAttribute('title')||'')+' '+(el.dataset.path||'');
+      el.style.display = t.toLowerCase().includes(s) ? '' : 'none';
+    });
+  }
+
+  async function onAttachVideo(){
+    const sel=$('#vidGrid .pick-item.selected'); if(!sel||!S.vidRow) return;
+    try{
+      spin.show();
+      // link by path; backend finds/creates Video row and attaches
+      await api.linkVideo(S.vidRow, { path: sel.dataset.path, status_id: 1 });
+      toast('Video linked','success');
+      el.vid.modal.style.display='none';
+      await load(S.page);
+    }catch(e){ toast(e||'Attach failed','error'); }
+    finally{ spin.hide(); }
+  }
+
+  async function detachVideo(skillId, videoId){
+    if(!confirm('Detach this video from the skill?')) return;
+    try{ spin.show(); await api.detachVideo(skillId, videoId); toast('Video detached','success'); await load(S.page); }
+    catch(e){ toast(e||'Detach failed','error'); }
+    finally{ spin.hide(); }
+  }
+
+  function playVideo(url){
+    if(!url){ toast('No video URL','warning'); return; }
+    el.playVideo.src=url+(url.includes('#')?'':'#t=0.1');
+    S.videoModal.show();
+    el.videoWrap.addEventListener('hidden.bs.modal',()=>{try{el.playVideo.pause()}catch{} el.playVideo.removeAttribute('src'); el.playVideo.load();},{once:true});
+  }
 })();
-document.addEventListener('DOMContentLoaded', applyFilters);
 </script>
 @endpush

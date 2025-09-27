@@ -2,91 +2,135 @@
 
 namespace App\Http\Controllers\Admin;
 
-use Illuminate\Http\Request;
-
-use App\Http\Requests;
 use App\Http\Controllers\Controller;
-use App\Unit;
-use App\Http\Requests\CreateUnitRequest;
-use Auth;
+use Illuminate\Http\Request;
+// If your model lives in App\Unit, change this import accordingly:
+use App\Models\Unit;
 
 class UnitController extends Controller
 {
     /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
+     * Display a listing of units (Blade by default).
      */
-    public function index()
+    public function index(Request $request)
     {
-        $user = Auth::user();
-        return response()-> json(['message' => 'Request executed successfully', 'units'=>Unit::all()],200);
+        $units = Unit::orderBy('id')->get();
 
-        //return response()->json(['levels'=>$levels],200);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\CreateUnitRequest  $unit
-     * @return \Illuminate\Http\Response
-     */
-    public function store(CreateUnitRequest $request)
-    {
-        $user = Auth::user();
-        if (!$user->is_admin){
-            return response()->json(['message'=>'Only administrators can create a new unit', 'code'=>403],403);
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Units retrieved successfully.',
+                'data'    => $units,
+            ], 200);
         }
-        $values = $request->all();
 
-        $unit = Unit::create($values);
-
-        return response()->json(['message'=>'Unit is now added','code'=>201, 'unit' => $unit], 201);
+        // Render your configuration Blade that includes the Units tab
+        return view('admin.configuration.index', compact('units'));
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  Unit $unit
-     * @return \Illuminate\Http\Response
+     * Show create form (rarely used if you create via modal+AJAX).
+     * Keep it for full resource compliance.
      */
-    public function show(Unit $unit)
+    public function create()
     {
-        return response()->json(['message' =>'Successful retrieval of unit.', 'unit'=>$unit, 'code'=>201], 201);
+        return view('admin.units.create');
     }
 
- /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  Unit  $unit
-     * @return \Illuminate\Http\Response
+    /**
+     * Store a newly created unit.
+     */
+    public function store(Request $request)
+    {
+        // Minimal validation (replace with FormRequest if you have one)
+        $validated = $request->validate([
+            'unit'        => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $unit = Unit::create($validated);
+
+        if ($this->wantsJson($request)) {
+            // Matches your JS expectation: response.data
+            return response()->json([
+                'message' => 'Unit created successfully.',
+                'data'    => $unit,
+            ], 201);
+        }
+
+        return redirect()
+            ->route('admin.units.index')
+            ->with('success', 'Unit created successfully.');
+    }
+
+    /**
+     * Display the specified unit (Blade by default).
+     */
+    public function show(Request $request, Unit $unit)
+    {
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Unit retrieved successfully.',
+                'data'    => $unit,
+            ], 200);
+        }
+
+        return view('admin.units.show', compact('unit'));
+    }
+
+    /**
+     * Show the form for editing the specified unit (optional if inline edit).
+     */
+    public function edit(Unit $unit)
+    {
+        return view('admin.units.edit', compact('unit'));
+    }
+
+    /**
+     * Update the specified unit.
      */
     public function update(Request $request, Unit $unit)
-    {   
-        $logon_user = Auth::user();
-        if ($logon_user->id != $unit->user_id && !$logon_user->is_admin) {            
-            return response()->json(['message' => 'You have no access rights to update unit','code'=>401], 401);     
+    {
+        $validated = $request->validate([
+            'unit'               => ['sometimes', 'required', 'string', 'max:255'],
+            'description'        => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $unit->fill($validated)->save();
+
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Unit updated successfully.',
+                'data'    => $unit->refresh(),
+            ], 200);
         }
 
-        $unit->fill($request->all())->save();
-
-        return response()->json(['message'=>'Unit updated','unit' => $unit, 201], 201);
+        return redirect()
+            ->route('admin.units.index')
+            ->with('success', 'Unit updated successfully.');
     }
 
-     /**
-     * Remove the specified resource from storage.
-     *
-     * @param  Unit  $unit
-     * @return \Illuminate\Http\Response
+    /**
+     * Remove the specified unit.
      */
-    public function destroy(Unit $unit)
+    public function destroy(Request $request, Unit $unit)
     {
-        $logon_user = Auth::user();
-        if (!$logon_user->is_admin) {            
-            return response()->json(['message' => 'You have no access rights to delete unit','code'=>401], 401);
-        } 
         $unit->delete();
-        return response()->json(['message'=>'This unit has been deleted','code'=>201], 201);
+
+        if ($this->wantsJson($request)) {
+            // 204 No Content for deletes
+            return response()->json(null, 204);
+        }
+
+        return redirect()
+            ->route('admin.units.index')
+            ->with('success', 'Unit deleted successfully.');
+    }
+
+    /**
+     * Helper: decide JSON vs Blade based on request headers.
+     */
+    protected function wantsJson(Request $request): bool
+    {
+        return $request->expectsJson() || $request->ajax();
     }
 }

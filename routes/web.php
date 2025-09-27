@@ -64,7 +64,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
             // New lightweight actions used by the updated QA UI
             Route::post('/status', [QAController::class, 'setStatus'])->name('status');     // unreviewed/approved/flagged/needs_revision/ai_generated
             Route::post('/assign', [QAController::class, 'assignToMe'])->name('assign');   // set qa_reviewer_id
-            Route::post('/notes',  [QAController::class, 'saveNotes'])->name('notes');     // update qa_notes
+            Route::post('/notes', [QAController::class, 'saveNotes'])->name('notes');     // update qa_notes
         });
     });
 
@@ -103,9 +103,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
             Route::post('/add-track', [SkillController::class, 'addTrack'])->name('add-track');
             Route::delete('/tracks/{track}', [SkillController::class, 'removeTrack'])->name('remove-track');
             Route::post('/link-video', [SkillController::class, 'linkVideo'])->name('link-video');
-            Route::delete('/videos/{video}', [SkillController::class, 'deleteVideo'])->name('deleteVideo');
-
-            // =====================================================
+            Route::delete('/videos/{video}', [SkillController::class, 'deleteVideo'])->name('deleteVideo');            // =====================================================
             // QUESTIONS NESTED UNDER SKILLS
             // =====================================================
             Route::prefix('questions')->name('questions.')->group(function () {
@@ -203,11 +201,11 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
             Route::delete('/house-roles/{houseRole}', [UserController::class, 'removeHouseRole'])->name('remove-role');
         });
 
-    // =====================================================
+        // =====================================================
         // CONFIGURATION TABLES
         // =====================================================   
         Route::get('configuration', [ConfigurationController::class, 'index'])->name('configuration.index');
-  
+
         Route::resource('difficulties', DifficultyController::class);
         Route::resource('types', TypeController::class);
         Route::resource('levels', LevelController::class);
@@ -218,49 +216,49 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
         // Add these for order updates
         Route::patch('difficulties/{difficulty}/order', [DifficultyController::class, 'updateOrder']);
         Route::patch('levels/{level}/order', [LevelController::class, 'updateOrder']);
-        
+
         // API endpoints for refreshing dropdown data
         Route::get('/api/config/{table}', [ConfigurationController::class, 'getTableData'])->name('api.config.get');
 
-    // =====================================================
+        // =====================================================
         // SETTINGS
         // =====================================================
         Route::prefix('settings')->name('settings.')->group(function () {
-            Route::get('/general',  [SettingsController::class, 'general'])->name('general');
+            Route::get('/general', [SettingsController::class, 'general'])->name('general');
             Route::post('/general', [SettingsController::class, 'updateGeneral'])->name('general.update');
 
-            Route::post('/test',    [SettingsController::class, 'testConfiguration'])->name('test');
-            Route::post('/reset',   [SettingsController::class, 'resetToDefaults'])->name('reset');
+            Route::post('/test', [SettingsController::class, 'testConfiguration'])->name('test');
+            Route::post('/reset', [SettingsController::class, 'resetToDefaults'])->name('reset');
 
-            Route::post('/logo',             [SettingsController::class, 'updateLogo'])->name('logo.update');
-            Route::delete('/logo',           [SettingsController::class, 'deleteLogo'])->name('logo.delete');
+            Route::post('/logo', [SettingsController::class, 'updateLogo'])->name('logo.update');
+            Route::delete('/logo', [SettingsController::class, 'deleteLogo'])->name('logo.delete');
 
-            Route::post('/favicon',          [SettingsController::class, 'updateFavicon'])->name('favicon.update');
-            Route::delete('/favicon',        [SettingsController::class, 'deleteFavicon'])->name('favicon.delete');
+            Route::post('/favicon', [SettingsController::class, 'updateFavicon'])->name('favicon.update');
+            Route::delete('/favicon', [SettingsController::class, 'deleteFavicon'])->name('favicon.delete');
 
             Route::post('/login_background', [SettingsController::class, 'updateLoginBackground'])->name('loginbg.update');
-            Route::delete('/login_background',[SettingsController::class, 'deleteLoginBackground'])->name('loginbg.delete');
+            Route::delete('/login_background', [SettingsController::class, 'deleteLoginBackground'])->name('loginbg.delete');
         });
 
         // =====================================================
         // ASSETS
         // =====================================================
         Route::prefix('assets')->name('assets.')->group(function () {
-            Route::get('/',          [AssetController::class, 'index'])->name('index');
-            Route::get('/list',      [AssetController::class, 'listAssets'])->name('list');
-            Route::post('/upload',   [AssetController::class, 'upload'])->name('upload');
-            Route::post('/folder',   [AssetController::class, 'createFolder'])->name('folder');
+            Route::get('/', [AssetController::class, 'index'])->name('index');
+            Route::get('/list', [AssetController::class, 'listAssets'])->name('list');
+            Route::post('/upload', [AssetController::class, 'upload'])->name('upload');
+            Route::post('/folder', [AssetController::class, 'createFolder'])->name('folder');
             Route::get('/file/{id}', [AssetController::class, 'getFileInfo'])->name('info');
-            Route::delete('/{id}',   [AssetController::class, 'delete'])->name('delete');
-            Route::post('/move',     [AssetController::class, 'move'])->name('move');
-            Route::get('/videos',    [AssetController::class, 'getVideos'])->name('admin.assets.videos');
+            Route::delete('/{id}', [AssetController::class, 'delete'])->name('delete');
+            Route::post('/move', [AssetController::class, 'move'])->name('move');
+            Route::get('/videos', [AssetController::class, 'getVideos'])->name('admin.assets.videos');
         });
 
         // =====================================================
         // REPORTS
         // =====================================================
         Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('/usage',       [ReportController::class, 'usage'])->name('usage');
+            Route::get('/usage', [ReportController::class, 'usage'])->name('usage');
             Route::get('/performance', [ReportController::class, 'performance'])->name('performance');
         });
 

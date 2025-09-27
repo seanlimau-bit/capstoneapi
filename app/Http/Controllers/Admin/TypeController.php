@@ -3,28 +3,32 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Type;
-use App\Models\Question;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+// If your model is App\Type, change the import accordingly:
+use App\Models\Type;
 
 class TypeController extends Controller
 {
     /**
-     * Display a listing of question types
+     * List all types.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $types = Type::withCount('questions')
-            ->orderBy('id')
-            ->paginate(20);
+        $types = Type::orderBy('id')->get();
 
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Types retrieved successfully.',
+                'data'    => $types,
+            ], 200);
+        }
+
+        // If you also have a standalone page:
         return view('admin.types.index', compact('types'));
     }
 
     /**
-     * Show the form for creating a new type
+     * Show create form (optional; Configuration page uses a modal).
      */
     public function create()
     {
@@ -32,81 +36,46 @@ class TypeController extends Controller
     }
 
     /**
-     * Store a newly created type
+     * Store a new type.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'type' => 'required|string|max:50|unique:types,type',
-            'description' => 'nullable|string|max:255',
-            'input_type' => 'required|in:multiple_choice,number,text,boolean,fill_blank',
-            'answer_format' => 'nullable|string|max:100',
-            'max_answers' => 'nullable|integer|min:1|max:10',
-            'requires_image' => 'boolean',
-            'calculator_allowed' => 'boolean',
-            'is_active' => 'boolean'
+            'type'        => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        try {
-            $type = Type::create([
-                'type' => $validated['type'],
-                'description' => $validated['description'],
-                'input_type' => $validated['input_type'],
-                'answer_format' => $validated['answer_format'],
-                'max_answers' => $validated['max_answers'] ?? 4,
-                'requires_image' => $validated['requires_image'] ?? false,
-                'calculator_allowed' => $validated['calculator_allowed'] ?? false,
-                'is_active' => $validated['is_active'] ?? true
-            ]);
+        $type = Type::create($validated);
 
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Question type created successfully',
-                    'type' => $type
-                ]);
-            }
-
-            return redirect()->route('admin.types.index')
-                ->with('success', 'Question type created successfully');
-
-        } catch (\Exception $e) {
-            Log::error('Failed to create question type', [
-                'error' => $e->getMessage(),
-                'data' => $validated
-            ]);
-
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to create question type'
-                ], 500);
-            }
-
-            return back()->withInput()
-                ->with('error', 'Failed to create question type');
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Type created successfully.',
+                'data'    => $type,
+            ], 201);
         }
+
+        return redirect()
+            ->route('admin.types.index')
+            ->with('success', 'Type created successfully.');
     }
 
     /**
-     * Display the specified type
+     * Show a single type.
      */
-    public function show(Type $type)
+    public function show(Request $request, Type $type)
     {
-        $type->loadCount('questions');
-        
-        // Get sample questions using this type
-        $sampleQuestions = Question::where('type_id', $type->id)
-            ->with(['skill', 'difficulty'])
-            ->latest()
-            ->limit(10)
-            ->get();
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Type retrieved successfully.',
+                'data'    => $type,
+            ], 200);
+        }
 
-        return view('admin.types.show', compact('type', 'sampleQuestions'));
+        return view('admin.types.show', compact('type'));
     }
 
     /**
-     * Show the form for editing the type
+     * Edit form (optional; you inline-edit in the table).
      */
     public function edit(Type $type)
     {
@@ -114,179 +83,50 @@ class TypeController extends Controller
     }
 
     /**
-     * Update the specified type
+     * Update a type (used by your inline Save).
      */
     public function update(Request $request, Type $type)
     {
         $validated = $request->validate([
-            'type' => 'required|string|max:50|unique:types,type,' . $type->id,
-            'description' => 'nullable|string|max:255',
-            'input_type' => 'required|in:multiple_choice,number,text,boolean,fill_blank',
-            'answer_format' => 'nullable|string|max:100',
-            'max_answers' => 'nullable|integer|min:1|max:10',
-            'requires_image' => 'boolean',
-            'calculator_allowed' => 'boolean',
-            'is_active' => 'boolean'
+            'type'        => ['sometimes', 'required', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
 
-        try {
-            $type->update([
-                'type' => $validated['type'],
-                'description' => $validated['description'],
-                'input_type' => $validated['input_type'],
-                'answer_format' => $validated['answer_format'],
-                'max_answers' => $validated['max_answers'] ?? $type->max_answers,
-                'requires_image' => $validated['requires_image'] ?? false,
-                'calculator_allowed' => $validated['calculator_allowed'] ?? false,
-                'is_active' => $validated['is_active'] ?? true
-            ]);
+        $type->fill($validated)->save();
 
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Question type updated successfully',
-                    'type' => $type
-                ]);
-            }
-
-            return redirect()->route('admin.types.index')
-                ->with('success', 'Question type updated successfully');
-
-        } catch (\Exception $e) {
-            Log::error('Failed to update question type', [
-                'type_id' => $type->id,
-                'error' => $e->getMessage()
-            ]);
-
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to update question type'
-                ], 500);
-            }
-
-            return back()->withInput()
-                ->with('error', 'Failed to update question type');
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'Type updated successfully.',
+                'data'    => $type->refresh(),
+            ], 200);
         }
+
+        return redirect()
+            ->route('admin.types.index')
+            ->with('success', 'Type updated successfully.');
     }
 
     /**
-     * Remove the specified type
+     * Delete a type (used by your Delete button).
      */
     public function destroy(Request $request, Type $type)
     {
-        try {
-            // Check if type is being used
-            $questionCount = Question::where('type_id', $type->id)->count();
-            
-            if ($questionCount > 0) {
-                $message = "Cannot delete this type. It's being used by {$questionCount} questions.";
-                
-                if ($request->ajax()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => $message
-                    ], 400);
-                }
+        $type->delete();
 
-                return back()->with('error', $message);
-            }
-
-            $type->delete();
-
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Question type deleted successfully'
-                ]);
-            }
-
-            return redirect()->route('admin.types.index')
-                ->with('success', 'Question type deleted successfully');
-
-        } catch (\Exception $e) {
-            Log::error('Failed to delete question type', [
-                'type_id' => $type->id,
-                'error' => $e->getMessage()
-            ]);
-
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to delete question type'
-                ], 500);
-            }
-
-            return back()->with('error', 'Failed to delete question type');
+        if ($this->wantsJson($request)) {
+            return response()->json(null, 204);
         }
+
+        return redirect()
+            ->route('admin.types.index')
+            ->with('success', 'Type deleted successfully.');
     }
 
     /**
-     * Bulk update question types
+     * Helper: decide JSON vs Blade.
      */
-    public function bulkUpdate(Request $request)
+    protected function wantsJson(Request $request): bool
     {
-        $validated = $request->validate([
-            'type_ids' => 'required|array',
-            'type_ids.*' => 'exists:types,id',
-            'action' => 'required|in:activate,deactivate,delete'
-        ]);
-
-        DB::beginTransaction();
-        try {
-            $types = Type::whereIn('id', $validated['type_ids']);
-
-            switch ($validated['action']) {
-                case 'activate':
-                    $types->update(['is_active' => true]);
-                    $message = 'Types activated successfully';
-                    break;
-
-                case 'deactivate':
-                    $types->update(['is_active' => false]);
-                    $message = 'Types deactivated successfully';
-                    break;
-
-                case 'delete':
-                    // Check if any types are in use
-                    $inUse = Question::whereIn('type_id', $validated['type_ids'])
-                        ->exists();
-                    
-                    if ($inUse) {
-                        throw new \Exception('Some types are in use and cannot be deleted');
-                    }
-                    
-                    $types->delete();
-                    $message = 'Types deleted successfully';
-                    break;
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => $message
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
-    }
-
-    /**
-     * Get types for dropdown/select options
-     */
-    public function getSelectOptions()
-    {
-        $types = Type::where('is_active', true)
-            ->orderBy('type')
-            ->get(['id', 'type', 'input_type']);
-
-        return response()->json($types);
+        return $request->expectsJson() || $request->ajax();
     }
 }

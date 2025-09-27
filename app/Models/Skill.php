@@ -12,13 +12,15 @@ class Skill extends Model
     use RecordLog;
     
     protected $hidden = ['user_id', 'create_at', 'updated_at','pivot'];
-    protected $fillable = ['skill', 'description', 'track_id','image', 'status_id', 'user_id', 'lesson_link', 'check'];
+    protected $fillable = ['skill', 'description', 'image', 'status_id', 'user_id', 'check'];
 
     // Relationships
-    public function links(){ //lesson_link
-        return $this->hasMany(\App\Models\SkillLink::class);
+    public function videos()
+    {
+        return $this->belongsToMany(Video::class, 'skill_video', 'skill_id', 'video_id')
+            ->withPivot(['status_id', 'sort_order'])
+            ->withTimestamps();
     }
-
     public function user(){
         return $this->belongsTo(\App\Models\User::class);
     }
@@ -50,11 +52,6 @@ class Skill extends Model
     public function users(){
         return $this->belongsToMany(\App\Models\User::class)->withPivot('skill_test_date','skill_passed','skill_maxile','noOfTries','correct_streak','difficulty_passed', 'fail_streak')->withTimestamps();
     }
-
-    public function videos(){
-        return $this->hasMany(Video::class);
-    }
-
 
     public function noOfQuestions(){
         return $this->questions->count();

@@ -129,7 +129,7 @@
                                     <th width="150" class="text-center">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="questions-tbody">
+                            <tbody id="questionsTableBody">
                                 @include('admin.questions.table-body', ['questions' => $questions])
                             </tbody>
                         </table>
@@ -199,7 +199,7 @@ function loadQuestions(page = 1) {
       currentPage     = data.current_page || page;
       totalPages      = data.num_pages || 1;
       totalRecords    = data.total ?? 0;
-
+hydrateFiltersOnce(data);
       updatePagination();
       updateStats(data.totals);
       updateBulkButtons();
@@ -356,5 +356,119 @@ function showToast(msg,type='info'){ window.showToast ? window.showToast(msg,typ
 function exportQuestions(){ window.location.href = '/admin/questions/export'; }
 function importQuestions(){ showToast('Import functionality coming soon','info'); }
 function refreshData(){ loadQuestions(currentPage); }
+// --- helpers to normalize and fill selects ---
+function populateSelect(selectId, items, { valueKey = 'id', labelKey = 'text' } = {}) {
+  const sel = document.getElementById(selectId);
+  if (!sel || !Array.isArray(items)) return;
+
+  // keep the first option (e.g., "All ...")
+  const first = sel.querySelector('option')?.outerHTML || '<option value=""></option>';
+  sel.innerHTML = first + items.map(it => {
+    // item can be a primitive, object with value/text, or object with custom keys
+    if (typeof it === 'string' || typeof it === 'number') {
+      return `<option value="${it}">${String(it)}</option>`;
+    }
+    const v = it.value ?? it[valueKey] ?? '';
+    const l = it.text ?? it[labelKey] ?? v;
+    return `<option value="${v}">${l}</option>`;
+  }).join('');
+}
+
+function populateFromQaStatuses(selectId, qa) {
+  const sel = document.getElementById(selectId);
+  if (!sel || !qa) return;
+
+  const first = sel.querySelector('option')?.outerHTML || '<option value=""></option>';
+  let options = '';
+
+  // qa may be: object map {approved:"Approved",...} OR array ["approved","flagged",...]
+  if (Array.isArray(qa)) {
+    options = qa.map(v => `<option value="${v}">${titleize(v)}</option>`).join('');
+  } else if (typeof qa === 'object') {
+    options = Object.entries(qa).map(([v,l]) => `<option value="${v}">${l || titleize(v)}</option>`).join('');
+  }
+  sel.innerHTML = first + options;
+
+  function titleize(s){ return String(s).replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()); }
+}
+
+// Map data-populate attribute -> data key (handles hyphen/underscore)
+const POPULATE_KEY_MAP = {
+  'fields': 'fields',
+  'skills': 'skills',
+  'difficulties': 'difficulties',
+  'statuses': 'statuses',
+  'types': 'types',
+  'qa-statuses': 'qa_statuses'
+};
+
+function populateFiltersFromData(data) {
+  if (!data) return;
+
+  // Fields
+  if (data.fields?.length) {
+    populateSelect('fieldFilter', data.fields, { valueKey: 'id', labelKey: 'field' });
+  }
+  // Skills
+  if (data.skills?.length) {
+    populateSelect('skillFilter', data.skills, { valueKey: 'id', labelKey: 'skill' });
+  }
+  // Difficulties (can be empty in your snapshot, that’s okay)
+  if (Array.isArray(data.difficulties)) {
+    // server shape (getDropdownOptions) is [{value, text}], but your localStorage snapshot shows []
+    const arr = data.difficulties.map(d => d.value ? d : { id: d.id, text: d.short_description || d.text || d.label || 'Unknown' });
+    populateSelect('difficultyFilter', arr, { valueKey: 'value', labelKey: 'text' });
+  }
+  // Statuses (public/draft/etc)
+  if (data.statuses?.length) {
+    const arr = data.statuses.map(s => ({ value: s.id ?? s.value, text: s.status ?? s.text }));
+    populateSelect('statusFilter', arr, { valueKey: 'value', labelKey: 'text' });
+  }
+  // Types
+  if (data.types?.length) {
+    const arr = data.types.map(t => ({ value: t.id ?? t.value, text: t.type ?? t.text }));
+    populateSelect('typeFilter', arr, { valueKey: 'value', labelKey: 'text' });
+  }
+  // QA statuses
+  if (data.qa_statuses) {
+    populateFromQaStatuses('qaStatusFilter', data.qa_statuses);
+  }
+}
+
+// Try server-provided options first (from index() JSON), else localStorage
+function hydrateFiltersOnce(dataFromServer) {
+  // avoid repopulating if already filled (keeps user selection)
+  const already = document.getElementById('skillFilter')?.options?.length > 1;
+  if (already) return;
+
+  if (dataFromServer && dataFromServer.filter_options) {
+    // Your controller sends { qa_statuses, skills, authors, sources }
+    const fo = dataFromServer.filter_options;
+
+    // Normalize to the shapes our helfpers expect
+    const normalized = {
+      qa_statuses: fo.qa_statuses, // array like ['approved','flagged',...]
+      skills: (fo.skills || []).map(s => ({ id: s.id, skill: s.skill })),
+      // difficulties/types/statuses are not in filter_options here; we may fill from localStorage below
+    };
+
+    populateFiltersFromData(normalized);
+  }
+
+  // Fallback to localStorage snapshot the app saved earlier
+  try {
+    // Adjust the key to whatever you actually used; guessing 'filtersCache' or similar
+    const raw = localStorage.getItem('filtersCache') || localStorage.getItem('metaFilters') || localStorage.getItem('filters');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Your snapshot shows the object under { data: { ... } }
+      const payload = parsed.data || parsed;
+      populateFiltersFromData(payload);
+    }
+  } catch (e) {
+    console.warn('Failed to load filters from localStorage', e);
+  }
+}
+
 </script>
 @endpush

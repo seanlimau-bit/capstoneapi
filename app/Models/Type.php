@@ -9,7 +9,7 @@ class Type extends Model
     use RecordLog;
 
     protected $hidden = ['created_at', 'updated_at'];
-    protected $fillable = ['type', 'description'];
+    protected $fillable = ['type', 'description', 'status_id'];
 
     //relationship
     public function questions(){

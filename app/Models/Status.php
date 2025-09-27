@@ -7,11 +7,16 @@ use App\Models\RecordLog;
 class Status extends Model
 {
     use RecordLog;
-    
-    public function tracks(){
+    protected $fillable = [
+        'status',
+        'description',
+    ];
+    public function tracks()
+    {
         return $this->hasMany(\App\Models\Track::class);
     }
-    public function houses(){
+    public function houses()
+    {
         return $this->hasMany(\App\Models\House::class);
     }
 }

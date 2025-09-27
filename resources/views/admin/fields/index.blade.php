@@ -1,698 +1,315 @@
 @extends('layouts.admin')
-
-@section('title', 'Fields Management')
+@section('title','Fields Management')
 
 @section('content')
 <div class="container-fluid">
-    {{-- Page Header - Using standard component --}}
-    @include('admin.components.page-header', [
-        'title' => 'Fields Management',
-        'subtitle' => 'Manage all fields in the math learning system',
-        'breadcrumbs' => [
-            ['title' => 'Dashboard', 'url' => url('/admin')],
-            ['title' => 'Fields']
-        ],
-        'actions' => [
-            [
-                'text' => 'Create New Field',
-                'url' => route('admin.fields.create'),
-                'icon' => 'plus',
-                'class' => 'primary'
-            ],
-            [
-                'type' => 'dropdown',
-                'class' => 'secondary',
-                'icon' => 'ellipsis-v',
-                'text' => 'Actions',
-                'items' => [
-                    ['icon' => 'download', 'text' => 'Export Fields', 'onclick' => 'exportFields()'],
-                    ['icon' => 'upload', 'text' => 'Import Fields', 'onclick' => 'importFields()'],
-                    ['icon' => 'copy', 'text' => 'Bulk Duplicate Selected', 'onclick' => 'bulkDuplicate()', 'id' => 'dropdownBulkDuplicate'],
-                    ['icon' => 'trash', 'text' => 'Bulk Delete Selected', 'onclick' => 'bulkDelete()', 'id' => 'dropdownBulkDelete'],
-                    ['icon' => 'sync', 'text' => 'Refresh', 'onclick' => 'refreshData()']
-                ]
-            ]
-        ]
-    ])
+  @include('admin.components.page-header',[
+    'title'=>'Fields Management',
+    'subtitle'=>'Manage all fields in the math learning system',
+    'breadcrumbs'=>[['title'=>'Dashboard','url'=>url('/admin')],['title'=>'Fields']],
+    'actions'=>[
+      ['text'=>'Create New Field','url'=>route('admin.fields.create'),'icon'=>'plus','class'=>'primary'],
+      ['type'=>'dropdown','class'=>'secondary','icon'=>'ellipsis-v','text'=>'Actions','items'=>[
+        ['icon'=>'download','text'=>'Export Fields','data-action'=>'export'],
+        ['icon'=>'upload','text'=>'Import Fields','data-action'=>'import'],
+        ['icon'=>'copy','text'=>'Bulk Duplicate Selected','data-action'=>'bulk-duplicate','data-bulk'=>'true'],
+        ['icon'=>'trash','text'=>'Bulk Delete Selected','data-action'=>'bulk-delete','data-bulk'=>'true'],
+        ['icon'=>'sync','text'=>'Refresh','data-action'=>'refresh']
+      ]]
+    ]
+  ])
 
-    {{-- Statistics Row - Using standard component --}}
-    @include('admin.components.stats-row', [
-        'stats' => [
-            [
-                'value' => 'Loading...',
-                'label' => 'Total Fields',
-                'color' => 'primary',
-                'icon' => 'tags',
-                'id' => 'totalFieldsCount'
-            ],
-            [
-                'value' => '0',
-                'label' => 'Public',
-                'color' => 'success',
-                'icon' => 'globe',
-                'id' => 'publicCount'
-            ],
-            [
-                'value' => '0',
-                'label' => 'Draft',
-                'color' => 'warning',
-                'icon' => 'edit',
-                'id' => 'draftCount'
-            ],
-            [
-                'value' => '0',
-                'label' => 'Private',
-                'color' => 'info',
-                'icon' => 'lock',
-                'id' => 'privateCount'
-            ]
-        ]
-    ])
+  @include('admin.components.stats-row',[
+    'stats'=>[
+      ['value'=>'0','label'=>'Total Fields','color'=>'primary','icon'=>'tags','data-stat'=>'total'],
+      ['value'=>'0','label'=>'Public','color'=>'success','icon'=>'globe','data-stat'=>'public'],
+      ['value'=>'0','label'=>'Draft','color'=>'warning','icon'=>'edit','data-stat'=>'draft'],
+      ['value'=>'0','label'=>'Private','color'=>'info','icon'=>'lock','data-stat'=>'private']
+    ]
+  ])
 
-    {{-- Filters - Essential lookup table filters --}}
-    @component('admin.components.filters-card', ['items' => []])
+  @component('admin.components.filters-card',['items'=>[]])
     <div class="col-md-3">
-        <select class="form-select" id="statusFilter" data-populate="statuses">
-            <option value="">All Status</option>
-        </select>
+      <select class="form-select" id="statusFilter" data-filter="status_id"><option value="">All Status</option></select>
     </div>
-    <div class="col-md-6">
-        <input type="search" class="form-control" id="searchInput" placeholder="Search fields...">
-    </div>
-    <div class="col-md-3">
-        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
-            <i class="fas fa-times me-1"></i>Clear Filters
-        </button>
-    </div>
-    @endcomponent
+    <div class="col-md-6"><input type="search" class="form-control" id="searchInput" placeholder="Search fields..." data-filter="search"></div>
+    <div class="col-md-3"><button type="button" class="btn btn-outline-secondary" data-action="clear-filters"><i class="fas fa-times me-1"></i>Clear Filters</button></div>
+  @endcomponent
 
-    {{-- Fields Table --}}
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-tags me-2"></i>Fields List
-                        </h5>
-
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()">
-                                <label class="form-check-label" for="selectAll">
-                                    <small>Select All</small>
-                                </label>
-                            </div>
-
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-outline-secondary" onclick="bulkDuplicate()" disabled id="bulkDuplicateBtn">
-                                    <i class="fas fa-copy me-1"></i>Duplicate Selected
-                                </button>
-                                <button type="button" class="btn btn-outline-danger" onclick="bulkDelete()" disabled id="bulkDeleteBtn">
-                                    <i class="fas fa-trash me-1"></i>Delete Selected
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th width="50">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" id="selectAllHeader">
-                                        </div>
-                                    </th>
-                                    <th style="cursor: pointer;" onclick="sortTable('field')">
-                                        <div class="d-flex align-items-center">
-                                            Field Name
-                                            <i class="fas fa-sort ms-1 text-muted sort-icon" id="sort-field"></i>
-                                        </div>
-                                    </th>
-                                    <th>Description</th>
-                                    <th style="cursor: pointer;" onclick="sortTable('status_id')">
-                                        <div class="d-flex align-items-center">
-                                            Status
-                                            <i class="fas fa-sort ms-1 text-muted sort-icon" id="sort-status_id"></i>
-                                        </div>
-                                    </th>
-                                    <th style="cursor: pointer;" onclick="sortTable('tracks_count')">
-                                        <div class="d-flex align-items-center">
-                                            Tracks
-                                            <i class="fas fa-sort ms-1 text-muted sort-icon" id="sort-tracks_count"></i>
-                                        </div>
-                                    </th>
-                                    <th style="cursor: pointer;" onclick="sortTable('created_at')">
-                                        <div class="d-flex align-items-center">
-                                            Created
-                                            <i class="fas fa-sort ms-1 text-muted sort-icon" id="sort-created_at"></i>
-                                        </div>
-                                    </th>
-                                    <th width="150" class="text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="fieldsTableBody">
-                                <tr>
-                                    <td colspan="7" class="text-center py-4">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <div class="mt-2">Loading fields...</div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {{-- Pagination Footer --}}
-                <div class="card-footer">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-muted">
-                            Showing <span id="showing-start">0</span> to <span id="showing-end">0</span> 
-                            of <span id="total-records">0</span> entries
-                        </div>
-
-                        <nav aria-label="Fields pagination">
-                            <ul class="pagination pagination-sm mb-0" id="pagination">
-                                {{-- Pagination will be populated by JavaScript --}}
-                            </ul>
-                        </nav>
-                    </div>
-                </div>
-            </div>
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0"><i class="fas fa-tags me-2"></i>Fields List</h5>
+      <div class="d-flex align-items-center gap-3">
+        <label class="form-check m-0"><input type="checkbox" class="form-check-input" id="selectAll"><small class="ms-1">Select All</small></label>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary bulk-action" data-action="bulk-duplicate" disabled><i class="fas fa-copy me-1"></i>Duplicate Selected</button>
+          <button class="btn btn-outline-danger bulk-action" data-action="bulk-delete" disabled><i class="fas fa-trash me-1"></i>Delete Selected</button>
         </div>
+      </div>
     </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="fieldsTable">
+        <thead class="table-light" id="fieldsHead">
+          <tr>
+            <th width="50"><input type="checkbox" id="selectAllHeader"></th>
+            <th class="sortable" data-key="field">Field <i class="fas fa-sort ms-1 text-muted"></i></th>
+            <th class="sortable" data-key="description">Description <i class="fas fa-sort ms-1 text-muted"></i></th>
+            <th class="sortable" data-key="status_id">Status <i class="fas fa-sort ms-1 text-muted"></i></th>
+            <th class="sortable" data-key="tracks_count">Tracks <i class="fas fa-sort ms-1 text-muted"></i></th>
+            <th class="sortable" data-key="created_at">Created <i class="fas fa-sort ms-1 text-muted"></i></th>
+            <th width="150" class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="fieldsBody">
+          <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div><div class="mt-2">Loading fields...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <div class="text-muted">Showing <span data-info="start">0</span> to <span data-info="end">0</span> of <span data-info="total">0</span> entries</div>
+      <ul class="pagination pagination-sm mb-0" id="pagination"></ul>
+    </div>
+  </div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
-let fieldsData = [];
-let currentPage = 1;
-let totalPages = 1;
-let totalFields = 0;
-let currentSortField = '';
-let currentSortDirection = 'asc';
+(() => {
+  const CSRF = document.querySelector('meta[name="csrf-token"]')?.content;
+  const QS = s => document.querySelector(s);
+  const QSA = s => [...document.querySelectorAll(s)];
+  const API = {
+    list:   p => fetch(u('/admin/fields', p), hdr()).then(j),
+    patch:  (id, body) => fetch(`/admin/fields/${id}`, hdr('PATCH', body)).then(j),
+    dup:    id => fetch(`/admin/fields/${id}/duplicate`, hdr('POST')).then(j),
+    del:    id => fetch(`/admin/fields/${id}`, hdr('DELETE')).then(j),
+    bulk:   (path, ids) => fetch(path, hdr('POST', { field_ids: ids })).then(j),
+    statuses: () => fetch('/admin/statuses?limit=1000', hdr()).then(j)
+  };
+  const state = { rows:[], page:1, pages:1, total:0, sort:'', dir:'asc', per:50, filters:{} , selected:new Set(), statusMap:{}, statusByName:{}};
+  const el = {
+    body: QS('#fieldsBody'), pag: QS('#pagination'),
+    info: {start:QS('[data-info="start"]'), end:QS('[data-info="end"]'), total:QS('[data-info="total"]')},
+    status: QS('#statusFilter'), search: QS('#searchInput'),
+    selectAll: QS('#selectAll'), selectAllHd: QS('#selectAllHeader'),
+    bulkBtns: QSA('.bulk-action')
+  };
 
-// Sort functionality
-function sortTable(field) {
-    if (!field) return;
-    
-    // Toggle direction if same field, otherwise start with asc
-    if (currentSortField === field) {
-        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-        currentSortDirection = 'asc';
-    }
-    
-    currentSortField = field;
-    
-    // Update sort icons
-    document.querySelectorAll('.sort-icon').forEach(icon => {
-        icon.className = 'fas fa-sort ms-1 text-muted sort-icon';
+  function hdr(method='GET', body){
+    const opt = { method, headers:{ 'Accept':'application/json','X-Requested-With':'XMLHttpRequest' } };
+    if(method!=='GET') { opt.headers['Content-Type']='application/json'; opt.headers['X-CSRF-TOKEN']=CSRF; opt.body = JSON.stringify(body||{}); }
+    return opt;
+  }
+  const j = r => r.ok ? r.json() : r.json().then(d=>Promise.reject(d.message||`HTTP ${r.status}`));
+  const u = (base, p={}) => {
+    const url = new URL(base, location.origin); Object.entries(p).forEach(([k,v])=> v!=null && v!=='' && url.searchParams.set(k,v)); return url;
+  };
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : 'Unknown';
+  const toast = (m,t='info') => window.showToast ? window.showToast(m,t) : console.log(t.toUpperCase()+':',m);
+  const debounce = (fn,ms) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+
+  init();
+  async function init(){
+    await loadStatuses();
+    bind();
+    load();
+  }
+
+  async function load(page=1){
+    renderLoading();
+    const data = await API.list({
+      page, sort:state.sort, direction:state.dir,
+      status_id: el.status.value || '', search: el.search.value || ''
+    }).catch(()=> (toast('Error loading fields','error'), { fields:[], num_pages:1, totals:{total:0}}));
+    state.rows = data.fields||[];
+    state.page = page;
+    state.pages = data.num_pages||1;
+    state.total = data.totals?.total ?? state.rows.length;
+    render();
+    updateStats(data.totals||{});
+  }
+
+  function bind(){
+    // Sorting
+    QS('#fieldsHead').addEventListener('click', e=>{
+      const th = e.target.closest('.sortable'); if(!th) return;
+      const key = th.dataset.key;
+      state.dir = state.sort===key && state.dir==='asc' ? 'desc':'asc'; state.sort = key; updateSortIcons(); load(1);
     });
-    
-    const currentIcon = document.getElementById(`sort-${field}`);
-    if (currentIcon) {
-        currentIcon.className = `fas fa-sort-${currentSortDirection === 'asc' ? 'up' : 'down'} ms-1 text-primary sort-icon`;
-    }
-    
-    // Reload fields with sort
-    loadFields(1);
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-    loadFields();
-    setupFieldsFilters();
-    
-    // Populate global dropdowns after a small delay to ensure DOM is ready
-    setTimeout(function() {
-        if (typeof populateGlobalDropdowns === 'function') {
-            populateGlobalDropdowns();
-        }
-    }, 100);
-});
-
-function loadFields(page = 1) {
-    const tbody = document.getElementById('fieldsTableBody');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><div class="mt-2">Loading fields...</div></td></tr>';
-    
-    const url = new URL(window.location.href);
-    url.searchParams.set('page', page);
-    
-    // Add filter parameters
-    const filters = getActiveFilters();
-    Object.entries(filters).forEach(([key, value]) => {
-        if (value) url.searchParams.set(key, value);
+    // Filters
+    el.status.addEventListener('change', ()=>load(1));
+    el.search.addEventListener('input', debounce(()=>load(1), 300));
+    document.addEventListener('click', e=>{
+      const a = e.target.closest('[data-action]'); if(!a) return;
+      const act = a.dataset.action;
+      if(act==='export') location.href='/admin/fields/export';
+      if(act==='import') toast('Import functionality coming soon');
+      if(act==='refresh') load(state.page);
+      if(act==='clear-filters'){ el.status.value=''; el.search.value=''; state.sort=''; state.dir='asc'; updateSortIcons(); load(1); }
+      if(act==='bulk-duplicate') bulk('duplicate');
+      if(act==='bulk-delete') bulk('delete');
     });
-    
-    // Add sort parameters if sorting is active
-    if (currentSortField) {
-        url.searchParams.set('sort', currentSortField);
-        url.searchParams.set('direction', currentSortDirection);
-    }
-    
-    fetch(url.toString(), {
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        fieldsData = data.fields;
-        currentPage = page;
-        totalPages = data.num_pages || 1;
-        totalFields = data.totals ? data.totals.total : data.fields.length;
-        
-        renderFieldsTable(fieldsData);
-        updatePagination();
-        updateStatistics(data.totals);
-    })
-    .catch(error => {
-        console.error('Error loading fields:', error);
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error loading fields. Please refresh the page.</td></tr>';
-    });
-}
 
-function getActiveFilters() {
-    return {
-        status_id: document.getElementById('statusFilter')?.value || '',
-        search: document.getElementById('searchInput')?.value || ''
+    // Select all
+    [el.selectAll, el.selectAllHd].forEach(c=>c.addEventListener('change', e=>{
+      const on = e.target.checked;
+      [el.selectAll, el.selectAllHd].forEach(i=> i && (i.checked = on));
+      QSA('.field-checkbox').forEach(cb=>{ cb.checked = on; toggleSel(cb.value, on); });
+      updateBulkBtns();
+    }));
+
+    // Delegated table actions
+    el.body.addEventListener('click', e=>{
+      const btn = e.target.closest('button'); if(!btn) return;
+      const tr = e.target.closest('tr'); const id = tr?.dataset.id;
+      if(btn.dataset.action==='view') location.href = `/admin/fields/${id}`;
+      if(btn.dataset.action==='duplicate') doDup(id);
+      if(btn.dataset.action==='delete') doDel(id);
+    });
+
+    // Checkbox selection
+    el.body.addEventListener('change', e=>{
+      if(!e.target.classList.contains('field-checkbox')) return;
+      toggleSel(e.target.value, e.target.checked); updateBulkBtns();
+    });
+
+    // Inline edit: blur/Enter saves, Esc reverts
+    el.body.addEventListener('keydown', e=>{
+      const cell = e.target.closest('[contenteditable][data-field]'); if(!cell) return;
+      if(e.key==='Enter'){ e.preventDefault(); cell.blur(); }
+      if(e.key==='Escape'){ e.target.textContent = cell.dataset.prev || cell.textContent; cell.blur(); }
+    });
+    el.body.addEventListener('focusin', e=>{
+      const cell = e.target.closest('[contenteditable][data-field]'); if(cell) cell.dataset.prev = cell.textContent.trim();
+    });
+    el.body.addEventListener('focusout', async e=>{
+      const cell = e.target.closest('[contenteditable][data-field]'); if(!cell) return;
+      const tr = cell.closest('tr'); const id = tr.dataset.id; const key = cell.dataset.field;
+      let val = cell.textContent.trim();
+
+      // Status: map name to status_id if user typed label
+      if(key==='status_id' && isNaN(+val)){
+        const sid = state.statusByName[val] ?? null;
+        if(!sid){ toast('Unknown status','warning'); cell.textContent = cell.dataset.prev; return; }
+        val = sid;
+      }
+      // Numeric coercion for tracks_count
+      if((key==='tracks_count') && isNaN(+val)){ toast('Tracks must be a number','warning'); cell.textContent = cell.dataset.prev; return; }
+
+      if(val === (cell.dataset.prev||'')) return;
+      cell.classList.add('bg-warning-subtle');
+      try{
+        await API.patch(id, { [key]: key==='tracks_count' ? +val : val });
+        toast('Saved','success'); cell.classList.remove('bg-warning-subtle'); cell.classList.add('bg-success-subtle');
+        setTimeout(()=>cell.classList.remove('bg-success-subtle'), 600);
+        if(key==='status_id') cell.textContent = state.statusMap[val] || val;
+        if(key==='created_at') cell.textContent = fmtDate(val);
+      }catch{
+        toast('Save failed','error'); cell.textContent = cell.dataset.prev; cell.classList.remove('bg-warning-subtle');
+      }
+    });
+  }
+
+  function render(){
+    if(!state.rows.length){ el.body.innerHTML = `<tr><td colspan="7" class="text-center py-4"><i class="fas fa-search me-2"></i>No fields found</td></tr>`; return; }
+    el.body.innerHTML = state.rows.map(r=> row(r)).join('');
+    paginate();
+  }
+
+  function row(r){
+    const statusName = r.status?.status || state.statusMap[r.status_id] || 'Unknown';
+    return `
+      <tr data-id="${r.id}">
+        <td><input type="checkbox" class="form-check-input field-checkbox" value="${r.id}" ${state.selected.has(String(r.id))?'checked':''}></td>
+        <td contenteditable="true" data-field="field" class="fw-semibold">${esc(r.field||'')}</td>
+        <td contenteditable="true" data-field="description">${esc(r.description||'')}</td>
+        <td contenteditable="true" data-field="status_id">${esc(statusName)}</td>
+        <td contenteditable="true" data-field="tracks_count">${r.tracks_count ?? 0}</td>
+        <td contenteditable="true" data-field="created_at">${fmtDate(r.created_at)}</td>
+        <td class="text-center">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-info" data-action="view" title="View"><i class="fas fa-eye"></i></button>
+            <button class="btn btn-outline-secondary" data-action="duplicate" title="Duplicate"><i class="fas fa-copy"></i></button>
+            <button class="btn btn-outline-danger" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function paginate(){
+    const make = (label, page, disabled=false, active=false) =>
+      `<li class="page-item ${disabled?'disabled':''} ${active?'active':''}">
+        <a class="page-link" href="#" ${disabled?'':`onclick="return false"`} data-page="${page||''}">${label}</a>
+      </li>`;
+    const items = [];
+    items.push(make('&laquo;', state.page-1, state.page<=1));
+    const s = Math.max(1, state.page-2), e = Math.min(state.pages, state.page+2);
+    if(s>1){ items.push(make('1',1)); if(s>2) items.push(`<li class="page-item disabled"><span class="page-link">…</span></li>`); }
+    for(let i=s;i<=e;i++) items.push(make(String(i),i,false,i===state.page));
+    if(e<state.pages){ if(e<state.pages-1) items.push(`<li class="page-item disabled"><span class="page-link">…</span></li>`); items.push(make(String(state.pages), state.pages)); }
+    items.push(make('&raquo;', state.page+1, state.page>=state.pages));
+    el.pag.innerHTML = items.join('');
+    el.pag.onclick = ev=>{
+      const a = ev.target.closest('a[data-page]'); if(!a) return;
+      const p = +a.dataset.page; if(!p || p===state.page) return;
+      load(p);
     };
-}
+    const start = (state.page-1)*state.per + 1, end = Math.min(state.page*state.per, state.total);
+    if(el.info.start) el.info.start.textContent = state.total ? start : 0;
+    if(el.info.end) el.info.end.textContent = state.total ? end : 0;
+    if(el.info.total) el.info.total.textContent = state.total;
+  }
 
-function setupFieldsFilters() {
-    // Add filter event listeners
-    ['statusFilter', 'searchInput'].forEach(filterId => {
-        const element = document.getElementById(filterId);
-        if (element) {
-            element.addEventListener('change', () => loadFields(1));
-            if (filterId === 'searchInput') {
-                let searchTimeout;
-                element.addEventListener('input', () => {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => loadFields(1), 500);
-                });
-            }
-        }
-    });
-}
+  async function doDup(id){ await API.dup(id).then(()=> (toast('Duplicated','success'), load(state.page))).catch(()=>toast('Duplicate failed','error')); }
+  async function doDel(id){
+    if(!confirm('Delete this field? This cannot be undone.')) return;
+    await API.del(id).then(()=> (toast('Deleted','success'), load(state.page))).catch(()=>toast('Delete failed','error'));
+  }
+  async function bulk(kind){
+    const ids = [...state.selected]; if(!ids.length) return toast(`Please select fields to ${kind}`,'warning');
+    if(!confirm(`${kind==='delete'?'Delete':'Duplicate'} ${ids.length} selected?${kind==='delete'?' This cannot be undone.':''}`)) return;
+    const path = kind==='delete'? '/admin/fields/bulk-delete':'/admin/fields/bulk-duplicate';
+    toggleBulk(true, kind); await API.bulk(path, ids).then(()=>{
+      toast(`${ids.length} ${kind==='delete'?'deleted':'duplicated'}!`,'success'); state.selected.clear(); load(state.page);
+    }).catch(()=> toast(`Bulk ${kind} failed`,'error')).finally(()=> toggleBulk(false, kind));
+  }
 
-function renderFieldsTable(fields) {
-    const tbody = document.getElementById('fieldsTableBody');
-    
-    if (!fields || fields.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><i class="fas fa-search me-2"></i>No fields found</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = fields.map(field => `
-        <tr class="field-row" data-field-id="${field.id}">
-        <td>
-        <div class="form-check">
-        <input type="checkbox" value="${field.id}" class="form-check-input field-checkbox">
-        </div>
-        </td>
-        <td>
-        <div class="field-details">
-        <div class="fw-semibold mb-1">${field.field}</div>
-        <small class="text-muted">ID: ${field.id}</small>
-        </div>
-        </td>
-        <td>
-        <div class="field-description">
-        ${field.description ? truncateText(field.description, 80) : '<span class="text-muted">No description</span>'}
-        </div>
-        </td>
-        <td>
-        ${renderFieldStatus(field.status)}
-        </td>
-        <td>
-        <span class="badge bg-info">${field.tracks_count || 0}</span>
-        </td>
-        <td>
-        ${formatDate(field.created_at)}
-        </td>
-        <td>
-        <div class="btn-group btn-group-sm">
-        <button type="button" class="btn btn-outline-info" onclick="viewField(${field.id})" title="View">
-        <i class="fas fa-eye"></i>
-        </button>
-        <button type="button" class="btn btn-outline-secondary" onclick="copyField(${field.id})" title="Duplicate">
-        <i class="fas fa-copy"></i>
-        </button>
-        <button type="button" class="btn btn-outline-danger" onclick="deleteField(${field.id})" title="Delete">
-        <i class="fas fa-trash"></i>
-        </button>
-        </div>
-        </td>
-        </tr>
-        `).join('');
-}
+  function toggleBulk(disabled, kind){
+    const btn = document.querySelector(`[data-action="bulk-${kind}"]`); if(!btn) return;
+    btn.disabled = disabled; btn.innerHTML = disabled ? `<i class="fas fa-spinner fa-spin me-1"></i>${kind==='delete'?'Deleting...':'Duplicating...'}` : btn.dataset.action==='bulk-delete'?'<i class="fas fa-trash me-1"></i>Delete Selected':'<i class="fas fa-copy me-1"></i>Duplicate Selected';
+    QSA('[data-bulk="true"]').forEach(i=> i.classList.toggle('disabled', disabled));
+  }
 
-function renderFieldStatus(status) {
-    if (!status) return '<span class="badge bg-secondary">Unknown</span>';
-    
-    const statusConfig = {
-        'Public': { class: 'success', icon: 'globe' },
-        'Draft': { class: 'warning', icon: 'edit' },
-        'Only Me': { class: 'info', icon: 'lock' },
-        'Restricted': { class: 'secondary', icon: 'ban' }
-    };
-    
-    const config = statusConfig[status.status] || { class: 'secondary', icon: 'question' };
-    
-    return `<span class="badge bg-${config.class}"><i class="fas fa-${config.icon} me-1"></i>${status.status}</span>`;
-}
+  function updateStats(t){ const s = { total: t.total||state.total, public:t.public||0, draft:t.draft||0, private:t.private||0 };
+    QSA('[data-stat]').forEach(e=> { const k=e.dataset.stat; if(k in s) e.textContent = s[k]; });
+  }
 
-function updatePagination() {
-    const paginationContainer = document.getElementById('pagination');
-    if (!paginationContainer) return;
-    
-    let paginationHtml = '';
-    
-    if (currentPage > 1) {
-        paginationHtml += `
-        <li class="page-item">
-        <a class="page-link" href="#" onclick="loadFields(${currentPage - 1}); return false;">
-        <i class="fas fa-chevron-left"></i> Previous
-        </a>
-        </li>
-        `;
-    } else {
-        paginationHtml += `
-        <li class="page-item disabled">
-        <span class="page-link">
-        <i class="fas fa-chevron-left"></i> Previous
-        </span>
-        </li>
-        `;
-    }
-    
-    const startPage = Math.max(1, currentPage - 2);
-    const endPage = Math.min(totalPages, currentPage + 2);
-    
-    if (startPage > 1) {
-        paginationHtml += `
-        <li class="page-item">
-        <a class="page-link" href="#" onclick="loadFields(1); return false;">1</a>
-        </li>
-        `;
-        if (startPage > 2) {
-            paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-        }
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-        paginationHtml += `
-        <li class="page-item ${i === currentPage ? 'active' : ''}">
-        <a class="page-link" href="#" onclick="loadFields(${i}); return false;">${i}</a>
-        </li>
-        `;
-    }
-    
-    if (endPage < totalPages) {
-        if (endPage < totalPages - 1) {
-            paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-        }
-        paginationHtml += `
-        <li class="page-item">
-        <a class="page-link" href="#" onclick="loadFields(${totalPages}); return false;">${totalPages}</a>
-        </li>
-        `;
-    }
-    
-    if (currentPage < totalPages) {
-        paginationHtml += `
-        <li class="page-item">
-        <a class="page-link" href="#" onclick="loadFields(${currentPage + 1}); return false;">
-        Next <i class="fas fa-chevron-right"></i>
-        </a>
-        </li>
-        `;
-    } else {
-        paginationHtml += `
-        <li class="page-item disabled">
-        <span class="page-link">
-        Next <i class="fas fa-chevron-right"></i>
-        </span>
-        </li>
-        `;
-    }
-    
-    paginationContainer.innerHTML = paginationHtml;
-    
-    const start = (currentPage - 1) * 50 + 1;
-    const end = Math.min(currentPage * 50, start + fieldsData.length - 1);
-    
-    document.getElementById('showing-start').textContent = start;
-    document.getElementById('showing-end').textContent = end;
-    document.getElementById('total-records').textContent = totalFields;
-}
+  function updateSortIcons(){
+    QSA('#fieldsHead .sortable i').forEach(i=> i.className='fas fa-sort ms-1 text-muted');
+    const th = QSA('#fieldsHead .sortable').find(h=> h.dataset.key===state.sort);
+    if(th) th.querySelector('i').className = `fas fa-sort-${state.dir==='asc'?'up':'down'} ms-1 text-primary`;
+  }
 
-function updateStatistics(totals) {
-    if (totals) {
-        document.getElementById('totalFieldsCount').textContent = totals.total || 0;
-        document.getElementById('publicCount').textContent = totals.public || 0;
-        document.getElementById('draftCount').textContent = totals.draft || 0;
-        document.getElementById('privateCount').textContent = totals.private || 0;
-    } else {
-        document.getElementById('totalFieldsCount').textContent = totalFields;
-        // Calculate from current data if no totals provided
-        const public = fieldsData.filter(f => f.status?.status === 'Public').length;
-        const draft = fieldsData.filter(f => f.status?.status === 'Draft').length;
-        const private = fieldsData.filter(f => f.status?.status === 'Only Me').length;
-        
-        document.getElementById('publicCount').textContent = public;
-        document.getElementById('draftCount').textContent = draft;
-        document.getElementById('privateCount').textContent = private;
-    }
-}
+  async function loadStatuses(){
+    const res = await API.statuses().catch(()=>({data:[]}));
+    const list = res.data || res.statuses || res || [];
+    state.statusMap = {}; state.statusByName = {};
+    list.forEach(s=>{ const id = s.id; const name = s.status || s.name || 'Unnamed'; state.statusMap[id]=name; state.statusByName[name]=id; });
+    // fill filter
+    const frag = document.createDocumentFragment();
+    Object.entries(state.statusMap).forEach(([id,name])=>{ const o=document.createElement('option'); o.value=id; o.textContent=name; frag.appendChild(o); });
+    el.status.appendChild(frag);
+  }
 
-function clearFilters() {
-    document.getElementById('statusFilter').value = '';
-    document.getElementById('searchInput').value = '';
-    loadFields(1);
-}
-
-function truncateText(text, length) {
-    if (!text) return '';
-    return text.length > length ? text.substring(0, length) + '...' : text;
-}
-
-function formatDate(dateString) {
-    if (!dateString) return 'Unknown';
-    return new Date(dateString).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-    });
-}
-
-function toggleSelectAll() {
-    const selectAllCheckbox = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.field-checkbox');
-    
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAllCheckbox.checked;
-    });
-    
-    updateBulkActionButtons();
-}
-
-function updateBulkActionButtons() {
-    const selectedCheckboxes = document.querySelectorAll('.field-checkbox:checked');
-    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-    const bulkDuplicateBtn = document.getElementById('bulkDuplicateBtn');
-    
-    const hasSelected = selectedCheckboxes.length > 0;
-    
-    if (bulkDeleteBtn) {
-        bulkDeleteBtn.disabled = !hasSelected;
-    }
-    
-    if (bulkDuplicateBtn) {
-        bulkDuplicateBtn.disabled = !hasSelected;
-    }
-}
-
-function bulkDuplicate() {
-    const selectedIds = getSelectedIds();
-    if (selectedIds.length === 0) {
-        showToast('Please select fields to duplicate', 'warning');
-        return;
-    }
-    
-    if (confirm(`Are you sure you want to duplicate ${selectedIds.length} selected fields?`)) {
-        const bulkDuplicateBtn = document.getElementById('bulkDuplicateBtn');
-        const originalText = bulkDuplicateBtn.innerHTML;
-        bulkDuplicateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Duplicating...';
-        bulkDuplicateBtn.disabled = true;
-        
-        fetch('/admin/fields/bulk-duplicate', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                field_ids: selectedIds
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast(`${selectedIds.length} fields duplicated successfully!`, 'success');
-                document.getElementById('selectAll').checked = false;
-                document.querySelectorAll('.field-checkbox').forEach(cb => cb.checked = false);
-                loadFields(currentPage);
-            } else {
-                showToast(data.message || 'Error duplicating fields', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('Error duplicating fields', 'error');
-        })
-        .finally(() => {
-            bulkDuplicateBtn.innerHTML = originalText;
-            updateBulkActionButtons();
-        });
-    }
-}
-
-function bulkDelete() {
-    const selectedIds = getSelectedIds();
-    
-    if (selectedIds.length === 0) {
-        showToast('Please select fields to delete', 'warning');
-        return;
-    }
-    
-    if (confirm(`Are you sure you want to delete ${selectedIds.length} selected fields? This action cannot be undone.`)) {
-        fetch('/admin/fields/bulk-delete', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                field_ids: selectedIds
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Selected fields deleted successfully!', 'success');
-                document.getElementById('selectAll').checked = false;
-                document.querySelectorAll('.field-checkbox').forEach(cb => cb.checked = false);
-                loadFields(currentPage);
-            } else {
-                showToast(data.message || 'Error deleting fields', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            showToast('Error deleting fields', 'error');
-        });
-    }
-}
-
-function getSelectedIds() {
-    const selectedCheckboxes = document.querySelectorAll('.field-checkbox:checked');
-    return Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
-}
-
-function viewField(fieldId) {
-    window.location.href = `/admin/fields/${fieldId}`;
-}
-
-function editField(fieldId) {
-    window.location.href = `/admin/fields/${fieldId}/edit`;
-}
-
-function copyField(fieldId) {
-    if (confirm('Are you sure you want to duplicate this field?')) {
-        fetch(`/admin/fields/${fieldId}/duplicate`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Accept': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Field duplicated successfully!', 'success');
-                loadFields(currentPage); // ← Already refreshes
-            } else {
-                showToast(data.message || 'Error duplicating field', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('Error duplicating field', 'error');
-        });
-    }
-}
-
-function deleteField(fieldId) {
-    if (confirm('Are you sure you want to delete this field? This action cannot be undone.')) {
-        fetch(`/admin/fields/${fieldId}`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Accept': 'application/json'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                showToast('Field deleted successfully!', 'success');
-                loadFields(currentPage); // Refresh the table
-            } else {
-                // Handle error response
-                return response.json().then(data => {
-                    showToast(data.message || 'Error deleting field', 'error');
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('Error deleting field', 'error');
-        });
-    }
-}
-function exportFields() {
-    window.location.href = '/admin/fields/export';
-}
-
-function importFields() {
-    showToast('Import functionality coming soon', 'info');
-}
-
-function refreshData() {
-    loadFields(currentPage);
-}
-
-function showToast(message, type = 'info') {
-    if (typeof window.showToast === 'function') {
-        window.showToast(message, type);
-    } else {
-        alert(`${type.toUpperCase()}: ${message}`);
-    }
-}
-
-document.addEventListener('change', function(e) {
-    if (e.target.classList.contains('field-checkbox')) {
-        updateBulkActionButtons();
-    }
-});
+  function toggleSel(id,on){ on ? state.selected.add(String(id)) : state.selected.delete(String(id)); }
+  function updateBulkBtns(){ const on = state.selected.size>0; el.bulkBtns.forEach(b=> b.disabled = !on); }
+  function renderLoading(){ el.body.innerHTML = `<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div><div class="mt-2">Loading fields...</div></td></tr>`; }
+  function esc(s){ const d=document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+})();
 </script>
 @endpush

@@ -11,17 +11,17 @@ class Difficulty extends Model
     
     protected $hidden = ['user_id', 'created_at', 'updated_at'];
     protected $fillable = ['difficulty', 'description', 'short_description',
-        'image', 'status'];
+        'image', 'status_id'];
 
     //relationship
     public function user() {                        //who created this difficulty level
-        return $this->belongsTo(\App\Models\User);
+        return $this->belongsTo(\App\Models\User::class,'user_id');
     }
 
     public function levels(){
         return $this->belongsToMany(\App\Models\Level);
     }
     public function status() {
-        return $this->belongsTo(\App\Models\Status);
+        return $this->belongsTo(\App\Models\Status::class, 'status_id');
     }
 }
