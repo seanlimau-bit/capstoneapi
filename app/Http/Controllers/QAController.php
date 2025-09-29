@@ -10,23 +10,42 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Services\LookupOptionsService;
+use Illuminate\Support\Facades\Schema;
 
 class QAController extends Controller
 {
     /**
      * QA Dashboard
      */
-    public function index(Request $request)
+    public function index(Request $request, LookupOptionsService $lookup)
     {
-        $query = Question::with('skill')
-        ->withCount('qaIssues')
-        ->withCount(['qaIssues as open_qa_issues_count' => function ($q) {
-            $q->where('status', 'open');
-        }]);
+        // ---------- Base builder (do NOT overwrite later) ----------
+        $query = Question::query()
+            ->with(['skill'])
+            ->withCount('qaIssues')
+            ->withCount([
+                'qaIssues as open_qa_issues_count' => function ($q) {
+                    $q->where('status', 'open');
+                },
+            ])
+            // only questions whose Skill is public
+            ->whereHas('skill', fn($s) => $s->public());
 
-        // ---- Filters ----
+        // ---------- Approved Today ----------
+        $tz    = config('app.timezone', 'UTC');
+        $start = now($tz)->startOfDay()->utc();  // convert the local day bounds to UTC
+        $end   = now($tz)->endOfDay()->utc();
+
+        // In the main list when ?today=1 is present:
+        if ($request->boolean('today')) {
+            $query->where('qa_status', 'approved')
+                  ->whereBetween(DB::raw('COALESCE(reviewed_at, updated_at)'), [$start, $end]);
+        }
+
+        // ---------- Filters ----------
         if ($request->filled('status')) {
-            $query->where('qa_status', $request->status);
+            $query->where('qa_status', $request->string('status'));
         }
 
         if ($request->filled('type')) {
@@ -34,8 +53,7 @@ class QAController extends Controller
         }
 
         // accept skill or skill_id
-        $skillId = $request->input('skill_id', $request->input('skill'));
-        if ($skillId) {
+        if ($skillId = $request->input('skill_id', $request->input('skill'))) {
             $query->where('skill_id', (int) $skillId);
         }
 
@@ -51,30 +69,40 @@ class QAController extends Controller
         // Level filter via question->skill->tracks(level_id)
         if ($request->filled('level')) {
             $levelId = (int) $request->level;
-            $query->whereHas('skill.tracks', function ($q) use ($levelId) {
-                $q->where('level_id', $levelId);
-            });
+            $query->whereHas('skill.tracks', fn($q) => $q->where('level_id', $levelId));
         }
 
-        // sorting (guard allowed columns)
+        // ---------- Sorting ----------
         $sort = $request->input('sort', 'created_at');
         $allowedSorts = ['created_at', 'updated_at'];
-        $sort = in_array($sort, $allowedSorts, true) ? $sort : 'created_at';
+        if (Schema::hasColumn('questions', 'priority')) {
+            $allowedSorts[] = 'priority';
+        }
+        if (!in_array($sort, $allowedSorts, true)) {
+            $sort = 'created_at';
+        }
 
         $questions = $query->orderBy($sort, 'desc')
-        ->paginate(25)
-        ->appends($request->query());
+            ->paginate(25)
+            ->appends($request->query());
 
-        // stats
+        // ---------- Stats (mirror the public-skill constraint) ----------
+        $statsBase = Question::query()->whereHas('skill', fn($s) => $s->public());
+        $todayExpr = DB::raw('COALESCE(reviewed_at, updated_at)');
+
         $stats = [
-            'pending'        => Question::where('qa_status', 'unreviewed')->count(),
-            'flagged'        => Question::where('qa_status', 'flagged')->count(),
-            'needs_revision' => Question::where('qa_status', 'needs_revision')->count(),
-            'approved'       => Question::where('qa_status', 'approved')->whereDate('reviewed_at', today())->count(),
+            'pending'        => (clone $statsBase)->where('qa_status', 'unreviewed')->count(),
+            'flagged'        => (clone $statsBase)->where('qa_status', 'flagged')->count(),
+            'needs_revision' => (clone $statsBase)->where('qa_status', 'needs_revision')->count(),
+            'approved'       => (clone $statsBase)->where('qa_status', 'approved')
+                                                  ->whereBetween($todayExpr, [$start, $end])
+                                                  ->count(),
         ];
-
-        $skills  = Skill::orderBy('skill')->get();
-        $levels  = Level::orderBy('level', 'asc')->get(); // works even if name is present/absent
+        // ---------- Filter options from the service (no Blade changes) ----------
+        // Your Blade expects $skills (with id & skill) and $levels. Use the service for skills.
+        $opts    = $lookup->filterOptionsForQuestionsIndex(); // returns skills as Eloquent with id,skill
+        $skills  = $opts['skills'];                           // matches Blade's expectation
+        $levels  = Level::orderBy('level', 'asc')->get();     // unchanged; service doesn’t provide levels
 
         return view('admin.qa.index', compact('questions', 'stats', 'skills', 'levels'));
     }

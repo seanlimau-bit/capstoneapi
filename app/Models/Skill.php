@@ -18,8 +18,8 @@ class Skill extends Model
     public function videos()
     {
         return $this->belongsToMany(Video::class, 'skill_video', 'skill_id', 'video_id')
-            ->withPivot(['status_id', 'sort_order'])
-            ->withTimestamps();
+        ->withPivot(['status_id', 'sort_order'])
+        ->withTimestamps();
     }
     public function user(){
         return $this->belongsTo(\App\Models\User::class);
@@ -40,6 +40,12 @@ class Skill extends Model
     public function status() {
         return $this->belongsTo(Status::class);
     }
+    
+    public function scopePublic($q)
+    {
+        return $q->whereHas('status', fn($s) => $s->where('status', 'Public'));
+    }
+
 
     public function houses() {
         return $this->belongsToMany(House::class)->withPivot('start_date','end_date');
@@ -143,15 +149,15 @@ class Skill extends Model
             if (!$correct) {
                 $fail_streak += 1;
                 if ($difficulty <= $difficulty_passed){   // testing simpler than passed
-                   if (!$test->diagnostic){
-                      if ($fail_streak >= Config::get('app.number_to_fail')){
-                         $difficulty_passed = max(0,$difficulty_passed - 1);
-                         $fail_streak = 1;                    
-                      }
-                   }
-                }
-            } else {
-                $correct_streak += 1;
+                 if (!$test->diagnostic){
+                  if ($fail_streak >= Config::get('app.number_to_fail')){
+                   $difficulty_passed = max(0,$difficulty_passed - 1);
+                   $fail_streak = 1;                    
+               }
+           }
+       }
+   } else {
+    $correct_streak += 1;
                 if ($difficulty_passed < $difficulty){  //testing more difficult than passed
                     if ($test->diagnostic || $correct_streak >= Config::get('app.number_to_pass')) {
                         $difficulty_passed = $difficulty;
@@ -202,10 +208,10 @@ class Skill extends Model
             'noOfTries'=> $noOfTries,
             'correct_streak'=>max(0,$correct_streak),
             'fail_streak'=> max(0,$fail_streak)];
-        return $this->users()->sync([$userid=>$record]);
-    }
+            return $this->users()->sync([$userid=>$record]);
+        }
 
-    public function users_failed(){
-        return $this->users()->wherePivot('skill_passed','=',FALSE)->wherePivot('fail_streak','>',3)->get();
+        public function users_failed(){
+            return $this->users()->wherePivot('skill_passed','=',FALSE)->wherePivot('fail_streak','>',3)->get();
+        }
     }
-}

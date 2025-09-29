@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Partner extends Model
 {
@@ -16,4 +19,14 @@ class Partner extends Model
         'features' => 'array',
         'verification_required' => 'boolean'
     ];
+    /**
+     * Get the status of this partner
+     */
+    public function status(): BelongsTo
+    {
+        return $this->belongsTo(Status::class);
+    }
+
+    public function scopePublic($q) { return $q->where('status', 'Public'); }
+
 }

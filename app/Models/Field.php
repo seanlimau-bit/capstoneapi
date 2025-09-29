@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Field;
 
 class Field extends Model
 {
@@ -77,18 +78,17 @@ class Field extends Model
      */
     public function status(): BelongsTo
     {
-        return $this->belongsTo(Status::class);
+        return $this->belongsTo(Status::class, 'status_id');
     }
 
     /**
      * Scope to get only active fields
      */
-    public function scopeActive($query)
+    public function scopePublic($q)
     {
-        return $query->whereHas('status', function ($q) {
-            $q->where('status', 'active'); // Changed from 'name' to 'status'
-        });
+        return $q->whereHas('status', fn($s) => $s->where('status', 'Public'));
     }
+
 
     /**
      * Scope to get fields by status
@@ -107,7 +107,7 @@ class Field extends Model
     {
         return $query->where(function ($q) use ($search) {
             $q->where('field', 'LIKE', "%{$search}%")
-              ->orWhere('description', 'LIKE', "%{$search}%");
+            ->orWhere('description', 'LIKE', "%{$search}%");
         });
     }
 
@@ -138,10 +138,10 @@ class Field extends Model
      /**
      * Get the count of active questions for this field
      */
-    public function getActiveQuestionsCountAttribute()
-    {
+     public function getActiveQuestionsCountAttribute()
+     {
         return $this->questions()
-                    ->whereHas('status', function ($q) {
+        ->whereHas('status', function ($q) {
                         $q->where('status', 'active');  // Changed from 'name' to 'status'
                     })->count();
     }

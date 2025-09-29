@@ -24,4 +24,5 @@ class Solution extends Model
         return $this->belongsTo(\App\Models\Status::class);
     }
 
+    public function scopePublic($q) { return $q->where('status', 'Public'); }
 }

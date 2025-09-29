@@ -13,6 +13,31 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Dynamic Favicon -->
+        <!-- KaTeX CSS & JS (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+         renderKaTeX();
+        });
+        
+        function renderKaTeX() {
+          const elements = document.querySelectorAll('.question-field, .editable-field, .fib-content, .mcq-option, .math-render');
+          elements.forEach(element => {
+            renderMathInElement(element, {
+              delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false},
+              {left: '\\(', right: '\\)', display: false},
+              {left: '\\[', right: '\\]', display: true}
+              ],
+              throwOnError: false
+            });
+          });
+        }
+    </script>
     @if(isset($siteSettings['favicon']) && $siteSettings['favicon'])
     <link rel="icon" type="image/x-icon" href="{{ asset($siteSettings['favicon']) }}">
     <link rel="shortcut icon" href="{{ asset($siteSettings['favicon']) }}">
@@ -495,6 +520,7 @@
         function debugGlobalData() {
             console.log('Global Admin Data:', getGlobalAdminData());
         }
+
     </script>
 
     @stack('scripts')

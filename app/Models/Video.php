@@ -47,6 +47,8 @@ class Video extends Model
         return $this->belongsTo(Status::class, 'status_id');
     }
 
+    public function scopePublic($q) { return $q->where('status', 'Public'); }
+
     // Belongs-to: videos.user_id → users.id
     public function author()
     {

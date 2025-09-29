@@ -22,8 +22,8 @@ use App\Http\Controllers\Admin\LevelController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\StatusController;
 use App\Http\Controllers\Admin\UnitController;
-use App\Http\Controllers\HintController;
-use App\Http\Controllers\SolutionController;
+use App\Http\Controllers\Admin\HintController;
+use App\Http\Controllers\Admin\SolutionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -192,6 +192,8 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
         });
 
         Route::prefix('users/{user}')->name('users.')->group(function () {
+            // Inline update for a single user (resourceful-ish)
+            Route::post('/inline', [UserController::class, 'inlineUpdate'])->name('inline');
             Route::get('/performance', [UserController::class, 'performance'])->name('performance');
             Route::post('/assign-role', [UserController::class, 'assignHouseRole'])->name('assign-role');
             Route::post('/reset', [UserController::class, 'reset'])->name('reset');
@@ -199,6 +201,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
             Route::post('/administrator', [UserController::class, 'administrator'])->name('administrator');
             Route::put('/fields/{field}', [UserController::class, 'updateField'])->name('fields.update');
             Route::delete('/house-roles/{houseRole}', [UserController::class, 'removeHouseRole'])->name('remove-role');
+            Route::get('/tests/{test}/questions', [UserController::class, 'showTestQuestion'])->name('tests.questions');
         });
 
         // =====================================================

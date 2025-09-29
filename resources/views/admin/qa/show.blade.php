@@ -157,7 +157,8 @@
                             @endphp
                             <span class="badge bg-{{ $difficultyColor }}">{{ $difficulty }}</span>
                         </div>
-                        <div class="col-md-3">
+
+                        <div class="col-md-5">
                             <h6 class="text-muted small mb-2">SKILL</h6>
                             @if($question->skill)
                             <span class="badge bg-primary">{{ $question->skill->skill }}</span>
@@ -165,19 +166,15 @@
                             <span class="text-muted">No skill assigned</span>
                             @endif
                         </div>
-                        {{--                        <div class="col-md-3">
-                            <h6 class="text-muted small mb-2">LEVEL</h6>
-                            @if($question->skill && $question->skill->tracks->isNotEmpty() && $question->level())
-                            <span class="badge bg-info">Level {{ $question->level() }}</span>
-                            @else
-                            <span class="text-muted">No level assigned</span>
-                            @endif
-                        </div> --}}
-                        <div class="col-md-3">
-                            <h6 class="text-muted small mb-2">CALCULATOR</h6>
+
+                        <div class="col-md-2 text-center">
+                            <h6 class="text-muted small mb-2">
+                                <i class="fas fa-calculator"></i>
+                            </h6>
                             <span class="badge bg-secondary">{{ $question->calculator ? ucfirst($question->calculator) : 'None' }}</span>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -232,7 +229,7 @@
         <button class="btn btn-outline-success w-100" onclick="saveNotes({{ $question->id }})">
           <i class="fas fa-save me-1"></i> Save Notes
       </button>
-
+      @include('admin.components.math-help')
       @if($question->qa_reviewed_at)
       <div class="text-muted small mt-3">
         <i class="fas fa-clock me-1"></i> Reviewed {{ $question->qa_reviewed_at->diffForHumans() }}

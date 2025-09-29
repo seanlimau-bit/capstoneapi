@@ -1,0 +1,206 @@
+    .editable-field {
+        cursor: pointer;
+        padding: 8px 12px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        position: relative;
+        min-height: 38px;
+        transition: all 0.2s;
+    }
+    
+    .editable-field:hover {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+    }
+    
+    .edit-icon {
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    
+    .editable-field:hover .edit-icon {
+        opacity: 1;
+    }
+    
+    .mcq-option {
+        display: flex;
+        align-items: flex-start;
+        padding: 15px;
+        margin-bottom: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+    
+    .mcq-option.border-success {
+        border-color: #198754 !important;
+        background-color: rgba(25, 135, 84, 0.1);
+    }
+    
+    .mcq-option-label {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #6c757d;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 15px;
+        flex-shrink: 0;
+        position: relative;
+    }
+    
+    .mcq-option-label.bg-success {
+        background-color: #198754 !important;
+    }
+    
+    .image-container, .answer-image-container {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 15px;
+    }
+    
+    .image-wrapper, .image-wrapper-small {
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+        border: 2px solid #e9ecef;
+    }
+    
+    .question-image {
+        max-width: 100%;
+        max-height: 300px;
+        height: auto;
+        border-radius: 6px;
+    }
+    
+    .answer-image {
+        max-height: 80px;
+        border-radius: 4px;
+    }
+    
+    .image-overlay, .image-overlay-small {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .image-wrapper:hover .image-overlay,
+    .image-wrapper-small:hover .image-overlay-small {
+        opacity: 1;
+    }
+    
+    .upload-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: #f8f9fa;
+    }
+    
+    .upload-area:hover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .upload-area-small {
+        border: 1px dashed #dee2e6;
+        border-radius: 4px;
+        padding: 8px 12px;
+        text-align: center;
+        cursor: pointer;
+        font-size: 0.875rem;
+        color: #6c757d;
+        background: #f8f9fa;
+        transition: all 0.2s;
+    }
+    
+    .upload-area-small:hover {
+        border-color: #0d6efd;
+        color: #0d6efd;
+        background: #e7f1ff;
+    }
+    
+    .skill-change-box {
+        border: 2px solid #198754 !important;
+        background-color: rgba(25, 135, 84, 0.05);
+    }
+
+    /* Image Preview Modal Styles */
+    .image-preview-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.8);
+    }
+    
+    .image-preview-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+    }
+    
+    .preview-image {
+        max-width: 100%;
+        max-height: 300px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    .file-info {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        margin-bottom: 15px;
+    }
+    .katex-display { 
+      display: inline; 
+      margin: 0;
+  }
+  .katex-display > .katex { 
+      display: inline; 
+  }
+  /* Hug content; prevent wrapping inside actions */
+  th.actions-col, td.actions-col {
+      width: 1%;
+      white-space: nowrap;
+  }
+
+  /* Make icon buttons tighter */
+  .actions-col .btn-group .btn {
+      padding: .25rem .4rem; /* tighter than btn-sm default */
+  }
+
+  /* If any button accidentally has text, hide it on the list table */
+  .actions-col .btn .btn-text { 
+      display: none; 
+  }
+
+  /* Optional: icon-only utility if you want */
+  .btn-icon-only i { margin: 0; } 

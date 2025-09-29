@@ -11,7 +11,7 @@ class Difficulty extends Model
     
     protected $hidden = ['user_id', 'created_at', 'updated_at'];
     protected $fillable = ['difficulty', 'description', 'short_description',
-        'image', 'status_id'];
+    'image', 'status_id'];
 
     //relationship
     public function user() {                        //who created this difficulty level
@@ -23,5 +23,9 @@ class Difficulty extends Model
     }
     public function status() {
         return $this->belongsTo(\App\Models\Status::class, 'status_id');
+    }
+    public function scopePublic($q)
+    {
+        return $q->whereHas('status', fn($s) => $s->where('status', 'Public'));
     }
 }

@@ -50,6 +50,8 @@ class Question extends Model
     public function status() {
         return $this->belongsTo(\App\Models\Status::class);
     }
+    
+    public function scopePublic($q) { return $q->where('status', 'Public'); }
 
     public function type() {
         return $this->belongsTo(\App\Models\Type::class);
@@ -366,5 +368,28 @@ class Question extends Model
             'track_maxile' => $track_maxile,
             'field_maxile' => max($existing_field_maxile, $highestTrackMaxile),
         ];
+    }
+
+    public const QA_STATUS_LABELS = [
+        'unreviewed'     => 'Unreviewed',
+        'ai_generated'   => 'AI Generated',
+        'approved'       => 'Approved',
+        'flagged'        => 'Flagged',
+        'needs_revision' => 'Needs Revision',
+    ];
+
+    // New, additive: value => label map, built from the enum list you already expose
+    public static function qaStatusOptions(): array
+    {
+        $enumValues = collect(self::getQaStatuses()); // your existing method
+        return $enumValues->mapWithKeys(
+            fn($v) => [$v => self::QA_STATUS_LABELS[$v] ?? ucfirst(str_replace('_',' ', $v))]
+        )->all();
+    }
+
+    // Optional convenience accessor (doesn’t break anything):
+    public function getQaStatusLabelAttribute(): string
+    {
+        return self::qaStatusOptions()[$this->qa_status] ?? (string) $this->qa_status;
     }
 }

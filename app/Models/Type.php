@@ -9,7 +9,7 @@ class Type extends Model
     use RecordLog;
 
     protected $hidden = ['created_at', 'updated_at'];
-    protected $fillable = ['type', 'description', 'status_id'];
+    protected $fillable = ['type', 'description'];
 
     //relationship
     public function questions(){
@@ -19,4 +19,11 @@ class Type extends Model
     public function status() {
         return $this->belongsTo(\App\Models\Status::class);
     }
-}
+        /**
+     * Scope for active types
+     */
+        public function scopePublic($q)
+        {
+            return $q->whereHas('status', fn($s) => $s->where('status', 'Public'));
+        }
+    }
