@@ -254,7 +254,7 @@ $human = function ($d, $fallback = 'Unknown') {
               </td>
               <td><a href="{{ $reviewUrl }}" class="text-decoration-none">#{{ $question->id }}</a></td>
               <td>
-                <a href="{{ $reviewUrl }}" class="question-link">
+                <a href="{{ $reviewUrl }}" class="question-link question-field">
                   {{ \Illuminate\Support\Str::limit(strip_tags($question->question ?? ''), 80) }}
                   @if(strlen(strip_tags($question->question ?? '')) > 80)…@endif
                   @if($question->question_image)
