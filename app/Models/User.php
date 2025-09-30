@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 use DateTime;
-
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Foundation\Auth\Access\Authorizable;
 use Illuminate\Auth\Passwords\CanResetPassword;
@@ -86,39 +85,95 @@ class User extends Authenticatable implements AuthenticatableContract, Authoriza
         return $this->belongsTo(Role::class);
     }
 
-    public function hasRole($roleName)
+    public function roleName(): ?string
     {
-        return $this->role?->role === $roleName;
+        // safer if role isn't eager loaded
+        return optional($this->role)->role;
     }
 
-    public function canAccessAdmin()
+    public function hasRole(string $roleName): bool
     {
-        return $this->is_admin || $this->hasRole('System Admin');
+        return $this->roleName() === $roleName;
     }
 
-    public function canAccessQA()
+    /**
+     * Permission helpers (fast DB checks; simple and explicit)
+     */
+    public function hasPermission(string $perm): bool
     {
-        return $this->hasRole('QA Reviewer') || $this->canAccessAdmin();
+        if (!$this->role_id) return false;
+        return DB::table('permission_role as pr')
+            ->join('permissions as p', 'p.id', '=', 'pr.permission_id')
+            ->where('pr.role_id', $this->role_id)
+            ->where('p.permission', $perm)
+            ->exists();
     }
 
-    // Keep for backward compatibility during transition
+    public function isQAEditor(): bool
+    {
+        return $this->hasPermission('qa_edit_content');
+    }
+
+    public function hasAnyPermission(array $perms): bool
+    {
+        foreach ($perms as $perm) {
+            if ($this->hasPermission($perm)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Admin access: either flagged is_admin OR role is one of the admin roles.
+     */
+    public function canAccessAdmin(): bool
+    {
+        $role = $this->roleName();
+        return (bool) $this->is_admin
+            || in_array($role, ['System Admin', 'Administrator'], true);
+    }
+
+    /**
+     * QA access: prefer permissions, with role-based safety net.
+     * Allows QA Reviewer/Lead/Publisher + all admins.
+     */
+    public function canAccessQA(): bool
+    {
+        if ($this->hasAnyPermission(['qa_view', 'qa_view_all'])) {
+            return true;
+        }
+
+        if ($this->canAccessAdmin()) {
+            return true;
+        }
+
+        $role = $this->roleName();
+        return in_array($role, ['QA Reviewer', 'QA Lead', 'Publisher'], true);
+    }
+
+    /**
+     * Back-compat accessor: treat admins by role OR column as admin.
+     * (Fixes the earlier lowercase/underscore mismatch.)
+     */
     public function getIsAdminAttribute($value)
     {
-        // Fallback to role-based check if role_id exists
-        if ($this->role_id) {
-            return $this->hasRole('system_admin');
-        }
-        return $value;
+        // if DB column is truthy, respect it
+        if (!is_null($value) && $value) return true;
+
+        $role = $this->roleName();
+        return in_array($role, ['System Admin', 'Administrator'], true);
     }
+
+    /**
+     * Your existing helper – unchanged except we rely on getIsAdminAttribute fix.
+     */
     public function getPrimaryRoleAttribute()
     {
         if ($this->is_admin) return 'System Admin';
-        
-        // Get the first house role (assumes relationship is already loaded)
-        $houseRole = $this->houseRoles->first();
-        return $houseRole ? $houseRole->role : 'No Role';
-    }
-/*
+
+        // If you actually have a houseRoles relation, keep this; otherwise safe fallback.
+        $houseRole = $this->houseRoles->first() ?? null;
+        return $houseRole ? $houseRole->role : ($this->roleName() ?? 'No Role');
+    }/*
     |--------------------------------------------------------------------------
     | Partner Configuration Methods
     |--------------------------------------------------------------------------

@@ -13,7 +13,6 @@ $human = function ($d, $fallback = 'Unknown') {
 
 @push('styles')
 <style>
-  /* Keep it minimal so it inherits your admin theme */
   .question-row { transition: background-color .15s ease; }
   .question-row:hover { background-color: rgba(0,0,0,.02); }
   .question-link { display:block; color:inherit; text-decoration:none; }
@@ -42,51 +41,65 @@ $human = function ($d, $fallback = 'Unknown') {
     </div>
   </div>
 
-  {{-- Statistics --}}
-  {{-- Pending Review --}}
-    <div class="row g-3 mb-4">
-    <div class="col-md-3">
-<a class="text-decoration-none" 
-   href="{{ route('admin.qa.index', array_merge(request()->query(), ['status' => 'unreviewed'])) }}">
-  <div class="card h-100"><div class="card-body text-center">
-    <div class="display-6 text-warning">{{ $stats['pending'] ?? 0 }}</div>
-    <div class="text-muted">Pending Review</div>
-  </div></div>
-</a>
+  <!-- Modal -->
+  <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl" style="max-width:90%;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="helpModalLabel">QA Reviewer Manual</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" style="height:80vh;">
+            <iframe src="{{ asset('assets/QA_Reviewer_Manual.pdf') }}" width="100%" height="100%" style="border:none;"></iframe>
+        </div>
+    </div>
 </div>
+</div>
+{{-- Statistics --}}
+  <div class="row g-3 mb-4">
+    {{-- Pending --}}
+    <div class="col-md-3">
+      <a class="text-decoration-none"
+         href="{{ route('admin.qa.index', ['status' => 'unreviewed']) }}">
+        <div class="card h-100"><div class="card-body text-center">
+          <div class="display-6 text-warning">{{ $stats['pending'] ?? 0 }}</div>
+          <div class="text-muted">Pending Review</div>
+        </div></div>
+      </a>
+    </div>
 
-{{-- Flagged --}}
+    {{-- Flagged --}}
     <div class="col-md-3">
-<a class="text-decoration-none" 
-   href="{{ route('admin.qa.index', array_merge(request()->query(), ['status' => 'flagged'])) }}">
-  <div class="card h-100"><div class="card-body text-center">
-    <div class="display-6 text-danger">{{ $stats['flagged'] ?? 0 }}</div>
-    <div class="text-muted">Flagged Issues</div>
-  </div></div>
-</a>
-</div>
+      <a class="text-decoration-none"
+         href="{{ route('admin.qa.index', array_merge(request()->query(), ['status' => 'flagged'])) }}">
+        <div class="card h-100"><div class="card-body text-center">
+          <div class="display-6 text-danger">{{ $stats['flagged'] ?? 0 }}</div>
+          <div class="text-muted">Flagged Issues</div>
+        </div></div>
+      </a>
+    </div>
 
-{{-- Needs Revision --}}
+    {{-- Needs Revision --}}
     <div class="col-md-3">
-<a class="text-decoration-none" 
-   href="{{ route('admin.qa.index', array_merge(request()->query(), ['status' => 'needs_revision'])) }}">
-  <div class="card h-100"><div class="card-body text-center">
-    <div class="display-6 text-info">{{ $stats['needs_revision'] ?? 0 }}</div>
-    <div class="text-muted">Needs Revision</div>
-  </div></div>
-</a>
-</div>
-{{-- Approved Today --}}
-    <div class="col-md-3">
+      <a class="text-decoration-none"
+         href="{{ route('admin.qa.index', array_merge(request()->query(), ['status' => 'needs_revision'])) }}">
+        <div class="card h-100"><div class="card-body text-center">
+          <div class="display-6 text-info">{{ $stats['needs_revision'] ?? 0 }}</div>
+          <div class="text-muted">Needs Revision</div>
+        </div></div>
+      </a>
+    </div>
 
-<a class="text-decoration-none" 
-   href="{{ route('admin.qa.index', array_merge(request()->query(), ['status' => 'approved', 'today' => 1])) }}">
-  <div class="card h-100"><div class="card-body text-center">
-    <div class="display-6 text-success">{{ $stats['approved'] ?? 0 }}</div>
-    <div class="text-muted">Approved Today</div>
-  </div></div>
-</a>
-</div>
+    {{-- Approved Today --}}
+    <div class="col-md-3">
+      <a class="text-decoration-none"
+         href="{{ route('admin.qa.index', array_merge(request()->query(), ['status' => 'approved', 'today' => 1])) }}">
+        <div class="card h-100"><div class="card-body text-center">
+          <div class="display-6 text-success">{{ $stats['approved'] ?? 0 }}</div>
+          <div class="text-muted">Approved Today</div>
+        </div></div>
+      </a>
+    </div>
   </div>
 
   {{-- Filters --}}
@@ -95,7 +108,6 @@ $human = function ($d, $fallback = 'Unknown') {
       <div class="card">
         <div class="card-body">
           <form method="GET" action="{{ route('admin.qa.index') }}" id="filterForm" class="row g-2 align-items-end">
-
             {{-- Status --}}
             <div class="col-md-2">
               <label class="form-label small">Status</label>
@@ -123,13 +135,13 @@ $human = function ($d, $fallback = 'Unknown') {
             {{-- Skill --}}
             <div class="col-md-3">
               <label class="form-label small">Skill</label>
-              @php $selectedSkill = request('skill_id', request('skill')); @endphp {{-- backward compatible --}}
+              @php $selectedSkill = request('skill_id', request('skill')); @endphp
               <select name="skill_id" class="form-select form-select-sm">
                 <option value="">All Skills</option>
                 @foreach(($skills ?? []) as $skill)
-                <option value="{{ $skill->id }}" {{ (string)$selectedSkill === (string)$skill->id ? 'selected' : '' }}>
-                  {{ $skill->skill }}
-                </option>
+                  <option value="{{ $skill->id }}" {{ (string)$selectedSkill === (string)$skill->id ? 'selected' : '' }}>
+                    {{ $skill->skill }}
+                  </option>
                 @endforeach
               </select>
             </div>
@@ -141,10 +153,10 @@ $human = function ($d, $fallback = 'Unknown') {
               <select name="level" class="form-select form-select-sm">
                 <option value="">All Levels</option>
                 @foreach(($levels ?? []) as $lvl)
-                @php $label = $lvl->name ?? $lvl->description ?? $lvl->level; @endphp
-                <option value="{{ $lvl->id }}" {{ (string)$selectedLevel === (string)$lvl->id ? 'selected' : '' }}>
-                  {{ is_numeric($label) ? 'Level '.$label : $label }}
-                </option>
+                  @php $label = $lvl->name ?? $lvl->description ?? $lvl->level; @endphp
+                  <option value="{{ $lvl->id }}" {{ (string)$selectedLevel === (string)$lvl->id ? 'selected' : '' }}>
+                    {{ is_numeric($label) ? 'Level '.$label : $label }}
+                  </option>
                 @endforeach
               </select>
             </div>
@@ -160,7 +172,7 @@ $human = function ($d, $fallback = 'Unknown') {
               </select>
             </div>
 
-            {{-- Sort By --}}
+            {{-- Sort --}}
             <div class="col-md-2">
               <label class="form-label small">Sort By</label>
               @php $sort = request('sort','created_at'); @endphp
@@ -171,19 +183,18 @@ $human = function ($d, $fallback = 'Unknown') {
               </select>
             </div>
 
-            {{-- Actions --}}
-            {{-- Right-aligned Reset link, no Filter button --}}
+            {{-- Reset --}}
             <div class="col-12 col-md-auto ms-md-auto">
-                <a href="{{ route('admin.qa.index') }}" class="btn btn-link p-0 text-decoration-none">Reset</a>
+              <a href="{{ route('admin.qa.index') }}" class="btn btn-link p-0 text-decoration-none">Reset</a>
             </div>
 
-        </form>
+          </form>
+        </div>
+      </div>
     </div>
-</div>
-</div>
-</div>
+  </div>
 
-  {{-- Batch Actions (standard alert) --}}
+  {{-- Batch Actions --}}
   <div class="alert alert-primary d-none" id="batchActions">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
       <strong><span id="selectedCount">0</span> questions selected</strong>
@@ -212,20 +223,21 @@ $human = function ($d, $fallback = 'Unknown') {
               <th width="60">ID</th>
               <th>Question</th>
               <th width="120">Type</th>
-              <th width="120">Status</th>
+              <th width="170">QA / Visibility</th>
               <th width="160">Skill</th>
               <th width="120">Issues</th>
-              <th width="140">Last Updated</th>
+              <th width="160">Last Updated</th>
               <th width="110">Actions</th>
             </tr>
           </thead>
           <tbody>
-            @forelse($questions as $question)
+          @forelse($questions as $question)
             @php
               $qaStatus   = $question->qa_status ?? 'unreviewed';
               $issueCount = $question->qa_issues_count ?? 0;
               $openIssues = $question->open_qa_issues_count ?? 0;
               $reviewUrl  = route('admin.qa.questions.review', $question->id);
+
               $statusConfig = [
                 'unreviewed'     => ['color' => 'warning', 'icon' => 'clock',        'text' => 'Unreviewed'],
                 'approved'       => ['color' => 'success', 'icon' => 'check-circle', 'text' => 'Approved'],
@@ -233,14 +245,14 @@ $human = function ($d, $fallback = 'Unknown') {
                 'needs_revision' => ['color' => 'info',    'icon' => 'edit',         'text' => 'Needs Revision'],
               ];
               $config = $statusConfig[$qaStatus] ?? $statusConfig['unreviewed'];
+
+              $isPublic = (int)($question->status_id ?? 4) === 3;
             @endphp
             <tr class="question-row">
               <td>
                 <input type="checkbox" class="form-check-input question-checkbox" value="{{ $question->id }}" data-id="{{ $question->id }}">
               </td>
-              <td>
-                <a href="{{ $reviewUrl }}" class="text-decoration-none">#{{ $question->id }}</a>
-              </td>
+              <td><a href="{{ $reviewUrl }}" class="text-decoration-none">#{{ $question->id }}</a></td>
               <td>
                 <a href="{{ $reviewUrl }}" class="question-link">
                   {{ \Illuminate\Support\Str::limit(strip_tags($question->question ?? ''), 80) }}
@@ -256,9 +268,17 @@ $human = function ($d, $fallback = 'Unknown') {
                 </span>
               </td>
               <td>
-                <span class="badge text-bg-{{ $config['color'] }}">
-                  <i class="fas fa-{{ $config['icon'] }} me-1"></i>{{ $config['text'] }}
-                </span>
+                <div class="d-flex flex-column gap-1">
+                  <span class="badge text-bg-{{ $config['color'] }}">
+                    <i class="fas fa-{{ $config['icon'] }} me-1"></i>{{ $config['text'] }}
+                  </span>
+                  <span class="badge {{ $isPublic ? 'text-bg-success' : 'text-bg-secondary' }}">
+                    {{ $isPublic ? 'Public' : 'Draft' }}
+                    @if($isPublic && $question->published_at)
+                      <small class="ms-1">{{ $human($question->published_at) }}</small>
+                    @endif
+                  </span>
+                </div>
               </td>
               <td>
                 @if($question->skill)
@@ -276,7 +296,9 @@ $human = function ($d, $fallback = 'Unknown') {
                   <span class="text-muted">None</span>
                 @endif
               </td>
-              <td><small class="text-muted">{{ $human($question->updated_at) }}</small></td>
+              <td><small class="text-muted">
+                {{ $human($question->updated_at) }}
+              </small></td>
               <td>
                 <div class="btn-group" role="group">
                   <a href="{{ $reviewUrl }}" class="btn btn-outline-primary btn-sm" title="Review">
@@ -293,7 +315,7 @@ $human = function ($d, $fallback = 'Unknown') {
                 </div>
               </td>
             </tr>
-            @empty
+          @empty
             <tr>
               <td colspan="9" class="text-center py-5">
                 <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
@@ -301,7 +323,7 @@ $human = function ($d, $fallback = 'Unknown') {
                 <a href="{{ route('admin.qa.index') }}" class="btn btn-outline-primary">View All Questions</a>
               </td>
             </tr>
-            @endforelse
+          @endforelse
           </tbody>
         </table>
       </div>
@@ -310,14 +332,14 @@ $human = function ($d, $fallback = 'Unknown') {
 
   {{-- Pagination --}}
   @if($questions->hasPages())
-  <div class="d-flex justify-content-center mt-4">
-    {{ $questions->appends(request()->query())->links() }}
-  </div>
+    <div class="d-flex justify-content-center mt-4">
+      {{ $questions->appends(request()->query())->links() }}
+    </div>
   @endif
 
-</div> {{-- /.container-fluid --}}
+</div>
 
-{{-- Quick Flag Modal (unchanged API) --}}
+{{-- Quick Flag Modal --}}
 <div class="modal fade" id="quickFlagModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">

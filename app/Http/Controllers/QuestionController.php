@@ -246,109 +246,209 @@ public function store(Request $request)
     public function updateField(Request $request, Question $question)
     {
         try {
+            $u = auth()->user();
+            $isAuthor = $u && $question->user_id === $u->id;
+            $isAdmin  = $u && $u->canAccessAdmin();
+            $isQAEdit = $u && $u->isQAEditor();
+
             $field = $request->input('field');
             $value = $request->input('value');
 
-            // Define validation rules for each field
             $validationRules = [
-                'skill_id' => 'nullable|exists:skills,id',
-                'difficulty_id' => 'nullable|exists:difficulties,id',
-                'type_id' => 'nullable|exists:types,id',
-                'status_id'      => 'nullable|exists:statuses,id',
-                'qa_status' => 'required|in:unreviewed,approved,flagged,needs_revision,ai_generated',
-                'question' => 'required|string|max:1000',
-                'answer0' => 'nullable|string|max:255',
-                'answer1' => 'nullable|string|max:255',
-                'answer2' => 'nullable|string|max:255',
-                'answer3' => 'nullable|string|max:255',
-                'correct_answer' => 'nullable|integer',
-                'explanation' => 'nullable|string|max:2000',
-                'hint' => 'nullable|string|max:500',
-                'calculator' => 'nullable|string|max:255',
-                'hint_text'=>'nullable|string|max:500',
+                'skill_id'        => 'nullable|exists:skills,id',
+                'difficulty_id'   => 'nullable|exists:difficulties,id',
+                'type_id'         => 'nullable|exists:types,id',
+                'status_id'       => 'nullable|exists:statuses,id',
+                'qa_status'       => 'required|in:unreviewed,approved,flagged,needs_revision,ai_generated',
+                'question'        => 'required|string|max:1000',
+                'answer0'         => 'nullable|string|max:255',
+                'answer1'         => 'nullable|string|max:255',
+                'answer2'         => 'nullable|string|max:255',
+                'answer3'         => 'nullable|string|max:255',
+                'correct_answer'  => 'nullable|integer',
+                'explanation'     => 'nullable|string|max:2000',
+                'hint'            => 'nullable|string|max:500',
+                'calculator'      => 'nullable|string|max:255',
+                'hint_text'       => 'nullable|string|max:500',
             ];
 
-            // Check if field is allowed
             if (!array_key_exists($field, $validationRules)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Field not allowed for inline editing'
-                ], 400);
+                return response()->json(['success'=>false,'message'=>'Field not allowed for inline editing'], 400);
             }
 
-            // Validate the value
-            $validator = \Validator::make(
-                [$field => $value],
-                [$field => $validationRules[$field]]
-            );
+            // Permissions:
+            // 1) Only QA (any) can change qa_status (your QAController handles status normally; inline is rare)
+            if ($field === 'qa_status' && !($u && $u->canAccessQA())) {
+                abort(403);
+            }
 
+            // 2) For content fields, require author/admin/QA Editor
+            $contentFields = [
+                'question','explanation','answer0','answer1','answer2','answer3',
+                'correct_answer','skill_id','difficulty_id','type_id','calculator','hint','hint_text'
+            ];
+            if (in_array($field, $contentFields, true)) {
+                abort_unless($isAuthor || $isAdmin || $isQAEdit, 403);
+            }
+
+            // Validate value
+            $validator = \Validator::make([$field => $value], [$field => $validationRules[$field]]);
             if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()->first($field)
-                ], 422);
+                return response()->json(['success'=>false,'message'=>$validator->errors()->first($field)], 422);
             }
 
-            // Update and save
-            $question->$field = $value;
+            // Detect meaningful change for unpublish/return-to-QA rules
+            $old = $question->getAttribute($field);
+
+            $question->setAttribute($field, $value);
             $question->save();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Field updated successfully',
-                'field' => $field,
-                'value' => $value
-            ]);
+            $meaningfulContentField = in_array($field, $contentFields, true) && $old !== $value;
+
+            // If approved content changed by anyone → unpublish & return to QA
+            if ($meaningfulContentField && $question->qa_status === 'approved') {
+                $question->update([
+                    'qa_status'       => 'unreviewed',
+                    'status_id'       => 4,
+                    'published_at'    => null,
+                    'qa_reviewer_id'  => null,
+                    'qa_reviewed_at'  => null,
+                ]);
+            }
+
+            // If QA Editor changed content → always return to QA & unpublish
+            if ($meaningfulContentField && $isQAEdit && !$isAdmin) {
+                $question->update([
+                    'qa_status'       => 'unreviewed',
+                    'status_id'       => 4,
+                    'published_at'    => null,
+                    'qa_reviewer_id'  => null,
+                    'qa_reviewed_at'  => null,
+                    'last_qa_editor_id' => \Schema::hasColumn('questions','last_qa_editor_id') ? $u->id : $question->last_qa_editor_id,
+                ]);
+                try {
+                    DB::table('review_history')->insert([
+                        'question_id'   => $question->id,
+                        'reviewer_id'   => $u->id,
+                        'reviewer_name' => $u->name ?? 'QA Editor',
+                        'action'        => 'qa_edit',
+                        'comment'       => 'Inline edit; auto-resubmitted',
+                        'created_at'    => now(),
+                        'updated_at'    => now(),
+                    ]);
+                } catch (\Throwable $e) {}
+            }
+
+            return response()->json(['success'=>true,'message'=>'Field updated successfully','field'=>$field,'value'=>$value]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Update failed'
-            ], 500);
+            return response()->json(['success'=>false,'message'=>'Update failed'], 500);
         }
     }
 
+
     public function update(Request $request, Question $question)
     {
+        $u = auth()->user();
+        $isAuthor  = $u && $question->user_id === $u->id;
+        $isAdmin   = $u && $u->canAccessAdmin();
+        $isQAEdit  = $u && $u->isQAEditor(); // needs 'qa_edit_content' perm
+
+        // Only author, admin, or QA Editor may edit
+        abort_unless($isAuthor || $isAdmin || $isQAEdit, 403);
+
         $validated = $request->validate([
-            'skill_id' => 'required|exists:skills,id',
-            'difficulty_id' => 'required|exists:difficulties,id',
-            'type_id' => 'required|exists:types,id',
-            'question' => 'required|string|max:2000',
-            'answer0' => 'required|string|max:255',
-            'answer1' => 'required|string|max:255',
-            'answer2' => 'required|string|max:255',
-            'answer3' => 'required|string|max:255',
-            'correct_answer' => 'required|integer|between:0,3',
-            'explanation' => 'nullable|string|max:1000',
-            'calculator' => 'nullable|in:scientific,basic',
+            'skill_id'        => 'required|exists:skills,id',
+            'difficulty_id'   => 'required|exists:difficulties,id',
+            'type_id'         => 'required|exists:types,id',
+            'question'        => 'required|string|max:2000',
+            'answer0'         => 'required|string|max:255',
+            'answer1'         => 'required|string|max:255',
+            'answer2'         => 'required|string|max:255',
+            'answer3'         => 'required|string|max:255',
+            'correct_answer'  => 'required|integer|between:0,3',
+            'explanation'     => 'nullable|string|max:1000',
+            'calculator'      => 'nullable|in:scientific,basic',
         ]);
 
         DB::beginTransaction();
         try {
+            // Track old values to detect meaningful changes
+            $before = $question->only([
+                'question','explanation','question_image',
+                'answer0','answer1','answer2','answer3',
+                'answer0_image','answer1_image','answer2_image','answer3_image',
+                'correct_answer','skill_id','difficulty_id','type_id'
+            ]);
+
             $question->update($validated);
+
+            // If *approved* content was changed by anyone, unpublish & return to QA
+            $meaningfulChanged = collect($before)->some(function ($old, $key) use ($question) {
+                return $question->getAttribute($key) !== $old;
+            });
+
+            if ($meaningfulChanged && $question->qa_status === 'approved') {
+                $question->qa_status       = 'unreviewed';
+                $question->status_id       = 4;        // Draft
+                $question->published_at    = null;     // needs cast in model
+                $question->qa_reviewer_id  = null;
+                $question->qa_reviewed_at  = null;
+                $question->save();
+            }
+
+            // If edited by QA Editor (not full admin), always return to QA & unpublish
+            if ($isQAEdit && !$isAdmin && $meaningfulChanged) {
+                $question->qa_status       = 'unreviewed';
+                $question->status_id       = 4;
+                $question->published_at    = null;
+                $question->qa_reviewer_id  = null;
+                $question->qa_reviewed_at  = null;
+                // Optional: track who edited so we can block self-approval later
+                if (\Schema::hasColumn('questions', 'last_qa_editor_id')) {
+                    $question->last_qa_editor_id = $u->id;
+                }
+                $question->save();
+
+                // Audit trail
+                try {
+                    DB::table('review_history')->insert([
+                        'question_id'   => $question->id,
+                        'reviewer_id'   => $u->id,
+                        'reviewer_name' => $u->name ?? 'QA Editor',
+                        'action'        => 'qa_edit',
+                        'comment'       => 'Edited by QA; auto-resubmitted',
+                        'created_at'    => now(),
+                        'updated_at'    => now(),
+                    ]);
+                } catch (\Throwable $e) {}
+            }
 
             DB::commit();
 
             if ($request->expectsJson()) {
                 return response()->json([
-                    'success' => true,
-                    'message' => 'Question updated successfully',
-                    'question' => $question->fresh(['skill', 'difficulty', 'type'])
+                    'success'  => true,
+                    'message'  => 'Question updated successfully',
+                    'question' => $question->fresh(['skill','difficulty','type']),
                 ]);
             }
 
-            return redirect()->route('admin.questions.show', $question)
-            ->with('success', 'Question updated successfully');
+            return redirect()
+                ->route('admin.questions.show', $question)
+                ->with('success', 'Question updated successfully');
 
         } catch (\Exception $e) {
-            DB::rollback();
-            Log::error('Question update failed', ['question_id' => $question->id, 'error' => $e->getMessage()]);
+            DB::rollBack();
+            Log::error('Question update failed', [
+                'question_id' => $question->id,
+                'error'       => $e->getMessage()
+            ]);
 
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to update question: ' . $e->getMessage()
+                    'message' => 'Failed to update question: '.$e->getMessage()
                 ], 500);
             }
 

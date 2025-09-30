@@ -19,8 +19,9 @@ class Question extends Model
     protected $casts = [
         'created_at'     => 'datetime',
         'updated_at'     => 'datetime',
-    'reviewed_at'    => 'datetime',       // custom column in your table
-    'qa_reviewed_at' => 'datetime',       // custom column in your table
+        'reviewed_at'    => 'datetime',
+        'qa_reviewed_at' => 'datetime',
+        'published_at'   => 'datetime',   // <-- add this
     ];
 
     public function qaIssues()

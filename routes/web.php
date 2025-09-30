@@ -44,29 +44,50 @@ Route::post('/logout', [WebAuthController::class, 'logout'])->name('auth.logout'
 Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () {
     // ---------------- QA (qa middleware) ----------------
     Route::prefix('qa')->middleware(['qa'])->name('qa.')->group(function () {
-        Route::get('/', [QAController::class, 'index'])->name('index');
-        Route::get('/export', [QAController::class, 'export'])->name('export');
-        Route::post('/bulk-approve', [QAController::class, 'bulkApprove'])->name('bulk-approve');
-        Route::post('/bulk-flag', [QAController::class, 'bulkFlag'])->name('bulk-flag');
-        Route::post('/issues/{issue}/resolve', [QAController::class, 'resolveIssue'])->name('resolve-issue');
+            Route::get('/', [QAController::class, 'index'])->name('index');   // qa_view
+            Route::get('/next', [QAController::class, 'next'])->name('next'); // qa_view
 
-        // Quick navigation to "next" question (e.g., next unreviewed)
-        Route::get('/next', [QAController::class, 'next'])->name('next');
+            Route::get('/export', [QAController::class, 'export'])
+                ->middleware('qa:qa_view_all')
+                ->name('export');
 
-        Route::prefix('questions/{question}')->name('questions.')->group(function () {
-            Route::get('/', [QAController::class, 'show'])->name('show'); // keep if you use it elsewhere
-            Route::get('/review', [QAController::class, 'reviewQuestion'])->name('review');
+            Route::post('/bulk-approve', [QAController::class, 'bulkApprove'])
+                ->middleware('qa:qa_approve_p2p3')   // P1 check done in controller
+                ->name('bulk-approve');
 
-            // Existing actions
-            Route::post('/approve', [QAController::class, 'approveQuestion'])->name('approve');
-            Route::post('/flag', [QAController::class, 'flagQuestion'])->name('flag');
+            Route::post('/bulk-flag', [QAController::class, 'bulkFlag'])
+                ->middleware('qa:qa_request_changes')
+                ->name('bulk-flag');
 
-            // New lightweight actions used by the updated QA UI
-            Route::post('/status', [QAController::class, 'setStatus'])->name('status');     // unreviewed/approved/flagged/needs_revision/ai_generated
-            Route::post('/assign', [QAController::class, 'assignToMe'])->name('assign');   // set qa_reviewer_id
-            Route::post('/notes', [QAController::class, 'saveNotes'])->name('notes');     // update qa_notes
+            Route::post('/issues/{issue}/resolve', [QAController::class, 'resolveIssue'])
+                ->middleware('qa:qa_checklist_update')
+                ->name('resolve-issue');
+
+            Route::prefix('questions/{question}')->name('questions.')->group(function () {
+                Route::get('/', [QAController::class, 'show'])->name('show');      // qa_view
+                Route::get('/review', [QAController::class, 'reviewQuestion'])->name('review');
+
+                Route::post('/approve', [QAController::class, 'approveQuestion'])
+                    ->middleware('qa:qa_approve_p2p3')   // Lead passes via qa_approve_any
+                    ->name('approve');
+
+                Route::post('/flag', [QAController::class, 'flagQuestion'])
+                    ->middleware('qa:qa_request_changes')
+                    ->name('flag');
+
+                Route::post('/status', [QAController::class, 'setStatus'])
+                    ->middleware('qa:qa_approve_any,qa_approve_p2p3,qa_request_changes,qa_escalate,qa_set_severity')
+                    ->name('status');
+
+                Route::post('/assign', [QAController::class, 'assignToMe'])
+                    ->middleware('qa:qa_assign')
+                    ->name('assign');
+
+                Route::post('/notes', [QAController::class, 'saveNotes'])
+                    ->middleware('qa:qa_comment')
+                    ->name('notes');
+            });
         });
-    });
 
     // ---------------- System Admin only ----------------
     Route::middleware(['admin'])->group(function () {
