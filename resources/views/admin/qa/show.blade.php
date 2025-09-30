@@ -196,7 +196,7 @@ $canQA = $u && (
               ];
               $correctIndex = (int)($question->correct_answer ?? 0);
             @endphp
-            <h6 class="text-muted small mb-3 mcq-option">ANSWER OPTIONS</h6>
+            <h6 class="text-muted small mb-3">ANSWER OPTIONS</h6>
 
             @foreach($answers as $ans)
               @php
@@ -218,7 +218,7 @@ $canQA = $u && (
                   </div>
                   <div class="col">
                     @if($ans['text'])
-                      <div class="mb-2">{{ $ans['text'] }}</div>
+                      <div class="mb-2 mcq-option">{{ $ans['text'] }}</div>
                     @endif
 
                     <div class="d-flex align-items-center gap-3">
