@@ -182,7 +182,7 @@ $canQA = $u && (
           {{-- Question text --}}
           <div class="mb-4">
             <h6 class="text-muted small mb-2">QUESTION TEXT</h6>
-            <div class="border rounded p-3 bg-light">{!! $question->question ?: '[No question text provided]' !!}</div>
+            <div class="border rounded p-3 bg-light question-field">{!! $question->question ?: '[No question text provided]' !!}</div>
           </div>
 
           {{-- Answers --}}
@@ -196,7 +196,7 @@ $canQA = $u && (
               ];
               $correctIndex = (int)($question->correct_answer ?? 0);
             @endphp
-            <h6 class="text-muted small mb-3">ANSWER OPTIONS</h6>
+            <h6 class="text-muted small mb-3 mcq-option">ANSWER OPTIONS</h6>
 
             @foreach($answers as $ans)
               @php
