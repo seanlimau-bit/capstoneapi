@@ -35,6 +35,9 @@ Route::post('/send-otp', [WebAuthController::class, 'sendOtp'])->name('auth.send
 Route::get('/verify', [WebAuthController::class, 'showVerify'])->name('auth.verify');
 Route::post('/verify-otp', [WebAuthController::class, 'verifyOtp'])->name('auth.verifyOtp');
 Route::post('/logout', [WebAuthController::class, 'logout'])->name('auth.logout');
+Route::get('/awaiting-access', function () {
+    return view('auth.awaiting-access');
+})->middleware('auth')->name('auth.awaiting-access');
 
 /*
 |--------------------------------------------------------------------------
@@ -42,52 +45,53 @@ Route::post('/logout', [WebAuthController::class, 'logout'])->name('auth.logout'
 |--------------------------------------------------------------------------
 */
 Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () {
+    
     // ---------------- QA (qa middleware) ----------------
     Route::prefix('qa')->middleware(['qa'])->name('qa.')->group(function () {
-            Route::get('/', [QAController::class, 'index'])->name('index');   // qa_view
-            Route::get('/next', [QAController::class, 'next'])->name('next'); // qa_view
+        Route::get('/', [QAController::class, 'index'])->name('index');
+        Route::get('/next', [QAController::class, 'next'])->name('next');
 
-            Route::get('/export', [QAController::class, 'export'])
-                ->middleware('qa:qa_view_all')
-                ->name('export');
+        Route::get('/export', [QAController::class, 'export'])
+            ->middleware('qa:qa_view_all')
+            ->name('export');
 
-            Route::post('/bulk-approve', [QAController::class, 'bulkApprove'])
-                ->middleware('qa:qa_approve_p2p3')   // P1 check done in controller
-                ->name('bulk-approve');
+        Route::post('/bulk-approve', [QAController::class, 'bulkApprove'])
+            ->middleware('qa:qa_approve_p2p3')
+            ->name('bulk-approve');
 
-            Route::post('/bulk-flag', [QAController::class, 'bulkFlag'])
+        Route::post('/bulk-flag', [QAController::class, 'bulkFlag'])
+            ->middleware('qa:qa_request_changes')
+            ->name('bulk-flag');
+
+        Route::post('/issues/{issue}/resolve', [QAController::class, 'resolveIssue'])
+            ->middleware('qa:qa_checklist_update')
+            ->name('resolve-issue');
+
+        Route::prefix('questions/{question}')->name('questions.')->group(function () {
+            Route::get('/', [QAController::class, 'show'])->name('show');
+            Route::get('/review', [QAController::class, 'reviewQuestion'])->name('review');
+
+            Route::post('/approve', [QAController::class, 'approveQuestion'])
+                ->middleware('qa:qa_approve_p2p3')
+                ->name('approve');
+
+            Route::post('/flag', [QAController::class, 'flagQuestion'])
                 ->middleware('qa:qa_request_changes')
-                ->name('bulk-flag');
+                ->name('flag');
 
-            Route::post('/issues/{issue}/resolve', [QAController::class, 'resolveIssue'])
-                ->middleware('qa:qa_checklist_update')
-                ->name('resolve-issue');
+            Route::post('/status', [QAController::class, 'setStatus'])
+                ->middleware('qa:qa_approve_any,qa_approve_p2p3,qa_request_changes,qa_escalate,qa_set_severity')
+                ->name('status');
 
-            Route::prefix('questions/{question}')->name('questions.')->group(function () {
-                Route::get('/', [QAController::class, 'show'])->name('show');      // qa_view
-                Route::get('/review', [QAController::class, 'reviewQuestion'])->name('review');
+            Route::post('/assign', [QAController::class, 'assignToMe'])
+                ->middleware('qa:qa_assign')
+                ->name('assign');
 
-                Route::post('/approve', [QAController::class, 'approveQuestion'])
-                    ->middleware('qa:qa_approve_p2p3')   // Lead passes via qa_approve_any
-                    ->name('approve');
-
-                Route::post('/flag', [QAController::class, 'flagQuestion'])
-                    ->middleware('qa:qa_request_changes')
-                    ->name('flag');
-
-                Route::post('/status', [QAController::class, 'setStatus'])
-                    ->middleware('qa:qa_approve_any,qa_approve_p2p3,qa_request_changes,qa_escalate,qa_set_severity')
-                    ->name('status');
-
-                Route::post('/assign', [QAController::class, 'assignToMe'])
-                    ->middleware('qa:qa_assign')
-                    ->name('assign');
-
-                Route::post('/notes', [QAController::class, 'saveNotes'])
-                    ->middleware('qa:qa_comment')
-                    ->name('notes');
-            });
+            Route::post('/notes', [QAController::class, 'saveNotes'])
+                ->middleware('qa:qa_comment')
+                ->name('notes');
         });
+    });
 
     // ---------------- System Admin only ----------------
     Route::middleware(['admin'])->group(function () {
@@ -124,7 +128,9 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
             Route::post('/add-track', [SkillController::class, 'addTrack'])->name('add-track');
             Route::delete('/tracks/{track}', [SkillController::class, 'removeTrack'])->name('remove-track');
             Route::post('/link-video', [SkillController::class, 'linkVideo'])->name('link-video');
-            Route::delete('/videos/{video}', [SkillController::class, 'deleteVideo'])->name('deleteVideo');            // =====================================================
+            Route::delete('/videos/{video}', [SkillController::class, 'deleteVideo'])->name('deleteVideo');
+            
+            // =====================================================
             // QUESTIONS NESTED UNDER SKILLS
             // =====================================================
             Route::prefix('questions')->name('questions.')->group(function () {
@@ -146,6 +152,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
                 Route::post('/copy-from-skill', [QuestionController::class, 'copyFromSkillForSkill'])->name('copy-from-skill');
             });
         });
+        
         // =====================================================
         // HINT & SOLUTIONS MANAGEMENT
         // =====================================================
@@ -200,29 +207,6 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
                 Route::post('/image', [QuestionController::class, 'uploadAnswerImage'])->name('upload-image');
                 Route::delete('/image', [QuestionController::class, 'deleteAnswerImage'])->name('delete-image');
             });
-        });
-
-        // =====================================================
-        // USERS MANAGEMENT
-        // =====================================================
-        Route::resource('users', UserController::class);
-        Route::prefix('users')->name('users.')->group(function () {
-            Route::get('/export', [UserController::class, 'export'])->name('export');
-            Route::get('/roles-houses', [UserController::class, 'getRolesAndHouses'])->name('roles-houses');
-            Route::post('/import', [UserController::class, 'import'])->name('import');
-        });
-
-        Route::prefix('users/{user}')->name('users.')->group(function () {
-            // Inline update for a single user (resourceful-ish)
-            Route::post('/inline', [UserController::class, 'inlineUpdate'])->name('inline');
-            Route::get('/performance', [UserController::class, 'performance'])->name('performance');
-            Route::post('/assign-role', [UserController::class, 'assignHouseRole'])->name('assign-role');
-            Route::post('/reset', [UserController::class, 'reset'])->name('reset');
-            Route::post('/diagnostic', [UserController::class, 'diagnostic'])->name('diagnostic');
-            Route::post('/administrator', [UserController::class, 'administrator'])->name('administrator');
-            Route::put('/fields/{field}', [UserController::class, 'updateField'])->name('fields.update');
-            Route::delete('/house-roles/{houseRole}', [UserController::class, 'removeHouseRole'])->name('remove-role');
-            Route::get('/tests/{test}/questions', [UserController::class, 'showTestQuestion'])->name('tests.questions');
         });
 
         // =====================================================
@@ -288,6 +272,31 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
 
         // Global export
         Route::get('/export', [AdminController::class, 'export'])->name('export');
+    });
+
+    // =====================================================
+    // USERS MANAGEMENT - PROTECTED WITH ADDITIONAL MIDDLEWARE
+    // =====================================================
+    Route::middleware(['admin', 'can.manage.users'])->group(function () {
+        Route::resource('users', UserController::class);
+        
+        Route::prefix('users')->name('users.')->group(function () {
+            Route::get('/export', [UserController::class, 'export'])->name('export');
+            Route::get('/roles-houses', [UserController::class, 'getRolesAndHouses'])->name('roles-houses');
+            Route::post('/import', [UserController::class, 'import'])->name('import');
+        });
+
+        Route::prefix('users/{user}')->name('users.')->group(function () {
+            Route::post('/inline', [UserController::class, 'inlineUpdate'])->name('inline');
+            Route::get('/performance', [UserController::class, 'performance'])->name('performance');
+            Route::post('/assign-role', [UserController::class, 'assignHouseRole'])->name('assign-role');
+            Route::post('/reset', [UserController::class, 'reset'])->name('reset');
+            Route::post('/diagnostic', [UserController::class, 'diagnostic'])->name('diagnostic');
+            Route::post('/administrator', [UserController::class, 'administrator'])->name('administrator');
+            Route::put('/fields/{field}', [UserController::class, 'updateField'])->name('fields.update');
+            Route::delete('/house-roles/{houseRole}', [UserController::class, 'removeHouseRole'])->name('remove-role');
+            Route::get('/tests/{test}/questions', [UserController::class, 'showTestQuestion'])->name('tests.questions');
+        });
     });
 });
 

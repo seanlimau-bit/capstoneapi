@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use App\Mail\SendOtpMail;
 use App\Models\User;
+use App\Models\Role;
 use Twilio\Rest\Client;
 
 class WebAuthController extends Controller
@@ -115,45 +116,61 @@ public function sendOtp(Request $request)
     }
 }
 
-    public function verifyOtp(Request $request)
-    {
-        $request->validate([
-            'identifier' => 'required|string',
-            'otp_code' => 'required|string|size:6'
-        ]);
-
-        $isEmail = filter_var($request->identifier, FILTER_VALIDATE_EMAIL);
-
-        $user = User::where($isEmail ? 'email' : 'phone_number', $request->identifier)
-            ->where('otp_code', $request->otp_code)
-            ->where('otp_expires_at', '>', now())
-            ->first();
-
-        if (!$user) {
-            return back()
-                ->withErrors(['otp_code' => 'Invalid or expired verification code'])
-                ->withInput(['identifier' => $request->identifier]);
-        }
-
-        // Mark verified and clear OTP
-        $user->update([
-            'email_verified' => true,
-            'email_verified_at' => now(),
-            'activated_at' => $user->activated_at ?? now(),
-            'otp_code' => null,
-            'otp_expires_at' => null
-        ]);
-
-        Auth::login($user);
-
-        // Route based on role
-        if ($user->is_admin) {
-            return redirect()->route('admin.dashboard.index');
-        }
-
-        return redirect('/dashboard')->with('success', 'Welcome to All Gifted!');
+public function verifyOtp(Request $request)
+{
+    $request->validate([
+        'identifier' => 'required|string',
+        'otp_code' => 'required|string|size:6'
+    ]);
+    
+    $isEmail = filter_var($request->identifier, FILTER_VALIDATE_EMAIL);
+    $user = User::where($isEmail ? 'email' : 'phone_number', $request->identifier)
+        ->where('otp_code', $request->otp_code)
+        ->where('otp_expires_at', '>', now())
+        ->first();
+        
+    if (!$user) {
+        return back()
+            ->withErrors(['otp_code' => 'Invalid or expired verification code'])
+            ->withInput(['identifier' => $request->identifier]);
     }
-
+    
+    // Check if this is a new user (no role assigned yet)
+    $isNewUser = !$user->role_id;
+    
+    if ($isNewUser) {
+        // Assign default role for new users - use a basic "Pending" or "Student" role
+        $defaultRoleId = Role::where('role', 'LIKE', '%Student%')->first()?->id ?? 6;
+        
+        $user->update([
+            'role_id' => $defaultRoleId,
+            'status' => 'pending', // Not 'active' until admin approves
+        ]);
+    }
+    
+    // Mark verified and clear OTP
+    $user->update([
+        'email_verified' => true,
+        'email_verified_at' => now(),
+        'activated_at' => $user->activated_at ?? now(),
+        'otp_code' => null,
+        'otp_expires_at' => null
+    ]);
+    
+    Auth::login($user);
+    
+    // Route based on permissions
+    if ($user->canAccessAdmin()) {
+        return redirect()->route('admin.dashboard.index');
+    }
+    
+    if ($user->canAccessQA()) {
+        return redirect()->route('admin.qa.index');
+    }
+    
+    // New users without admin/QA access - show awaiting access page
+    return redirect()->route('auth.awaiting-access');
+}
     private function sendSmsOtp($phoneNumber, $otp)
     {
         $twilio = new Client(

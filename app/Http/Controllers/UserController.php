@@ -18,9 +18,64 @@ use Carbon\Carbon;
 use DB;
 use App\Services\LookupOptionsService;
 
-
 class UserController extends Controller
 {
+    /**
+     * CRITICAL: Add constructor to check permissions on ALL methods
+     */
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $user = auth()->user();
+            
+            // First check: Must be able to access admin
+            if (!$user->canAccessAdmin()) {
+                abort(403, 'Admin access required.');
+            }
+
+            // Second check: Check specific permission based on route action
+            $action = $request->route()->getActionMethod();
+            
+            switch ($action) {
+                case 'index':
+                case 'show':
+                case 'export':
+                case 'performance':
+                    if (!$user->hasPermission('list_users')) {
+                        abort(403, 'Permission denied: You do not have permission to view users.');
+                    }
+                    break;
+                    
+                case 'create':
+                case 'store':
+                    if (!$user->hasPermission('create_users')) {
+                        abort(403, 'Permission denied: You do not have permission to create users.');
+                    }
+                    break;
+                    
+                case 'edit':
+                case 'update':
+                case 'inlineUpdate':
+                case 'reset':
+                case 'diagnostic':
+                case 'administrator':
+                    if (!$user->hasPermission('modify_users')) {
+                        abort(403, 'Permission denied: You do not have permission to modify users.');
+                    }
+                    break;
+                    
+                case 'destroy':
+                case 'bulkAction':
+                    if (!$user->hasPermission('delete_users')) {
+                        abort(403, 'Permission denied: You do not have permission to delete users.');
+                    }
+                    break;
+            }
+            
+            return $next($request);
+        });
+    }
+
     /**
      * Display a listing of users with statistics for admin interface
      */
@@ -33,7 +88,9 @@ class UserController extends Controller
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('firstname', 'like', "%{$search}%")
+                  ->orWhere('lastname', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
             });
         }
         
@@ -42,36 +99,32 @@ class UserController extends Controller
             $query->where('role_id', $request->role_id);
         }
         
-        // Apply status filter using your actual 'status' field
+        // Apply status filter
         if ($request->filled('status')) {
             switch ($request->status) {
                 case 'active':
-                $query->where('status', 'active');
-                break;
+                    $query->where('status', 'active');
+                    break;
                 case 'inactive':
-                $query->where('status', 'inactive');
-                break;
+                    $query->where('status', 'inactive');
+                    break;
                 case 'suspended':
-                $query->where('status', 'suspended');
-                break;
+                    $query->where('status', 'suspended');
+                    break;
                 case 'verified':
-                $query->whereNotNull('email_verified_at');
-                break;
+                    $query->whereNotNull('email_verified_at');
+                    break;
                 case 'unverified':
-                $query->whereNull('email_verified_at');
-                break;
+                    $query->whereNull('email_verified_at');
+                    break;
             }
         }
         
-        // Order by latest first
         $query->orderBy('created_at', 'desc');
-        
-        // Eager load relationships to avoid N+1 queries
         $query->with(['role']);
         
         $users = $query->paginate(20);
         
-        // Calculate statistics using your actual 'status' field
         $totals = [
             'total' => User::count(),
             'active' => User::where('status', 'active')->count(),
@@ -90,77 +143,11 @@ class UserController extends Controller
             ]);
         }
         
-        // Get all roles for the filter dropdown - use 'role' column
-        $roles = collect(); // Empty collection by default
-        if (class_exists('\App\Models\Role')) {
-            try {
-                $roles = \App\Models\Role::orderBy('role')->get();
-            } catch (\Exception $e) {
-                $roles = collect();
-            }
-        }
+        $roles = Role::orderBy('role')->get();
         
         return view('admin.users.index', compact('users', 'roles', 'totals'));
     }
 
-    // Bulk operations using 'status' field
-    public function bulkActivate(Request $request)
-    {
-        $request->validate([
-            'user_ids' => 'required|array',
-            'user_ids.*' => 'exists:users,id'
-        ]);
-        
-        try {
-            User::whereIn('id', $request->user_ids)->update(['status' => 'active']);
-            
-            return response()->json([
-                'success' => true,
-                'message' => count($request->user_ids) . ' users activated successfully'
-            ]);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error activating users: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function bulkSuspend(Request $request)
-    {
-        $request->validate([
-            'user_ids' => 'required|array',
-            'user_ids.*' => 'exists:users,id'
-        ]);
-        
-        try {
-            // Don't allow suspending the current user
-            $userIds = collect($request->user_ids)->filter(function($id) {
-                return $id != auth()->id();
-            });
-            
-            if ($userIds->isEmpty()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot suspend yourself or no valid users selected'
-                ]);
-            }
-            
-            User::whereIn('id', $userIds)->update(['status' => 'suspended']);
-            
-            return response()->json([
-                'success' => true,
-                'message' => count($userIds) . ' users suspended successfully'
-            ]);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error suspending users: ' . $e->getMessage()
-            ], 500);
-        }
-    }
     /**
      * Store a newly created user
      */
@@ -168,11 +155,6 @@ class UserController extends Controller
     {
         $isApi = $request->expectsJson() || $request->wantsJson() || $request->is('api/*');
 
-        if ($request->has('date_of_birth') && !$request->has('date_of_birth')) {
-            $request->merge(['date_of_birth' => $request->input('date_of_birth')]);
-        }
-
-        // Common rules (API + Web)
         $baseRules = [
             'name'          => ['required','string','max:255'],
             'email'         => ['required','email','unique:users,email'],
@@ -181,13 +163,11 @@ class UserController extends Controller
             'role_id'       => ['nullable','integer','exists:roles,id'],
             'status'        => ['nullable', Rule::in(['active','inactive','suspended'])],
             'is_admin'      => ['sometimes','boolean'],
-            'is_active'     => ['sometimes','boolean'],
             'email_verified'=> ['sometimes','boolean'],
         ];
 
         if ($isApi) {
             $validator = Validator::make($request->all(), $baseRules);
-
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed',
@@ -195,72 +175,54 @@ class UserController extends Controller
                     'code'    => 422
                 ], 422);
             }
+        } else {
+            $validated = $request->validate($baseRules);
+        }
 
-            try {
-                DB::beginTransaction();
+        try {
+            DB::beginTransaction();
 
-                $contact = preg_replace('/\s+/', '', $request->contact);
+            $data = $isApi ? $request->all() : $validated;
+            $contact = preg_replace('/\s+/', '', $data['contact']);
 
-                $user = User::create([
-                    'name'              => $request->name,
-                    'email'             => $request->email,
-                    'contact'           => $contact,
-                    'date_of_birth'     => $request->date_of_birth,   // <-- correct column
-                    'role_id'           => $request->role_id ?? null, // <-- single role_id
-                    'status'            => $request->status ?? 'active',
-                    'is_admin'          => (bool) ($request->is_admin ?? false),
-                    'is_active'         => array_key_exists('is_active', $request->all()) ? (bool)$request->is_active : true,
-                    'email_verified_at' => !empty($request->email_verified) ? now() : null,
-                ]);
+            $user = User::create([
+                'name'              => $data['name'],
+                'email'             => $data['email'],
+                'contact'           => $contact,
+                'date_of_birth'     => $data['date_of_birth'],
+                'role_id'           => $data['role_id'] ?? null,
+                'status'            => $data['status'] ?? 'active',
+                'is_admin'          => (bool)($data['is_admin'] ?? false),
+                'email_verified_at' => !empty($data['email_verified']) ? now() : null,
+            ]);
 
-                DB::commit();
+            DB::commit();
 
+            if ($isApi) {
                 return response()->json([
                     'message' => 'User created successfully',
                     'user'    => $user,
                     'code'    => 201,
                 ], 201);
-            } catch (\Throwable $e) {
-                DB::rollBack();
-                return response()->json(['message' => $e->getMessage(), 'code' => 500], 500);
             }
-        }
 
-        // Web path
-        $validated = $request->validate($baseRules);
+            if ($request->ajax()) {
+                return response()->json(['success' => true, 'message' => 'User created successfully', 'user' => $user]);
+            }
 
-        try {
-            DB::beginTransaction();
+            return redirect()->route('admin.users.index')->with('success', 'User created successfully');
 
-            $contact = preg_replace('/\s+/', '', $validated['contact']);
-
-            $user = User::create([
-                'name'              => $validated['name'],
-                'email'             => $validated['email'],
-                'contact'           => $contact,
-                'date_of_birth'     => $validated['date_of_birth'],  // <-- correct column
-                'role_id'           => $validated['role_id'] ?? null, // <-- single role_id
-                'status'            => $validated['status'] ?? 'active',
-                'is_admin'          => (bool)($validated['is_admin'] ?? false),
-                'is_active'         => array_key_exists('is_active', $validated) ? (bool)$validated['is_active'] : true,
-                'email_verified_at' => !empty($validated['email_verified']) ? now() : null,
-            ]);
-
-            DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
-
+            
+            if ($isApi) {
+                return response()->json(['message' => $e->getMessage(), 'code' => 500], 500);
+            }
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
             }
             return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
-
-        if ($request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'User created successfully', 'user' => $user]);
-        }
-
-        return redirect()->route('admin.users.index')->with('success', 'User created successfully');
     }
 
     /**
@@ -268,27 +230,26 @@ class UserController extends Controller
      */
     public function show(User $user, Request $request, LookupOptionsService $lookups)
     {
-        // Eager loads (your original, kept intact)
         $user->load([
             'role',
-            'enrolledClasses', // house_role_user pivot
+            'enrolledClasses',
             'tests' => function($q) {
                 $q->withPivot('test_completed','completed_date','result','attempts','kudos')
-                ->orderBy('test_user.completed_date','desc');
+                  ->orderBy('test_user.completed_date','desc');
             },
             'quizzes' => function($q) {
                 $q->withPivot('quiz_completed','completed_date','result','attempts')
-                ->orderBy('quiz_user.completed_date','desc');
+                  ->orderBy('quiz_user.completed_date','desc');
             },
             'myQuestions' => function($q) {
                 $q->withPivot('question_answered','answered_date','correct','attempts','test_id','quiz_id','assessment_type','kudos')
-                ->orderBy('question_user.answered_date','desc')
-                ->limit(100);
+                  ->orderBy('question_user.answered_date','desc')
+                  ->limit(100);
             },
             'myquestions.difficulty',
             'testedTracks' => function($q) {
                 $q->withPivot('track_maxile','track_passed','track_test_date','doneNess')
-                ->orderBy('track_user.track_test_date','desc');
+                  ->orderBy('track_user.track_test_date','desc');
             },
             'skill_user' => function($q) {
                 $q->withPivot([
@@ -299,31 +260,26 @@ class UserController extends Controller
             },
             'fields' => function($q) {
                 $q->withPivot('field_maxile','field_test_date','month_achieved')
-                ->orderBy('field_user.field_test_date','desc');
+                  ->orderBy('field_user.field_test_date','desc');
             },
             'logs' => function($q) {
                 $q->orderBy('created_at','desc')->limit(50);
             },
         ]);
 
-        // Stats (your originals + keep helpers)
         $stats = [
             'total_questions_answered' => $user->myQuestions()->wherePivot('question_answered', true)->count(),
             'correct_answers'          => $user->myQuestions()->wherePivot('correct', true)->count(),
-            'accuracy_percentage'      => $user->accuracy(),            // assuming helper on model
+            'accuracy_percentage'      => $user->accuracy(),
             'tests_completed'          => $user->tests()->wherePivot('test_completed', true)->count(),
             'quizzes_completed'        => $user->quizzes()->wherePivot('quiz_completed', true)->count(),
             'tracks_passed'            => $user->testedTracks()->wherePivot('track_passed', true)->count(),
             'skills_mastered'          => $user->skill_user()->wherePivot('skill_passed', true)->count(),
-            'current_maxile'           => $user->currentMaxile(),       // assuming helper on model
+            'current_maxile'           => $user->currentMaxile(),
         ];
 
-        // Lookup-driven statuses for selects/badges
-        // returns collection of ['id' => ..., 'text' => ...]
         $statusOptions = $lookups->statuses();
-
-        // If you store a string enum in users.status, we’ll try to resolve its lookup id for convenience.
-        // If you store users.status_id, the Blade will use that directly.
+        
         $currentStatusId = null;
         if (isset($user->status_id)) {
             $currentStatusId = $user->status_id;
@@ -332,10 +288,8 @@ class UserController extends Controller
             $currentStatusId = $match['id'] ?? null;
         }
 
-        // Roles for inline select
         $roles = Role::orderBy('role')->get(['id','role']);
 
-        // JSON responses preserved
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'user'   => $user,
@@ -356,12 +310,31 @@ class UserController extends Controller
             'roles'            => $roles,
         ]);
     }
+
     /**
      * Update the specified user
      */
     public function update(Request $request, User $user)
     {
-        // Base validation rules
+        // Prevent non-admins with modify permission from elevating privileges
+        if ($request->filled('role_id') && !auth()->user()->hasPermission('manage_roles')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to change user roles.'
+            ], 403);
+        }
+
+        // Prevent user from demoting their own role
+        if ($user->id === auth()->id() && $request->filled('role_id')) {
+            $newRole = Role::find($request->role_id);
+            if ($newRole && !in_array($newRole->role, ['System Admin', 'Administrator'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot change your own admin role.'
+                ], 403);
+            }
+        }
+
         $rules = [
             'name' => 'sometimes|string|max:255',
             'firstname' => 'sometimes|string|max:255',
@@ -374,12 +347,9 @@ class UserController extends Controller
             'game_level' => 'sometimes|numeric|nullable',
         ];
 
-        // Don't allow email changes for security
         $request->request->remove('email');
-
         $validated = $request->validate($rules);
         
-        // UPDATE THE USER - this was missing!
         $user->update($validated);
 
         if ($request->expectsJson()) {
@@ -393,113 +363,29 @@ class UserController extends Controller
         return redirect()->route('admin.users.show', $user)->with('success', 'User updated successfully');
     }
 
-    public function inlineUpdate(User $user, Request $request)
-    {
-        $request->validate([
-            'field' => ['required','string'],
-            'value' => ['nullable'],
-        ]);
-
-        // enum options from schema
-        $statusEnum       = ['potential','active','suspended','inactive','pending'];
-        $accessTypeEnum   = ['premium','freemium','trial','basic','free'];
-        $paymentMethodEnum= ['free','credit_card','telco_billing','school_billing','tuition_billing'];
-
-        // whitelist fields we will allow from the UI
-        $allowed = [
-            // text
-            'name','firstname','lastname','phone_number','telco_provider','telco_subscriber_id',
-            'partner_subscriber_id','contact','billing_method','signup_channel','image','auth0',
-
-            // enums (string)
-            'status','access_type','payment_method',
-
-            // integers
-            'role_id','lives','game_level','partner_id',
-
-            // decimals
-            'maxile_level',
-
-            // booleans (tinyint 0/1)
-            'partner_verified','diagnostic','email_verified','is_admin',
-
-            // dates/timestamps
-            'date_of_birth','last_test_date','next_test_date','trial_expires_at',
-            'suspended_at','cancelled_at','activated_at','email_verified_at',
-        ];
-
-        $field = $request->string('field')->toString();
-        if (!in_array($field, $allowed, true)) {
-            return response()->json(['ok'=>false,'message'=>'Field not allowed'], 422);
-        }
-
-        // normalize/cast/validate per-field
-        $val = $request->input('value');
-
-        // enums
-        if ($field === 'status') {
-            $request->validate(['value' => ['required', Rule::in($statusEnum)]]);
-            $user->status = $val;
-        } elseif ($field === 'access_type') {
-            $request->validate(['value' => ['required', Rule::in($accessTypeEnum)]]);
-            $user->access_type = $val;
-        } elseif ($field === 'payment_method') {
-            $request->validate(['value' => ['required', Rule::in($paymentMethodEnum)]]);
-            $user->payment_method = $val;
-
-        // integers
-        } elseif (in_array($field, ['role_id','lives','game_level','partner_id'], true)) {
-            $request->validate(['value' => ['nullable','integer']]);
-            $user->{$field} = ($val === '' || $val === null) ? null : (int)$val;
-
-        // decimals
-        } elseif ($field === 'maxile_level') {
-            $request->validate(['value' => ['nullable','numeric']]);
-            $user->maxile_level = ($val === '' || $val === null) ? 0 : (float)$val;
-
-        // booleans → tinyint(1)
-        } elseif (in_array($field, ['partner_verified','diagnostic','email_verified','is_admin'], true)) {
-            // accept true/false/"1"/"0"/"on"
-            $user->{$field} = filter_var($val, FILTER_VALIDATE_BOOL) ? 1 : 0;
-
-        // dates & timestamps
-        } elseif (in_array($field, [
-            'date_of_birth','last_test_date','next_test_date','trial_expires_at',
-            'suspended_at','cancelled_at','activated_at','email_verified_at',
-        ], true)) {
-            if ($val === '' || $val === null) {
-                $user->{$field} = null;
-            } else {
-                try {
-                    // 'date_of_birth' expects date; others accept datetime (but date works too)
-                    $dt = Carbon::parse($val);
-                    $user->{$field} = $field === 'date_of_birth'
-                        ? $dt->format('Y-m-d')
-                        : $dt; // let Eloquent cast to timestamp
-                } catch (\Throwable $e) {
-                    return response()->json(['ok'=>false,'message'=>'Invalid date/time'], 422);
-                }
-            }
-
-        // strings (trim; empty → null where sensible)
-        } else {
-            $v = is_string($val) ? trim($val) : $val;
-            $user->{$field} = ($v === '') ? null : $v;
-        }
-
-        $user->save();
-
-        return response()->json([
-            'ok' => true,
-            'updated_at_human' => optional($user->updated_at)->format('M d, Y'),
-        ]);
-    }
-
-     /*
+    /**
      * Remove the specified user
      */
     public function destroy(User $user, Request $request)
     {
+        // Prevent self-deletion
+        if ($user->id === auth()->id()) {
+            $message = 'You cannot delete your own account';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 400);
+            }
+            return back()->withErrors($message);
+        }
+
+        // Prevent deletion of other admins without special permission
+        if ($user->canAccessAdmin() && !auth()->user()->hasPermission('delete_admin_users')) {
+            $message = 'You do not have permission to delete admin users';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 403);
+            }
+            return back()->withErrors($message);
+        }
+
         // Prevent deletion if user has enrolled classes
         if ($user->enrolledClasses()->exists()) {
             $message = 'User has existing classes and cannot be deleted';
@@ -529,50 +415,6 @@ class UserController extends Controller
         }
         return redirect()->route('admin.users.index')->with('success', $message);
     }
-
-    public function showTestQuestion(User $user, Test $test)
-    {
-        // Optional safety: ensure this test belongs to the user
-        if (!$user->tests()->where('tests.id', $test->id)->exists()) {
-            abort(404);
-        }
-
-        // Eager-load relations only; don't put them in SELECT
-        $with = [];
-        if (method_exists(Question::class, 'skill')) {
-            $with[] = 'skill:id,skill'; // skill name
-            if (method_exists(\App\Models\Skill::class ?? (object)[], 'tracks')) {
-                // Assuming Track has field_id and Track->field relation
-                $with[] = 'skill.tracks:id,track,field_id';
-                $with[] = 'skill.tracks.field:id,field';
-            }
-        }
-
-        $attempts = $user->myQuestions()
-            ->wherePivot('test_id', $test->id)
-            ->withPivot('question_answered','answered_date','correct','attempts','kudos','assessment_type')
-            ->with('skill.tracks.field')
-            ->orderBy('question_user.answered_date', 'desc')
-            ->get(); // no constrained columns
-
-        $testPivot = $user->tests()
-            ->where('tests.id', $test->id)
-            ->first()?->pivot;
-
-        // Flags so Blade can conditionally render columns
-        $hasSkill = method_exists(Question::class, 'skill');
-
-        return view('admin.users.test_questions', [
-            'user'      => $user,
-            'test'      => $test,
-            'attempts'  => $attempts,
-            'testPivot' => $testPivot,
-            'hasSkill'  => $hasSkill,
-            // we always compute fields from skill->tracks->field in the blade if present
-        ]);
-    }
-
-
 
     /**
      * Handle bulk actions for multiple users

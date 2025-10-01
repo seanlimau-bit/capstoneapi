@@ -27,7 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
             'cors.image' => \App\Http\Middleware\CorsImageMiddleware::class,
-            'qa' => \App\Http\Middleware\QAMiddleware::class,// Add as alias instead
+            'qa' => \App\Http\Middleware\QAMiddleware::class,
+            'can.manage.users' => \App\Http\Middleware\CanManageUsers::class,
+
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
