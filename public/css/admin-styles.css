@@ -153,6 +153,62 @@ body {
 .sidebar-header .logo:hover { transform: translateY(-2px); color: var(--secondary-color); }
 
 .sidebar-nav { padding: var(--spacing-lg) 0; }
+/* Add this to your dashboard's @push('styles') section */
+
+/* Fix z-index for header and dropdown on dashboard */
+.main-header {
+    position: relative;
+    z-index: 2000 !important;
+}
+
+.navbar-custom {
+    position: relative;
+    z-index: 2001 !important;
+}
+
+.navbar-nav {
+    position: relative;
+    z-index: 2002 !important;
+}
+
+.dropdown {
+    position: relative;
+    z-index: 2003 !important;
+}
+
+.dropdown-menu {
+    position: absolute !important;
+    z-index: 2004 !important;
+}
+
+/* Ensure hero header doesn't overlap */
+.learning-hero-header {
+    z-index: 1 !important;
+}
+
+.learning-hero-header::after {
+    z-index: -1 !important;
+}
+
+/* Ensure canvas stays in background */
+.learning-neural-bg {
+    z-index: 0 !important;
+}
+
+/* Make sure cards don't overlap header */
+.metric-card-advanced,
+.hierarchy-card,
+.chart-card,
+.quick-action-card,
+.insight-panel {
+    position: relative;
+    z-index: 1;
+}
+
+/* Debug: Add temporary red border to dropdown menu to see if it exists */
+.dropdown-menu {
+    border: 2px solid red !important; /* Remove this after testing */
+}
 .nav-item { margin-bottom: var(--spacing-xs); }
 .nav-link {
   color: rgba(255,255,255,.85);

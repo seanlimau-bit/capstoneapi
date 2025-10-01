@@ -3,190 +3,190 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use App\Mail\SendOtpMail;
 use App\Models\User;
-use App\Models\Status;
-use App\Models\Difficulty;
-use App\Models\Field;
-use App\Models\Level;
-use App\Models\Track;
-use App\Models\Skill;
-use App\Models\Type;
+use Twilio\Rest\Client;
+
 class WebAuthController extends Controller
 {
-	public function showLogin()
-	{
-		$questions = collect();
-		return view('auth.login');
-	}
+    public function showLogin()
+    {
+        return view('auth.login');
+    }
 
-	public function showVerify(Request $request)
-	{
-		if (!$request->has('email')) {
-			return redirect()->route('auth.login');
-		}
-		return view('auth.verify', ['email' => $request->email]);
-	}
+    public function showVerify(Request $request)
+    {
+        if (!$request->has('identifier')) {
+            return redirect()->route('login');
+        }
+        return view('auth.verify', [
+            'identifier' => $request->identifier,
+            'channel' => $request->channel
+        ]);
+    }
 
-	public function sendOtp(Request $request)
-	{
-		$request->validate([
-			'email' => 'required|email'
-		]);
+public function sendOtp(Request $request)
+{
+    \Log::info('=== SendOTP Started ===');
+    \Log::info('Request data:', $request->all());
 
-		$user = DB::table('users')->where('email', $request->email)->first();
+    try {
+        $request->validate([
+            'identifier' => 'required|string',
+            'channel' => 'required|in:email,sms,whatsapp'
+        ]);
+        \Log::info('Validation passed');
 
-		if (!$user) {
-			return redirect()->back()
-				->withInput()
-				->with('error', 'No account found with this email address.');
-		}
+        $identifier = $request->identifier;
+        $channel = $request->channel;
+        \Log::info("Identifier: {$identifier}, Channel: {$channel}");
 
-		if (!$user->email_verified) {
-			return redirect()->back()
-				->withInput()
-				->with('error', 'Email address must be verified to login.');
-		}
+        // Validate identifier based on channel
+        $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL);
+        \Log::info('Is email: ' . ($isEmail ? 'yes' : 'no'));
 
-		// Generate OTP
-		$otp = rand(100000, 999999);
+        if ($channel === 'email' && !$isEmail) {
+            \Log::warning('Email required but not valid');
+            return back()->withInput()->with('error', 'Please provide a valid email address');
+        }
 
-		try {
-			// Save OTP to database
-			DB::table('users')
-				->where('id', $user->id)
-				->update([
-					'otp_code' => $otp,
-					'otp_expires_at' => now()->addMinutes(10)
-				]);
+        if (in_array($channel, ['sms', 'whatsapp']) && $isEmail) {
+            \Log::warning('Phone required but email provided');
+            return back()->withInput()->with('error', 'Please provide a phone number for SMS/WhatsApp');
+        }
 
-			// Send email
-			Mail::to($user->email)->send(new SendOtpMail($otp));
+        // Find or create user
+        \Log::info('Finding or creating user...');
+        $user = User::firstOrCreate(
+            $isEmail ? ['email' => $identifier] : ['phone_number' => $identifier],
+            [
+                'status' => 'active',
+                'access_type' => 'free',
+                'signup_channel' => 'direct',
+                'role_id' => 6,
+                'diagnostic' => true,
+                'payment_method' => 'free',
+            ]
+        );
+        \Log::info('User found/created: ' . $user->id);
 
-			// Redirect to verification step
-			return redirect()->route('auth.verify', ['email' => $request->email])
-				->with('success', 'Verification code sent to your email');
+        // Generate OTP
+        $otp = rand(100000, 999999);
+        \Log::info("Generated OTP: {$otp}");
 
-		} catch (\Exception $e) {
-			\Log::error('Auth OTP Send Error: ' . $e->getMessage());
-			return redirect()->back()
-				->withInput()
-				->with('error', 'Failed to send verification code. Please try again.');
-		}
-	}
+        $user->update([
+            'otp_code' => $otp,
+            'otp_expires_at' => now()->addMinutes(10)
+        ]);
+        \Log::info('OTP saved to database');
 
-	public function verifyOtp(Request $request)
-	{
-		$request->validate([
-			'email' => 'required|email',
-			'otp_code' => 'required|string|size:6'
-		]);
+        // Send OTP
+        \Log::info("Attempting to send via {$channel}...");
+        switch ($channel) {
+            case 'email':
+                Mail::to($user->email)->send(new SendOtpMail($otp));
+                \Log::info('Email sent successfully');
+                break;
 
-		// Find user with valid OTP in one query
-		$user = User::where('email', $request->email)
-			->where('otp_code', $request->otp_code)
-			->where('otp_expires_at', '>', now())
-			->first();
+            case 'sms':
+                $this->sendSmsOtp($user->phone_number, $otp);
+                \Log::info('SMS sent successfully');
+                break;
 
-		if (!$user) {
-			return redirect()->back()
-				->withErrors(['otp_code' => 'Invalid or expired OTP code'])
-				->withInput(['email' => $request->email]);
-		}
+            case 'whatsapp':
+                $this->sendWhatsAppOtp($user->phone_number, $otp);
+                \Log::info('WhatsApp sent successfully');
+                break;
+        }
 
-		// Clear the OTP
-		$user->update([
-			'otp_code' => null,
-			'otp_expires_at' => null
-		]);
+        \Log::info('Redirecting to verify page...');
+        return redirect()->route('auth.verify', [
+            'identifier' => $identifier,
+            'channel' => $channel
+        ])->with('success', 'Verification code sent successfully');
 
-		// Log the user in
-		Auth::login($user);
+    } catch (\Exception $e) {
+        \Log::error('SendOTP Exception: ' . $e->getMessage());
+        \Log::error('Stack trace: ' . $e->getTraceAsString());
+        return back()->withInput()->with('error', 'Error: ' . $e->getMessage());
+    }
+}
 
-		// Store global admin data in session
-		session(['globalAdminData' => $this->getGlobalAdminData()]);
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'identifier' => 'required|string',
+            'otp_code' => 'required|string|size:6'
+        ]);
 
-		// Route based on user permissions
-		if ($user->canAccessAdmin()) {
-			return redirect()->route('admin.dashboard.index')
-				->with('success', 'Welcome to the admin dashboard');
-		}
+        $isEmail = filter_var($request->identifier, FILTER_VALIDATE_EMAIL);
 
-		if ($user->canAccessQA()) {
-			return redirect()->route('qa.dashboard.index')
-				->with('success', 'Welcome to the QA dashboard');
-		}
+        $user = User::where($isEmail ? 'email' : 'phone_number', $request->identifier)
+            ->where('otp_code', $request->otp_code)
+            ->where('otp_expires_at', '>', now())
+            ->first();
 
-		return redirect()->route('user.dashboard')
-			->with('success', 'Welcome back!');
-	}
-	private function getGlobalAdminData(): array
-	{
-		$publicStatusId = Status::where('status', 'Public')->value('id');
+        if (!$user) {
+            return back()
+                ->withErrors(['otp_code' => 'Invalid or expired verification code'])
+                ->withInput(['identifier' => $request->identifier]);
+        }
 
-		// Helper to apply the Public filter only if we found it
-		$onlyPublic = fn($q) => $q->when($publicStatusId, fn($qq) => $qq->where('status_id', $publicStatusId));
+        // Mark verified and clear OTP
+        $user->update([
+            'email_verified' => true,
+            'email_verified_at' => now(),
+            'activated_at' => $user->activated_at ?? now(),
+            'otp_code' => null,
+            'otp_expires_at' => null
+        ]);
 
-		$data = [
-			// master statuses list
-			'statuses' => Status::orderBy('status')->get(['id', 'status'])->toArray(),
+        Auth::login($user);
 
-			// fixed QA statuses
-			'qa_statuses' => [
-				'unreviewed' => 'Unreviewed',
-				'approved' => 'Approved',
-				'flagged' => 'Flagged',
-				'needs_revision' => 'Needs Revision',
-				'ai_generated' => 'AI Generated',
-			],
+        // Route based on role
+        if ($user->is_admin) {
+            return redirect()->route('admin.dashboard.index');
+        }
 
-			// public-only lookups (if "Public" exists)
-			'difficulties' => $onlyPublic(Difficulty::query())
-				->orderBy('difficulty')
-				->get(['id', 'difficulty', 'short_description'])
-				->toArray(),
+        return redirect('/dashboard')->with('success', 'Welcome to All Gifted!');
+    }
 
-			'fields' => $onlyPublic(Field::query())
-				->orderBy('field')
-				->get(['id', 'field'])
-				->toArray(),
+    private function sendSmsOtp($phoneNumber, $otp)
+    {
+        $twilio = new Client(
+            config('services.twilio.sid'),
+            config('services.twilio.token')
+        );
 
-			'levels' => $onlyPublic(Level::query())
-				->orderBy('level')
-				->get(['id', 'level', 'description'])
-				->toArray(),
+        $twilio->messages->create($phoneNumber, [
+            'from' => config('services.twilio.from'),
+            'body' => "Your All Gifted verification code is: {$otp}. Valid for 10 minutes."
+        ]);
+    }
 
-			'tracks' => $onlyPublic(Track::query())
-				->orderBy('track')
-				->get(['id', 'track'])
-				->toArray(),
+    private function sendWhatsAppOtp($phoneNumber, $otp)
+    {
+        $twilio = new Client(
+            config('services.twilio.sid'),
+            config('services.twilio.token')
+        );
 
-			'skills' => $onlyPublic(Skill::query())
-				->orderBy('skill')
-				->get(['id', 'skill'])
-				->toArray(),
+        // WhatsApp requires 'whatsapp:' prefix for both from and to
+        $twilio->messages->create("whatsapp:{$phoneNumber}", [
+            'from' => 'whatsapp:' . config('services.twilio.whatsapp'),
+            'body' => "Your All Gifted verification code is: {$otp}\n\nValid for 10 minutes."
+        ]);
+    }
 
-			'types' => $onlyPublic(Type::query())
-				->orderBy('type')
-				->get(['id', 'type'])
-				->toArray(),
-		];
+    public function logout(Request $request)
+    {
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-		return [
-			'data' => $data,
-			'timestamp' => now()->getTimestampMs(), // milliseconds
-		];
-	}
-	public function logout(Request $request)
-	{
-		Auth::logout();
-		$request->session()->invalidate();
-		$request->session()->regenerateToken();
-
-		return redirect()->route('login')
-			->with('success', 'You have been logged out successfully');
-	}
+        return redirect()->route('login')->with('success', 'Logged out successfully');
+    }
 }

@@ -532,15 +532,6 @@
 
 @push('scripts')
 <script>
-    (() => {
-        const MAP = JSON.parse(localStorage.getItem('STATUS_MAP') || '{ }');
-        window.STATUS_MAP = MAP;
-        window.renderStatusBadge = id => `<span class="badge bg-secondary">${MAP[String(id)] ?? '—'}</span>`;
-        window.renderStatusOptions = selId => Object.entries(MAP)
-        .map(([id, name]) => `<option value="${id}" ${String(selId) === id ? 'selected' : ''}>${name}</option>`)
-        .join('');
-    })();
-
     $(document).ready(function () {
             // CSRF + AJAX headers
             $.ajaxSetup({
