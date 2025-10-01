@@ -10,26 +10,30 @@ use App\Models\Status;
 use App\Models\Role;
 use App\Models\Unit;
 use Illuminate\Http\Request;
+use App\Services\LookupOptionsService;
 
 class ConfigurationController extends Controller
 {
+    public function __construct(
+        private LookupOptionsService $lookupService
+    ) {}
+
     public function index()
     {
         $difficulties = Difficulty::with('status')
             ->select('id', 'status_id', 'difficulty', 'short_description', 'description')
             ->get();
-
+        
         $types = Type::with('status')
             ->select('id', 'status_id', 'type', 'description')
             ->get();
-
+        
         $levels = Level::with('status')
             ->select('id', 'status_id', 'level', 'description', 'age', 'start_maxile_level', 'end_maxile_level')
             ->get();
-
-        // No relation to eager-load on Status itself
+        
         $statuses = Status::select('id', 'status', 'description')->get();
-
+        
         $roles = Role::withCount('users')
             ->select('id', 'role', 'description')
             ->get()
@@ -37,17 +41,20 @@ class ConfigurationController extends Controller
                 unset($role->permissions);
                 return $role;
             });
-
-        $units = Unit::select('id', 'unit', 'description')
-            ->get();
-
+        
+        $units = Unit::select('id', 'unit', 'description')->get();
+        
+        // Get status options from lookup service
+        $statusOptions = $this->lookupService->statuses();
+        
         return view('admin.configuration.index', compact(
             'difficulties',
             'types',
             'levels',
             'statuses',
             'roles',
-            'units'
+            'units',
+            'statusOptions'
         ));
     }
 }

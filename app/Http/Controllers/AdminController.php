@@ -1,270 +1,228 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use App\Models\User;
-use App\Models\Config;
+use App\Models\Field;
+use App\Models\Track;
+use App\Models\Skill;
+use App\Models\Question;
+use Carbon\Carbon;
 
 class AdminController extends Controller
 {
     public function index()
     {
-        // Get dynamic config
-        $config = Config::current();
-        
-        // Define stats first
-        $stats = [
-            'total_questions' => DB::table('questions')->count(),
-            'active_users' => User::where('status', 'active')->count(),
-            'pending_qa' => DB::table('questions')->where('qa_status', 'unreviewed')->count(),
-            'total_skills' => DB::table('skills')->count(),
-        ];
-        
-        // Get recent activity
-        $recent_activity = [
-            [
-                'action' => 'Question Approved',
-                'description' => 'Math question #1234 was approved for Grade 5',
-                'time_ago' => '2 hours ago',
-                'icon' => 'fas fa-check-circle text-success'
-            ],
-            [
-                'action' => 'New User Registration', 
-                'description' => 'Student registered via ' . $config->site_name,
-                'time_ago' => '4 hours ago',
-                'icon' => 'fas fa-user-plus text-info'
-            ],
-            [
-                'action' => 'Skills Updated',
-                'description' => 'Added new algebra skills for Grade 8',
-                'time_ago' => '6 hours ago',
-                'icon' => 'fas fa-brain text-warning'
-            ],
-            [
-                'action' => 'QA Review Completed',
-                'description' => '15 questions passed quality assurance',
-                'time_ago' => '8 hours ago',
-                'icon' => 'fas fa-clipboard-check text-primary'
-            ]
-        ];
-        
-        // Management items using dynamic config
-        $managementItems = [
-            [
-                'title' => 'Questions',
-                'description' => 'Create and manage math questions',
-                'icon' => 'fas fa-question-circle',
-                'route' => 'admin.questions.index',
-                'color' => 'primary',
-                'count' => $stats['total_questions']
-            ],
-            [
-                'title' => 'Skills',
-                'description' => 'Organize learning skills and topics',
-                'icon' => 'fas fa-brain',
-                'route' => 'admin.skills.index',
-                'color' => 'success',
-                'count' => $stats['total_skills']
-            ],
-            [
-                'title' => 'Users',
-                'description' => 'Manage user accounts and permissions',
-                'icon' => 'fas fa-users',
-                'route' => 'admin.users.index',
-                'color' => 'info',
-                'count' => $stats['active_users']
-            ],
-            [
-                'title' => 'QA Review',
-                'description' => 'Quality assurance for content',
-                'icon' => 'fas fa-clipboard-check',
-                'route' => 'admin.qa.index',
-                'color' => 'warning',
-                'count' => $stats['pending_qa']
-            ],
-            [
-                'title' => 'Assets',
-                'description' => 'Manage images and media files',
-                'icon' => 'fas fa-folder-open',
-                'route' => 'admin.assets.index',
-                'color' => 'secondary',
-                'count' => null
-            ],
-            [
-                'title' => 'Settings',
-                'description' => 'Configure ' . $config->site_shortname . ' system',
-                'icon' => 'fas fa-cogs',
-                'route' => 'admin.settings.general',
-                'color' => 'dark',
-                'count' => null
-            ]
-        ];
-        
-        // Pass config to view (note: config is already available via AppServiceProvider)
-        return view('admin.dashboard.index', compact('stats', 'recent_activity', 'managementItems', 'config'));
+        return $this->dashboard();
     }
     
     public function dashboard()
     {
-        // Redirect to main index method
-        return $this->index();
-    }
-}
+        // Cache dashboard data for 5 minutes to improve performance
+        $data = Cache::remember('admin_dashboard', 300, function () {
+            return [
+                'counts' => $this->getCounts(),
+                'metrics' => $this->getMetrics(),
+                'insights' => $this->getInsights(),
+                'recent_questions' => $this->getRecentQuestions(),
+                'chart_data' => $this->getChartData(),
+                'field_distribution' => $this->getFieldDistribution(),
+            ];
+        });
 
-// Also create a settings controller for handling updates
-// app/Http/Controllers/Admin/SettingsController.php
-namespace App\Http\Controllers\Admin;
-
-use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
-use App\Models\Config;
-use Illuminate\Support\Facades\Storage;
-
-class SettingsController extends Controller
-{
-    public function general()
-    {
-        $config = Config::current();
-        return view('admin.settings.general', compact('config'));
+        return view('admin.dashboard.index', $data);
     }
 
-    public function update(Request $request)
+    /**
+     * Get all entity counts
+     */
+    private function getCounts(): array
     {
-        $config = Config::current();
-        
-        $validated = $request->validate([
-            'site_name' => 'nullable|string|max:255',
-            'site_shortname' => 'nullable|string|max:255',
-            'site_url' => 'nullable|url|max:255',
-            'email' => 'nullable|email|max:255',
-            'main_color' => 'nullable|string|regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/',
-            'timezone' => 'nullable|string|max:50',
-            'date_format' => 'nullable|string|max:20',
-            'time_format' => 'nullable|in:12,24',
-            'number_of_teaching_days' => 'nullable|integer|min:1|max:365',
-            'no_rights_to_pass' => 'nullable|integer|min:1|max:10',
-            'no_wrongs_to_fail' => 'nullable|integer|min:1|max:10',
-            'self_paced' => 'nullable|boolean',
-            'maintenance_mode' => 'nullable|boolean',
-            'maintenance_message' => 'nullable|string',
-        ]);
-
-        $config->updateSettings($validated);
-
-        if ($request->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'Settings updated successfully']);
-        }
-
-        return redirect()->back()->with('success', 'Settings updated successfully');
-    }
-
-    public function uploadLogo(Request $request)
-    {
-        $request->validate([
-            'logo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-        ]);
-
-        $config = Config::current();
-        
-        // Delete old logo if exists
-        if ($config->site_logo && Storage::disk('public')->exists($config->site_logo)) {
-            Storage::disk('public')->delete($config->site_logo);
-        }
-
-        $path = $request->file('logo')->store('logos', 'public');
-        $config->updateSettings(['site_logo' => 'storage/' . $path]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Logo uploaded successfully',
-            'url' => asset('storage/' . $path)
-        ]);
-    }
-
-    public function uploadFavicon(Request $request)
-    {
-        $request->validate([
-            'favicon' => 'required|image|mimes:ico,png|max:512',
-        ]);
-
-        $config = Config::current();
-        
-        if ($config->favicon && Storage::disk('public')->exists($config->favicon)) {
-            Storage::disk('public')->delete($config->favicon);
-        }
-
-        $path = $request->file('favicon')->store('favicons', 'public');
-        $config->updateSettings(['favicon' => 'storage/' . $path]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Favicon uploaded successfully'
-        ]);
-    }
-
-    public function uploadLoginBackground(Request $request)
-    {
-        $request->validate([
-            'login_background' => 'required|image|mimes:jpeg,png,jpg|max:5120', // 5MB
-        ]);
-
-        $config = Config::current();
-        
-        if ($config->login_background && Storage::disk('public')->exists($config->login_background)) {
-            Storage::disk('public')->delete($config->login_background);
-        }
-
-        $path = $request->file('login_background')->store('backgrounds', 'public');
-        $config->updateSettings(['login_background' => 'storage/' . $path]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login background uploaded successfully'
-        ]);
-    }
-
-    public function test()
-    {
-        $config = Config::current();
-        
-        $tests = [
-            'database_connection' => true,
-            'config_loaded' => !empty($config->site_name),
-            'timezone_valid' => in_array($config->timezone, timezone_identifiers_list()),
-            'email_format' => filter_var($config->email, FILTER_VALIDATE_EMAIL) !== false,
-            'color_format' => preg_match('/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/', $config->main_color),
-            'logo_exists' => $config->hasLogo(),
+        return [
+            // Hierarchy counts
+            'fields' => Field::count(),
+            'tracks' => Track::count(),
+            'skills' => Skill::count(),
+            'questions' => Question::count(),
+            
+            // User metrics
+            'total_users' => User::count(),
+            'active_users' => User::where('status', 'active')->count(),
+            
+            // QA status breakdown
+            'pending_qa' => Question::where('qa_status', 'unreviewed')->count(),
+            'unreviewed' => Question::where('qa_status', 'unreviewed')->count(),
+            'approved' => Question::where('qa_status', 'approved')->count(),
+            'flagged' => Question::where('qa_status', 'flagged')->count(),
+            'needs_revision' => Question::where('qa_status', 'needs_revision')->count(),
         ];
-
-        return response()->json([
-            'success' => !in_array(false, $tests),
-            'tests' => $tests,
-            'message' => 'Configuration test completed'
-        ]);
     }
 
-    public function reset()
+    /**
+     * Get calculated metrics and growth rates
+     */
+    private function getMetrics(): array
     {
-        $config = Config::current();
+        $totalQuestions = Question::count();
+        $approvedQuestions = Question::where('qa_status', 'approved')->count();
         
-        $config->updateSettings([
-            'site_name' => 'All Gifted Math',
-            'site_shortname' => 'AGM',
-            'main_color' => '#960000',
-            'timezone' => 'UTC',
-            'date_format' => 'd/m/Y',
-            'time_format' => '12',
-            'number_of_teaching_days' => 180,
-            'no_rights_to_pass' => 2,
-            'no_wrongs_to_fail' => 2,
-            'self_paced' => true,
-            'maintenance_mode' => false,
-        ]);
+        // QA approval rate
+        $qaApprovalRate = $totalQuestions > 0 
+            ? ($approvedQuestions / $totalQuestions) * 100 
+            : 0;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Settings reset to defaults'
-        ]);
+        // User growth rate (last 30 days vs previous 30 days)
+        $usersLast30 = User::where('created_at', '>=', Carbon::now()->subDays(30))->count();
+        $usersPrevious30 = User::whereBetween('created_at', [
+            Carbon::now()->subDays(60),
+            Carbon::now()->subDays(30)
+        ])->count();
+        
+        $userGrowthRate = $usersPrevious30 > 0
+            ? (($usersLast30 - $usersPrevious30) / $usersPrevious30) * 100
+            : ($usersLast30 > 0 ? 100 : 0);
+
+        // Content growth rate (questions in last 30 days)
+        $questionsLast30 = Question::where('created_at', '>=', Carbon::now()->subDays(30))->count();
+        $questionsPrevious30 = Question::whereBetween('created_at', [
+            Carbon::now()->subDays(60),
+            Carbon::now()->subDays(30)
+        ])->count();
+        
+        $contentGrowthRate = $questionsPrevious30 > 0
+            ? (($questionsLast30 - $questionsPrevious30) / $questionsPrevious30) * 100
+            : ($questionsLast30 > 0 ? 100 : 0);
+
+        return [
+            'qa_approval_rate' => round($qaApprovalRate, 2),
+            'user_growth_rate' => round($userGrowthRate, 2),
+            'content_growth_rate' => round($contentGrowthRate, 2),
+            'questions_last_30days' => $questionsLast30,
+        ];
+    }
+
+    /**
+     * Get platform insights
+     */
+    private function getInsights(): array
+    {
+        // Find top performing track (highest approval rate with significant content)
+        // Using the skill_track pivot table for many-to-many relationship
+        $topTrack = DB::table('tracks')
+            ->leftJoin('skill_track', 'tracks.id', '=', 'skill_track.track_id')
+            ->leftJoin('skills', 'skill_track.skill_id', '=', 'skills.id')
+            ->leftJoin('questions', 'skills.id', '=', 'questions.skill_id')
+            ->select(
+                'tracks.id',
+                'tracks.track as name',
+                DB::raw('COUNT(DISTINCT questions.id) as question_count'),
+                DB::raw('SUM(CASE WHEN questions.qa_status = "approved" THEN 1 ELSE 0 END) as approved_count')
+            )
+            ->groupBy('tracks.id', 'tracks.track')
+            ->having('question_count', '>=', 20) // Minimum threshold
+            ->get()
+            ->map(function ($track) {
+                $track->approval_rate = $track->question_count > 0
+                    ? ($track->approved_count / $track->question_count) * 100
+                    : 0;
+                return $track;
+            })
+            ->sortByDesc('approval_rate')
+            ->first();
+
+        return [
+            'top_track' => $topTrack ? [
+                'name' => $topTrack->name,
+                'question_count' => $topTrack->question_count,
+                'approval_rate' => round($topTrack->approval_rate, 2),
+            ] : null,
+            'needs_attention' => Question::where('qa_status', 'unreviewed')->count() > 100,
+        ];
+    }
+
+    /**
+     * Get recent questions for activity feed
+     */
+    private function getRecentQuestions()
+    {
+        return Question::with('skill')
+            ->latest('updated_at')
+            ->limit(5)
+            ->get()
+            ->map(function ($question) {
+                return [
+                    'id' => $question->id,
+                    'question' => strip_tags($question->question),
+                    'qa_status' => $question->qa_status,
+                    'updated_at' => $question->updated_at,
+                ];
+            });
+    }
+
+    /**
+     * Get chart data for content creation trends (last 14 days)
+     */
+    private function getChartData(): array
+    {
+        $days = 14;
+        $labels = [];
+        $created = [];
+        $approved = [];
+
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i);
+            $labels[] = $date->format('M j');
+            
+            $created[] = Question::whereDate('created_at', $date)->count();
+            $approved[] = Question::whereDate('created_at', $date)
+                ->where('qa_status', 'approved')
+                ->count();
+        }
+
+        return [
+            'labels' => $labels,
+            'created' => $created,
+            'approved' => $approved,
+        ];
+    }
+
+    /**
+     * Get field distribution for pie chart
+     */
+    private function getFieldDistribution(): array
+    {
+        // Fields -> Tracks (direct relationship)
+        // Tracks -> Skills (many-to-many via skill_track)
+        // Skills -> Questions (direct relationship)
+        $fieldData = DB::table('fields')
+            ->leftJoin('tracks', 'fields.id', '=', 'tracks.field_id')
+            ->leftJoin('skill_track', 'tracks.id', '=', 'skill_track.track_id')
+            ->leftJoin('skills', 'skill_track.skill_id', '=', 'skills.id')
+            ->leftJoin('questions', 'skills.id', '=', 'questions.skill_id')
+            ->select(
+                'fields.field as name',
+                DB::raw('COUNT(DISTINCT questions.id) as question_count')
+            )
+            ->groupBy('fields.id', 'fields.field')
+            ->orderByDesc('question_count')
+            ->limit(6)
+            ->get();
+
+        return [
+            'labels' => $fieldData->pluck('name')->toArray(),
+            'data' => $fieldData->pluck('question_count')->toArray(),
+        ];
+    }
+
+    /**
+     * Clear dashboard cache (call this when major changes occur)
+     */
+    public function clearCache()
+    {
+        Cache::forget('admin_dashboard');
+        return response()->json(['success' => true, 'message' => 'Dashboard cache cleared']);
     }
 }

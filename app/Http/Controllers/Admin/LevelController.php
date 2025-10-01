@@ -97,7 +97,7 @@ class LevelController extends Controller
             'age' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'start_maxile_level' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'end_maxile_level' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'status_id' => ['sometimes', 'required', 'exists:statuses,id'],
+            'status_id' => ['sometimes', 'required', 'exists:statuses'],
             'order' => ['sometimes', 'nullable', 'integer', 'min:0'],
         ]);
 

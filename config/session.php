@@ -12,9 +12,9 @@ return [
     'lottery' => [2, 100],
     'cookie' => 'laravel_session',
     'path' => '/',
-    'domain' => env('SESSION_DOMAIN', 'localhost'), // fallback to localhost
-    'secure' => env('SESSION_SECURE_COOKIE', true),
-    'http_only' => env('SESSION_HTTP_ONLY', true),
-    'same_site' => 'none',
-    'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
+     'domain'    => env('SESSION_DOMAIN', null),            // null is best for localhost
+     'secure'    => env('SESSION_SECURE_COOKIE', false),    // false for http locally
+     'same_site' => env('SESSION_SAME_SITE', 'lax'),        // 'lax' works on http
+     'http_only' => env('SESSION_HTTP_ONLY', true),
+     'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
 ];

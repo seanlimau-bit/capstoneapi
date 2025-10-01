@@ -31,9 +31,10 @@ class Level extends Model
     }
 
     public function status() {
-        return $this->belongsTo(\App\Models\Status::class);
+        return $this->belongsTo(\App\Models\Status::class, 'status_id');
     }
-    public function scopePublic($q) { return $q->where('status', 'Public'); }
+
+    public function scopePublic($q) { return $q->where('status_id', 3); }
 
     public function scopeNext() {
         return $this->belongsTo(\App\Models\Level::class)->where('start_maxile_level','>', $this->start_maxile_level)->orderBy('start_maxile_level','asc')->first();

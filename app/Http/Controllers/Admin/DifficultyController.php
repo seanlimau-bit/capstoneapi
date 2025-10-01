@@ -73,6 +73,7 @@ class DifficultyController extends Controller
             'difficulty'         => ['sometimes', 'required', 'integer', 'min:0'],
             'short_description'  => ['sometimes', 'required', 'string', 'max:255'],
             'description'        => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'status_id'          => ['sometimes', 'required',  'integer'],
             'order'              => ['sometimes', 'nullable', 'integer', 'min:0'],
         ]);
 

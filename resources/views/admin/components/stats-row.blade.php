@@ -5,7 +5,9 @@
             <div class="card bg-{{ $stat['color'] ?? 'primary' }} text-white h-100">
                 <div class="card-body d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h4 class="mb-0" @if(isset($stat['id'])) id="{{ $stat['id'] }}" @endif>
+                        <h4 class="mb-0" 
+                            @if(isset($stat['id'])) id="{{ $stat['id'] }}" @endif
+                            @if(isset($stat['data-stat'])) data-stat="{{ $stat['data-stat'] }}" @endif>
                             {{ $stat['value'] ?? $stat['count'] ?? 0 }}
                         </h4>
                         <small class="opacity-90">{{ $stat['label'] ?? $stat['title'] ?? 'Statistic' }}</small>
@@ -29,7 +31,6 @@
         </div>
     @endforeach
 </div>
-
 @if(empty($stats))
 <div class="row mb-4">
     <div class="col-12">

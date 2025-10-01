@@ -10,81 +10,75 @@ use App\Models\Track;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Services\LookupOptionsService;
 
 class FieldController extends Controller
 {
     /**
      * API + Web index entrypoint.
      */
-    public function index(Request $request)
-    {
-        // If it's NOT an AJAX request expecting JSON, go to webIndex for Blade view
-        if (!($request->ajax() && $request->expectsJson())) {
-            return $this->webIndex($request);
-        }
+public function index(Request $request)
+{
+    // If it's NOT an AJAX request expecting JSON, go to webIndex for Blade view
+    if (!$request->ajax()) {
+        return $this->webIndex($request);
+    }
 
-        // Continue with JSON logic for AJAX requests
-        $query = Field::with(['tracks', 'status'])
-            ->orderBy('created_at', 'desc'); // Add default ordering
+    // Continue with JSON logic for AJAX requests
+    $query = Field::with(['tracks', 'status'])
+        ->orderBy('created_at', 'desc');
 
-        // Fix: Direct column filter, not relationship
-        if ($request->filled('status_id')) {
-            $query->where('status_id', $request->status_id);
-        }
+    // Filter by status_id
+    if ($request->filled('status_id')) {
+        $query->where('status_id', $request->status_id);
+    }
 
-        // Add sorting support
-        if ($request->filled('sort')) {
-            $sortField = $request->sort;
-            $direction = $request->filled('direction') ? $request->direction : 'asc';
-            $query->orderBy($sortField, $direction);
-        }
+    // Add sorting support
+    if ($request->filled('sort')) {
+        $sortField = $request->sort;
+        $direction = $request->filled('direction') ? $request->direction : 'asc';
+        $query->orderBy($sortField, $direction);
+    }
 
-        if ($request->filled('has_tracks')) {
-            $request->has_tracks === '1'
-                ? $query->has('tracks')
-                : $query->doesntHave('tracks');
-        }
+    if ($request->filled('has_tracks')) {
+        $request->has_tracks === '1'
+            ? $query->has('tracks')
+            : $query->doesntHave('tracks');
+    }
 
-        if ($request->filled('search')) {
-            $searchTerm = $request->search;
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('field', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('description', 'LIKE', "%{$searchTerm}%");
-            });
-        }
-
-        $fields = $query->get();
-
-        // Your existing count calculations...
-        $fields->each(function (Field $field) {
-            $field->tracks_count = $field->tracks()->count();
-
-            $trackIds = $field->tracks()->pluck('id');
-
-            $field->questions_count = Question::whereHas('skill', function($query) use ($trackIds) {
-                $query->whereHas('tracks', function($subQuery) use ($trackIds) {
-                    $subQuery->whereIn('tracks.id', $trackIds);
-                });
-            })->count();
-
-            $field->skills_count = Skill::whereHas('tracks', function($query) use ($trackIds) {
-                $query->whereIn('tracks.id', $trackIds);
-            })->count();
+    if ($request->filled('search')) {
+        $searchTerm = $request->search;
+        $query->where(function ($q) use ($searchTerm) {
+            $q->where('field', 'LIKE', "%{$searchTerm}%")
+              ->orWhere('description', 'LIKE', "%{$searchTerm}%");
         });
+    }
 
-        // Return JSON for AJAX requests
-        return response()->json([
-            'fields' => $fields,
-            'totals' => [
-                'total' => Field::count(),
-                'public' => Field::where('status_id', 3)->count(),  // Assuming status_id 3 = Public
-                'draft' => Field::where('status_id', 4)->count(),   // Assuming status_id 4 = Draft
-                'restricted' => Field::where('status_id', 2)->count(), // Assuming status_id 2 = Restricted
-            ],
-            'num_pages' => 1,
-        ]);
-    } // ← Added missing closing brace here
+    $fields = $query->get();
 
+    // Calculate counts for each field
+    $fields->each(function (Field $field) {
+        $field->tracks_count = $field->tracks()->count();
+        $field->questions_count = 0;
+        $field->skills_count = 0;
+    });
+
+    // Get status counts dynamically by status name
+    $publicStatus = \DB::table('statuses')->where('status', 'Public')->first();
+    $draftStatus = \DB::table('statuses')->where('status', 'Draft')->first();
+    $privateStatus = \DB::table('statuses')->whereIn('status', ['Private', 'Restricted'])->first();
+
+    return response()->json([
+        'fields' => $fields,
+        'totals' => [
+            'total' => Field::count(),
+            'public' => $publicStatus ? Field::where('status_id', $publicStatus->id)->count() : 0,
+            'draft' => $draftStatus ? Field::where('status_id', $draftStatus->id)->count() : 0,
+            'private' => $privateStatus ? Field::where('status_id', $privateStatus->id)->count() : 0,
+        ],
+        'num_pages' => 1,
+    ]);
+}
     /**
      * Web admin index with filters and search.
      */
@@ -102,8 +96,8 @@ class FieldController extends Controller
         // Filter fields by presence of tracks
         if ($request->filled('has_tracks')) {
             $request->has_tracks === '1'
-                ? $query->has('tracks')
-                : $query->doesntHave('tracks');
+            ? $query->has('tracks')
+            : $query->doesntHave('tracks');
         }
 
         // Search on field name or description
@@ -111,7 +105,7 @@ class FieldController extends Controller
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('field', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('description', 'LIKE', "%{$searchTerm}%");
+                ->orWhere('description', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -173,8 +167,8 @@ class FieldController extends Controller
                 ]);
             }
             return redirect()
-                ->route('admin.fields.index')
-                ->with('success', 'Field created successfully');
+            ->route('admin.fields.index')
+            ->with('success', 'Field created successfully');
         }
 
         // API response
@@ -188,7 +182,7 @@ class FieldController extends Controller
     /**
      * Show a Field.
      */
-    public function show(Field $field, Request $request)
+    public function show(Field $field, Request $request, LookupOptionsService $lookups)
     {
         // Handle API requests
         if ($request->expectsJson()) {
@@ -198,64 +192,72 @@ class FieldController extends Controller
                 'code' => 200,
             ], 200);
         }
-
-        // Load only the direct relationships
-        $field->load(['tracks', 'user', 'status']);
-
-        // Calculate counts through the proper hierarchy: Field → Tracks → Skills → Questions
+        
+        // Load relationships
+        $field->load(['tracks.status', 'tracks.level','tracks.skills', 'user', 'status']);
+        
+        // Calculate counts
         $field->tracks_count = $field->tracks()->count();
         
-        // Get questions count through tracks → skills → questions
         if ($field->tracks_count > 0) {
             $trackIds = $field->tracks()->pluck('id')->toArray();
             
             $field->questions_count = DB::table('questions')
-                ->join('skills', 'questions.skill_id', '=', 'skills.id')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->whereIn('skill_track.track_id', $trackIds)
-                ->count();
+            ->join('skills', 'questions.skill_id', '=', 'skills.id')
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->whereIn('skill_track.track_id', $trackIds)
+            ->count();
 
             $field->active_questions_count = DB::table('questions')
-                ->join('skills', 'questions.skill_id', '=', 'skills.id')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->join('statuses', 'questions.status_id', '=', 'statuses.id')
-                ->whereIn('skill_track.track_id', $trackIds)
-                ->where('statuses.status', 'active')
-                ->count();
+            ->join('skills', 'questions.skill_id', '=', 'skills.id')
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->join('statuses', 'questions.status_id', '=', 'statuses.id')
+            ->whereIn('skill_track.track_id', $trackIds)
+            ->where('statuses.status', 'active')
+            ->count();
 
             $field->skills_count = DB::table('skills')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->whereIn('skill_track.track_id', $trackIds)
-                ->distinct('skills.id')
-                ->count();
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->whereIn('skill_track.track_id', $trackIds)
+            ->distinct('skills.id')
+            ->count();
         } else {
             $field->questions_count = 0;
             $field->active_questions_count = 0;
             $field->skills_count = 0;
         }
-
-        return view('admin.fields.show', compact('field'));
+        
+        // Get lookup options
+        $statuses = $lookups->statuses();
+        $levels = $lookups->levels();
+        
+        return view('admin.fields.show', compact('field', 'statuses', 'levels'));
     }
-
     /**
      * Update a Field.
      */
     public function update(Request $request, Field $field)
     {
-        $user = Auth::user();
-        if ($user->id !== $field->user_id && !$user->is_admin) {
-            if ($request->expectsJson()) {
-                return response()->json(['message' => 'You have no access rights to update field', 'code' => 401], 401);
-            }
-            abort(403, 'You have no access rights to update field');
-        }
+    // Add this at the very top
+        \Log::info('Update request received', [
+            'ajax' => $request->ajax(),
+            'has_field' => $request->has('field'),
+            'all_data' => $request->all(),
+            'field_name' => $request->input('field'),
+            'value' => $request->input('value')
+        ]);
 
-        // Inline AJAX update from web UI
-        if ($request->ajax() && $request->has('field') && !$request->expectsJson()) {
+    // Inline AJAX update from web UI
+        if ($request->ajax() && $request->has('field')) {
             $fieldName = $request->input('field');
             $value     = $request->input('value');
 
-            // Rules per updatable attribute
+            \Log::info('Inline update detected', [
+                'field_name' => $fieldName,
+                'value' => $value,
+                'field_id' => $field->id
+            ]);
+
             $rules = [
                 'field'       => 'required|string|max:255',
                 'description' => 'nullable|string',
@@ -264,47 +266,22 @@ class FieldController extends Controller
             ];
 
             if (!array_key_exists($fieldName, $rules)) {
+                \Log::warning('Invalid field name', ['field_name' => $fieldName]);
                 return response()->json(['success' => false, 'message' => 'Invalid field name'], 400);
             }
 
-            // Validate "value" against the selected rule, turning required into nullable for inline edits
             $ruleForValue = preg_replace('/\brequired\|?/', 'nullable|', $rules[$fieldName]);
             $request->validate(['value' => $ruleForValue]);
 
             $field->update([$fieldName => $value]);
 
+            \Log::info('Field updated', ['field' => $field->fresh()->toArray()]);
+
             return response()->json(['success' => true, 'message' => 'Field updated successfully']);
         }
 
-        // Full form submit on web
-        if (!$request->expectsJson()) {
-            $validated = $request->validate([
-                'field'       => 'required|string|max:255|unique:fields,field,' . $field->id,
-                'description' => 'nullable|string',
-                'image'       => 'nullable|string|max:255',
-                'status_id'   => 'nullable|exists:statuses,id',
-            ]);
-
-            $field->update($validated);
-
-            if ($request->ajax()) {
-                return response()->json(['success' => true, 'message' => 'Field updated successfully']);
-            }
-
-            return redirect()
-                ->route('admin.fields.show', $field)
-                ->with('success', 'Field updated successfully');
-        }
-
-        // API update, keep loose for backward compatibility
-        $field->fill($request->all())->save();
-
-        return response()->json([
-            'message' => 'Field updated',
-            'field'   => $field,
-        ], 201);
+    // ... rest of the method
     }
-
     /**
      * Delete a Field.
      */
@@ -324,7 +301,7 @@ class FieldController extends Controller
 
             // Redirect for non-AJAX requests
             return redirect()->route('admin.fields.index')
-                ->with('success', 'Field deleted successfully');
+            ->with('success', 'Field deleted successfully');
             
         } catch (\Exception $e) {
             if (request()->ajax()) {
@@ -335,7 +312,7 @@ class FieldController extends Controller
             }
 
             return redirect()->back()
-                ->with('error', 'Error deleting field');
+            ->with('error', 'Error deleting field');
         }
     }
 
@@ -346,11 +323,11 @@ class FieldController extends Controller
     {
         // Use direct DB query instead of nested relationships
         $query = DB::table('questions')
-            ->join('skills', 'questions.skill_id', '=', 'skills.id')
-            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-            ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
-            ->where('tracks.field_id', $field->id)
-            ->select('questions.*', 'skills.skill as skill_name', 'tracks.track as track_name');
+        ->join('skills', 'questions.skill_id', '=', 'skills.id')
+        ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+        ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
+        ->where('tracks.field_id', $field->id)
+        ->select('questions.*', 'skills.skill as skill_name', 'tracks.track as track_name');
 
         if ($request->filled('difficulty')) {
             $query->where('questions.difficulty', $request->difficulty);
@@ -360,7 +337,7 @@ class FieldController extends Controller
         }
         if ($request->filled('status')) {
             $query->join('statuses', 'questions.status_id', '=', 'statuses.id')
-                ->where('statuses.status', $request->status);
+            ->where('statuses.status', $request->status);
         }
 
         $questions = $query->paginate(20);
@@ -377,8 +354,8 @@ class FieldController extends Controller
         if ($request->isMethod('get')) {
             $currentTracks   = $field->tracks()->pluck('id')->toArray();
             $availableTracks = Track::whereNull('field_id')
-                ->orWhere('field_id', $field->id)
-                ->get();
+            ->orWhere('field_id', $field->id)
+            ->get();
 
             return response()->json([
                 'current_tracks'   => $currentTracks,
@@ -396,16 +373,16 @@ class FieldController extends Controller
 
         // Detach from this field any tracks not in the submitted list
         Track::where('field_id', $field->id)
-            ->whereNotIn('id', $trackIds)
-            ->update(['field_id' => null]);
+        ->whereNotIn('id', $trackIds)
+        ->update(['field_id' => null]);
 
         // Attach to this field any tracks that are selected and currently unassigned
         if (!empty($trackIds)) {
             Track::whereIn('id', $trackIds)
-                ->where(function ($q) use ($field) {
-                    $q->whereNull('field_id')->orWhere('field_id', $field->id);
-                })
-                ->update(['field_id' => $field->id]);
+            ->where(function ($q) use ($field) {
+                $q->whereNull('field_id')->orWhere('field_id', $field->id);
+            })
+            ->update(['field_id' => $field->id]);
         }
 
         return response()->json(['success' => true, 'message' => 'Tracks updated successfully']);
@@ -463,21 +440,21 @@ class FieldController extends Controller
             'tracks'    => $field->tracks()->get()->toArray(),
             // Questions through Skill ⇄ Track pivot, limited to tracks in this field
             'questions' => DB::table('questions')
-                ->join('skills', 'questions.skill_id', '=', 'skills.id')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
-                ->where('tracks.field_id', $field->id)
-                ->select('questions.*')
-                ->get()
-                ->toArray(),
+            ->join('skills', 'questions.skill_id', '=', 'skills.id')
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
+            ->where('tracks.field_id', $field->id)
+            ->select('questions.*')
+            ->get()
+            ->toArray(),
         ];
 
         $filename = 'field_' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $field->field) . '_' . now()->format('Y-m-d') . '.json';
 
         return response()
-            ->json($data)
-            ->header('Content-Type', 'application/json')
-            ->header('Content-Disposition', "attachment; filename={$filename}");
+        ->json($data)
+        ->header('Content-Type', 'application/json')
+        ->header('Content-Disposition', "attachment; filename={$filename}");
     }
 
     /**
@@ -505,42 +482,42 @@ class FieldController extends Controller
         // Use direct DB queries instead of nested relationships
         $analytics = [
             'questions_by_difficulty' => DB::table('questions')
-                ->join('skills', 'questions.skill_id', '=', 'skills.id')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
-                ->where('tracks.field_id', $field->id)
-                ->select('questions.difficulty', DB::raw('count(*) as count'))
-                ->groupBy('questions.difficulty')
-                ->pluck('count', 'difficulty'),
+            ->join('skills', 'questions.skill_id', '=', 'skills.id')
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
+            ->where('tracks.field_id', $field->id)
+            ->select('questions.difficulty', DB::raw('count(*) as count'))
+            ->groupBy('questions.difficulty')
+            ->pluck('count', 'difficulty'),
 
             'questions_by_type' => DB::table('questions')
-                ->join('skills', 'questions.skill_id', '=', 'skills.id')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
-                ->where('tracks.field_id', $field->id)
-                ->select('questions.type', DB::raw('count(*) as count'))
-                ->groupBy('questions.type')
-                ->pluck('count', 'type'),
+            ->join('skills', 'questions.skill_id', '=', 'skills.id')
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
+            ->where('tracks.field_id', $field->id)
+            ->select('questions.type', DB::raw('count(*) as count'))
+            ->groupBy('questions.type')
+            ->pluck('count', 'type'),
 
             'questions_by_month' => DB::table('questions')
-                ->join('skills', 'questions.skill_id', '=', 'skills.id')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
-                ->where('tracks.field_id', $field->id)
-                ->select(DB::raw('DATE_FORMAT(questions.created_at, "%Y-%m") as month'), DB::raw('count(*) as count'))
-                ->groupBy('month')
-                ->orderBy('month')
-                ->pluck('count', 'month'),
+            ->join('skills', 'questions.skill_id', '=', 'skills.id')
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
+            ->where('tracks.field_id', $field->id)
+            ->select(DB::raw('DATE_FORMAT(questions.created_at, "%Y-%m") as month'), DB::raw('count(*) as count'))
+            ->groupBy('month')
+            ->orderBy('month')
+            ->pluck('count', 'month'),
 
             'tracks_count' => $field->tracks()->count(),
 
             // Distinct skills attached to any track of this field using direct DB query
             'skills_count' => DB::table('skills')
-                ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
-                ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
-                ->where('tracks.field_id', $field->id)
-                ->distinct('skills.id')
-                ->count(),
+            ->join('skill_track', 'skills.id', '=', 'skill_track.skill_id')
+            ->join('tracks', 'skill_track.track_id', '=', 'tracks.id')
+            ->where('tracks.field_id', $field->id)
+            ->distinct('skills.id')
+            ->count(),
         ];
 
         return response()->json($analytics);

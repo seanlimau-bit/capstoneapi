@@ -19,73 +19,73 @@ use Illuminate\Support\Facades\Schema;
 $get = fn($k) => data_get($config ?? [], $k);
 $mailDefaults = $mailDefaults ?? [];
 $columnsFromController = isset($dbFields) && is_array($dbFields)
-  ? $dbFields
-  : (Schema::hasTable('configs') ? Schema::getColumnListing('configs') : []);
+? $dbFields
+: (Schema::hasTable('configs') ? Schema::getColumnListing('configs') : []);
 $onlyDb = fn(array $items) => array_values(array_filter($items, fn($it) => in_array($it['k'], $columnsFromController, true)));
 
 $site = [
-  ['k'=>'site_name','label'=>'Site Name','type'=>'text','desc'=>'Full name of your LMS'],
-  ['k'=>'site_shortname','label'=>'Short Name','type'=>'text','desc'=>'Abbreviation used in menus'],
-  ['k'=>'site_url','label'=>'Site URL','type'=>'url','desc'=>'Base URL of your application'],
-  ['k'=>'email','label'=>'Contact Email','type'=>'email','desc'=>'Primary contact email'],
-  ['k'=>'timezone','label'=>'Timezone','type'=>'select','desc'=>'Site timezone','options'=>[
-    'UTC'=>'UTC','America/New_York'=>'Eastern Time','America/Chicago'=>'Central Time','America/Denver'=>'Mountain Time',
-    'America/Los_Angeles'=>'Pacific Time','Europe/London'=>'London','Asia/Singapore'=>'Singapore','Asia/Tokyo'=>'Tokyo'
-  ]],
-  ['k'=>'date_format','label'=>'Date Format','type'=>'select','desc'=>'Display format for dates','options'=>[
-    'd/m/Y'=>'DD/MM/YYYY','m/d/Y'=>'MM/DD/YYYY','Y-m-d'=>'YYYY-MM-DD','d-m-Y'=>'DD-MM-YYYY'
-  ]],
-  ['k'=>'time_format','label'=>'Time Format','type'=>'select','desc'=>'Display format for time','options'=>['12'=>'12 Hour','24'=>'24 Hour']],
+['k'=>'site_name','label'=>'Site Name','type'=>'text','desc'=>'Full name of your LMS'],
+['k'=>'site_shortname','label'=>'Short Name','type'=>'text','desc'=>'Abbreviation used in menus'],
+['k'=>'site_url','label'=>'Site URL','type'=>'url','desc'=>'Base URL of your application'],
+['k'=>'email','label'=>'Contact Email','type'=>'email','desc'=>'Primary contact email'],
+['k'=>'timezone','label'=>'Timezone','type'=>'select','desc'=>'Site timezone','options'=>[
+'UTC'=>'UTC','America/New_York'=>'Eastern Time','America/Chicago'=>'Central Time','America/Denver'=>'Mountain Time',
+'America/Los_Angeles'=>'Pacific Time','Europe/London'=>'London','Asia/Singapore'=>'Singapore','Asia/Tokyo'=>'Tokyo'
+]],
+['k'=>'date_format','label'=>'Date Format','type'=>'select','desc'=>'Display format for dates','options'=>[
+'d/m/Y'=>'DD/MM/YYYY','m/d/Y'=>'MM/DD/YYYY','Y-m-d'=>'YYYY-MM-DD','d-m-Y'=>'DD-MM-YYYY'
+]],
+['k'=>'time_format','label'=>'Time Format','type'=>'select','desc'=>'Display format for time','options'=>['12'=>'12 Hour','24'=>'24 Hour']],
 ];
 
 $email = [
-  ['k'=>'mail_host','label'=>'SMTP Host','type'=>'text','desc'=>'Email server hostname (e.g., smtp.gmail.com)'],
-  ['k'=>'mail_port','label'=>'SMTP Port','type'=>'number','desc'=>'Email server port (usually 587 for TLS)'],
-  ['k'=>'mail_username','label'=>'SMTP Username','type'=>'text','desc'=>'Email server username/email address'],
-  ['k'=>'mail_from_name','label'=>'From Name','type'=>'text','desc'=>'Default sender name for system emails'],
-  ['k'=>'mail_encryption','label'=>'Encryption','type'=>'select','desc'=>'Email encryption method','options'=>['none'=>'None','tls'=>'TLS','ssl'=>'SSL']],
-  ['k'=>'mail_from_address','label'=>'From Email Address','type'=>'email','desc'=>'Default sender email address'],
+['k'=>'mail_host','label'=>'SMTP Host','type'=>'text','desc'=>'Email server hostname (e.g., smtp.gmail.com)'],
+['k'=>'mail_port','label'=>'SMTP Port','type'=>'number','desc'=>'Email server port (usually 587 for TLS)'],
+['k'=>'mail_username','label'=>'SMTP Username','type'=>'text','desc'=>'Email server username/email address'],
+['k'=>'mail_from_name','label'=>'From Name','type'=>'text','desc'=>'Default sender name for system emails'],
+['k'=>'mail_encryption','label'=>'Encryption','type'=>'select','desc'=>'Email encryption method','options'=>['none'=>'None','tls'=>'TLS','ssl'=>'SSL']],
+['k'=>'mail_from_address','label'=>'From Email Address','type'=>'email','desc'=>'Default sender email address'],
 ];
 
 $colors = [
-  ['k'=>'main_color','label'=>'Primary Color','type'=>'color','desc'=>'Main brand color for buttons and links'],
-  ['k'=>'secondary_color','label'=>'Secondary Color','type'=>'color','desc'=>'Accent color for highlights and warnings'],
-  ['k'=>'tertiary_color','label'=>'Tertiary Color','type'=>'color','desc'=>'Success and positive actions'],
-  ['k'=>'success_color','label'=>'Success Color','type'=>'color','desc'=>'Success messages and confirmations'],
-  ['k'=>'error_color','label'=>'Error Color','type'=>'color','desc'=>'Error messages and warnings'],
-  ['k'=>'warning_color','label'=>'Warning Color','type'=>'color','desc'=>'Warning messages and cautions'],
-  ['k'=>'info_color','label'=>'Info Color','type'=>'color','desc'=>'Informational messages'],
-  ['k'=>'black_color','label'=>'Dark Color','type'=>'color','desc'=>'Dark text and backgrounds'],
-  ['k'=>'white_color','label'=>'Light Color','type'=>'color','desc'=>'Light text and backgrounds'],
+['k'=>'main_color','label'=>'Primary Color','type'=>'color','desc'=>'Main brand color for buttons and links'],
+['k'=>'secondary_color','label'=>'Secondary Color','type'=>'color','desc'=>'Accent color for highlights and warnings'],
+['k'=>'tertiary_color','label'=>'Tertiary Color','type'=>'color','desc'=>'Success and positive actions'],
+['k'=>'success_color','label'=>'Success Color','type'=>'color','desc'=>'Success messages and confirmations'],
+['k'=>'error_color','label'=>'Error Color','type'=>'color','desc'=>'Error messages and warnings'],
+['k'=>'warning_color','label'=>'Warning Color','type'=>'color','desc'=>'Warning messages and cautions'],
+['k'=>'info_color','label'=>'Info Color','type'=>'color','desc'=>'Informational messages'],
+['k'=>'black_color','label'=>'Dark Color','type'=>'color','desc'=>'Dark text and backgrounds'],
+['k'=>'white_color','label'=>'Light Color','type'=>'color','desc'=>'Light text and backgrounds'],
 ];
 
 $typography = [
-  ['k'=>'primary_font','label'=>'Primary Font','type'=>'text','desc'=>'Main font family for body text'],
-  ['k'=>'secondary_font','label'=>'Secondary Font','type'=>'text','desc'=>'Font family for headings and accents'],
-  ['k'=>'body_font_size','label'=>'Body Font Size','type'=>'text','desc'=>'Base font size (e.g., 16px)'],
-  ['k'=>'h1_font_size','label'=>'H1 Font Size','type'=>'text','desc'=>'Large heading size'],
-  ['k'=>'h2_font_size','label'=>'H2 Font Size','type'=>'text','desc'=>'Medium heading size'],
-  ['k'=>'h3_font_size','label'=>'H3 Font Size','type'=>'text','desc'=>'Small heading size'],
-  ['k'=>'h4_font_size','label'=>'H4 Font Size','type'=>'text','desc'=>'Extra small heading size'],
-  ['k'=>'h5_font_size','label'=>'H5 Font Size','type'=>'text','desc'=>'Minimal heading size'],
-  ['k'=>'body_line_height','label'=>'Body Line Height','type'=>'text','desc'=>'Line spacing for body text (e.g., 1.5)'],
-  ['k'=>'heading_line_height','label'=>'Heading Line Height','type'=>'text','desc'=>'Line spacing for headings (e.g., 1.2)'],
-  ['k'=>'font_weight_normal','label'=>'Normal Weight','type'=>'text','desc'=>'Regular text weight (e.g., 400)'],
-  ['k'=>'font_weight_medium','label'=>'Medium Weight','type'=>'text','desc'=>'Medium text weight (e.g., 500)'],
-  ['k'=>'font_weight_bold','label'=>'Bold Weight','type'=>'text','desc'=>'Bold text weight (e.g., 600)'],
+['k'=>'primary_font','label'=>'Primary Font','type'=>'text','desc'=>'Main font family for body text'],
+['k'=>'secondary_font','label'=>'Secondary Font','type'=>'text','desc'=>'Font family for headings and accents'],
+['k'=>'body_font_size','label'=>'Body Font Size','type'=>'text','desc'=>'Base font size (e.g., 16px)'],
+['k'=>'h1_font_size','label'=>'H1 Font Size','type'=>'text','desc'=>'Large heading size'],
+['k'=>'h2_font_size','label'=>'H2 Font Size','type'=>'text','desc'=>'Medium heading size'],
+['k'=>'h3_font_size','label'=>'H3 Font Size','type'=>'text','desc'=>'Small heading size'],
+['k'=>'h4_font_size','label'=>'H4 Font Size','type'=>'text','desc'=>'Extra small heading size'],
+['k'=>'h5_font_size','label'=>'H5 Font Size','type'=>'text','desc'=>'Minimal heading size'],
+['k'=>'body_line_height','label'=>'Body Line Height','type'=>'text','desc'=>'Line spacing for body text (e.g., 1.5)'],
+['k'=>'heading_line_height','label'=>'Heading Line Height','type'=>'text','desc'=>'Line spacing for headings (e.g., 1.2)'],
+['k'=>'font_weight_normal','label'=>'Normal Weight','type'=>'text','desc'=>'Regular text weight (e.g., 400)'],
+['k'=>'font_weight_medium','label'=>'Medium Weight','type'=>'text','desc'=>'Medium text weight (e.g., 500)'],
+['k'=>'font_weight_bold','label'=>'Bold Weight','type'=>'text','desc'=>'Bold text weight (e.g., 600)'],
 ];
 
 $layout = [
-  ['k'=>'border_radius','label'=>'Border Radius','type'=>'text','desc'=>'Corner roundness (e.g., 8px)'],
-  ['k'=>'sidebar_width','label'=>'Sidebar Width','type'=>'text','desc'=>'Admin sidebar width (e.g., 280px)'],
-  ['k'=>'content_max_width','label'=>'Content Max Width','type'=>'text','desc'=>'Maximum content area width (e.g., 1400px)'],
+['k'=>'border_radius','label'=>'Border Radius','type'=>'text','desc'=>'Corner roundness (e.g., 8px)'],
+['k'=>'sidebar_width','label'=>'Sidebar Width','type'=>'text','desc'=>'Admin sidebar width (e.g., 280px)'],
+['k'=>'content_max_width','label'=>'Content Max Width','type'=>'text','desc'=>'Maximum content area width (e.g., 1400px)'],
 ];
 
 $learning = [
-  // Removed number_of_teaching_days as requested
-  ['k'=>'questions_per_test','label'=>'Questions Per Test','type'=>'number','min'=>1,'max'=>100],
-  ['k'=>'no_rights_to_pass','label'=>'Rights Needed to Pass','type'=>'number','min'=>1,'max'=>10],
-  ['k'=>'no_wrongs_to_fail','label'=>'Wrongs to Fail','type'=>'number','min'=>1,'max'=>10],
+// Removed number_of_teaching_days as requested
+['k'=>'questions_per_test','label'=>'Questions Per Test','type'=>'number','min'=>1,'max'=>100],
+['k'=>'no_rights_to_pass','label'=>'Rights Needed to Pass','type'=>'number','min'=>1,'max'=>10],
+['k'=>'no_wrongs_to_fail','label'=>'Wrongs to Fail','type'=>'number','min'=>1,'max'=>10],
 ];
 
 // Hide any fields not in DB
@@ -137,100 +137,99 @@ $learning   = $onlyDb($learning);
             <div class="card-header"><strong>Basic Site Settings</strong></div>
             <div class="card-body">
               @foreach($site as $it)
-                @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">{{ $it['label'] }}</label>
-                  <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
-                    <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
-                    @if($type==='select')
-                      <select class="form-select form-select-sm d-none edit-input">
-                        @foreach(($it['options'] ?? []) as $ov => $ol)
-                          <option value="{{ $ov }}" {{ (string)$val===(string)$ov?'selected':'' }}>{{ $ol }}</option>
-                        @endforeach
-                      </select>
-                    @elseif($type==='textarea')
-                      <textarea rows="3" class="form-control d-none edit-input">{{ $val }}</textarea>
-                    @else
-                      <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" @if(isset($it['min'])) min="{{ $it['min'] }}" @endif @if(isset($it['max'])) max="{{ $it['max'] }}" @endif />
-                    @endif
-                    <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
-                    <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
-                  </div>
-                  @if(!empty($it['desc'] ?? null))
-                    <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
+              @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ $it['label'] }}</label>
+                <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
+                  <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
+                  @if($type==='select')
+                  <select class="form-select form-select-sm d-none edit-input">
+                    @foreach(($it['options'] ?? []) as $ov => $ol)
+                    <option value="{{ $ov }}" {{ (string)$val===(string)$ov?'selected':'' }}>{{ $ol }}</option>
+                    @endforeach
+                  </select>
+                  @elseif($type==='textarea')
+                  <textarea rows="3" class="form-control d-none edit-input">{{ $val }}</textarea>
+                  @else
+                  <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" @if(isset($it['min'])) min="{{ $it['min'] }}" @endif @if(isset($it['max'])) max="{{ $it['max'] }}" @endif />
                   @endif
+                  <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
+                  <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
                 </div>
+                @if(!empty($it['desc'] ?? null))
+                <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
+                @endif
+              </div>
               @endforeach
             </div>
           </div>
         </div>
 
+        {{-- Visual Assets card in resources/views/admin/settings/general.blade.php --}}
         <div class="col-lg-4 mt-3 mt-lg-0">
           <div class="card">
             <div class="card-header"><strong>Visual Assets</strong></div>
             <div class="card-body">
               {{-- Logo --}}
-              <div class="mb-3">
-                <label class="form-label fw-semibold">Site Logo</label>
+              <div class="mb-4">
+                <label class="form-label fw-semibold d-block mb-2">Site Logo</label>
                 @php
-                  $logoPath = $get('site_logo');
-                  $logoUrl  = $logoPath ? asset($logoPath) . '?v=' . ($assetVersion ?? time()) : null;
+                $logoPath = $get('site_logo');
+                $logoUrl  = $logoPath ? asset($logoPath) . '?v=' . ($assetVersion ?? time()) : null;
                 @endphp
                 @if($logoPath && file_exists(public_path($logoPath)))
-                  <div class="position-relative d-inline-block">
-                    <img id="logoImg" src="{{ $logoUrl }}" class="img-fluid rounded border" style="max-height:80px" alt="Logo">
-                    <div class="position-absolute top-0 end-0 p-1">
-                      <button class="btn btn-sm btn-light" onclick="document.getElementById('logoInput').click()"><i class="fas fa-edit"></i></button>
-                      <button class="btn btn-sm btn-danger" onclick="deleteFile('logo')"><i class="fas fa-trash"></i></button>
-                    </div>
+                <div class="border rounded p-2 bg-light">
+                  <img id="logoImg" src="{{ $logoUrl }}" class="img-fluid d-block mx-auto mb-2" style="max-height:80px" alt="Logo">
+                  <div class="d-flex gap-2 justify-content-center">
+                    <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('logoInput').click()">
+                      <i class="fas fa-edit me-1"></i>Change
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFile('logo')">
+                      <i class="fas fa-trash me-1"></i>Delete
+                    </button>
                   </div>
+                </div>
                 @else
-                  <button class="btn btn-outline-secondary w-100" onclick="document.getElementById('logoInput').click()">
-                    <i class="fas fa-image me-1"></i> Upload Logo
-                  </button>
+                <button class="btn btn-outline-secondary w-100" onclick="document.getElementById('logoInput').click()">
+                  <i class="fas fa-image me-2"></i> Upload Logo
+                </button>
                 @endif
                 <input id="logoInput" type="file" accept="image/*" class="d-none" onchange="uploadFile(this,'logo')">
               </div>
 
               {{-- Favicon --}}
-              <div class="mb-3">
-                <label class="form-label fw-semibold">Favicon</label>
+              <div class="mb-4">
+                <label class="form-label fw-semibold d-block mb-2">Favicon</label>
                 @php
-                  $faviconPath = $get('favicon');
-                  $faviconUrl  = $faviconPath ? asset($faviconPath) . '?v=' . ($assetVersion ?? time()) : null;
+                $faviconPath = $get('favicon');
+                $faviconUrl  = $faviconPath ? asset($faviconPath) . '?v=' . ($assetVersion ?? time()) : null;
                 @endphp
-
                 @if($faviconPath && file_exists(public_path($faviconPath)))
-                  <div class="position-relative d-inline-block">
-                    <img id="faviconImg" src="{{ $faviconUrl }}" class="rounded border" style="width:32px;height:32px" alt="Favicon">
-                    <div class="position-absolute top-0 end-0 p-1">
-                      <button class="btn btn-sm btn-light" onclick="document.getElementById('faviconInput').click()">
-                        <i class="fas fa-edit"></i>
-                      </button>
-                      <button class="btn btn-sm btn-danger" onclick="deleteFile('favicon')">
-                        <i class="fas fa-trash"></i>
-                      </button>
-                    </div>
+                <div class="border rounded p-2 bg-light text-center">
+                  <img id="faviconImg" src="{{ $faviconUrl }}" class="d-block mx-auto mb-2" style="width:32px;height:32px" alt="Favicon">
+                  <div class="d-flex gap-2 justify-content-center">
+                    <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('faviconInput').click()">
+                      <i class="fas fa-edit me-1"></i>Change
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFile('favicon')">
+                      <i class="fas fa-trash me-1"></i>Delete
+                    </button>
                   </div>
+                </div>
                 @else
-                  <button class="btn btn-outline-secondary w-100" onclick="document.getElementById('faviconInput').click()">
-                    <i class="fas fa-star me-1"></i> Upload Favicon
-                  </button>
-                  <div class="text-muted small mt-1">16×16 or 32×32 px recommended</div>
+                <button class="btn btn-outline-secondary w-100" onclick="document.getElementById('faviconInput').click()">
+                  <i class="fas fa-star me-2"></i> Upload Favicon
+                </button>
+                <div class="text-muted small mt-1">16×16 or 32×32 px recommended</div>
                 @endif
-
-                <input id="faviconInput"
-                       type="file"
-                       class="d-none"
-                       accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon,.ico"
-                       onchange="uploadFile(this,'favicon')">
+                <input id="faviconInput" type="file" class="d-none" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon,.ico" onchange="uploadFile(this,'favicon')">
               </div>
 
               {{-- Login background --}}
               <div class="mb-0">
-                <label class="form-label fw-semibold">Login Background</label>
+                <label class="form-label fw-semibold d-block mb-2">Login Background</label>
                 <button class="btn btn-outline-secondary w-100" onclick="document.getElementById('backgroundInput').click()">
-                  <i class="fas fa-image me-1"></i> Upload Background
+                  <i class="fas fa-image me-2"></i> Upload Background
                 </button>
                 <input id="backgroundInput" type="file" accept="image/*" class="d-none" onchange="uploadFile(this,'login_background')">
                 <div class="text-muted small mt-1">1920×1080 px recommended</div>
@@ -249,34 +248,34 @@ $learning   = $onlyDb($learning);
             <div class="card-header"><strong>SMTP Email Configuration</strong></div>
             <div class="card-body">
               @foreach($email as $it)
-                @php
-                  $k   = $it['k'];
-                  $type= $it['type'];
-                  // show DB value or .env/config() fallback
-                  $val = old($k, $get($k) ?? data_get($mailDefaults, $k));
-                @endphp
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">{{ $it['label'] }}</label>
-                  <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
-                    <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
-                    @if(($it['type'] ?? '') === 'select')
-                      <select class="form-select form-select-sm d-none edit-input">
-                        @foreach(($it['options'] ?? []) as $ov => $ol)
-                          <option value="{{ $ov }}" {{ (string)$val===(string)$ov?'selected':'' }}>{{ $ol }}</option>
-                        @endforeach
-                      </select>
-                    @else
-                      <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}"
-                             @if(isset($it['min'])) min="{{ $it['min'] }}" @endif
-                             @if(isset($it['max'])) max="{{ $it['max'] }}" @endif />
-                    @endif
-                    <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
-                    <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
-                  </div>
-                  @if(!empty($it['desc'] ?? null))
-                    <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
+              @php
+              $k   = $it['k'];
+              $type= $it['type'];
+              // show DB value or .env/config() fallback
+              $val = old($k, $get($k) ?? data_get($mailDefaults, $k));
+              @endphp
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ $it['label'] }}</label>
+                <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
+                  <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
+                  @if(($it['type'] ?? '') === 'select')
+                  <select class="form-select form-select-sm d-none edit-input">
+                    @foreach(($it['options'] ?? []) as $ov => $ol)
+                    <option value="{{ $ov }}" {{ (string)$val===(string)$ov?'selected':'' }}>{{ $ol }}</option>
+                    @endforeach
+                  </select>
+                  @else
+                  <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}"
+                  @if(isset($it['min'])) min="{{ $it['min'] }}" @endif
+                  @if(isset($it['max'])) max="{{ $it['max'] }}" @endif />
                   @endif
+                  <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
+                  <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
                 </div>
+                @if(!empty($it['desc'] ?? null))
+                <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
+                @endif
+              </div>
               @endforeach
 
               <div class="alert alert-info">
@@ -311,19 +310,19 @@ $learning   = $onlyDb($learning);
             <div class="card-header"><strong>Colors</strong></div>
             <div class="card-body">
               @foreach($colors as $it)
-                @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">{{ $it['label'] }}</label>
-                  <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
-                    <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
-                    <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" />
-                    <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
-                    <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
-                  </div>
-                  @if(!empty($it['desc'] ?? null))
-                    <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
-                  @endif
+              @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ $it['label'] }}</label>
+                <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
+                  <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
+                  <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" />
+                  <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
+                  <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
                 </div>
+                @if(!empty($it['desc'] ?? null))
+                <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
+                @endif
+              </div>
               @endforeach
             </div>
           </div>
@@ -332,19 +331,19 @@ $learning   = $onlyDb($learning);
             <div class="card-header"><strong>Layout</strong></div>
             <div class="card-body">
               @foreach($layout as $it)
-                @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">{{ $it['label'] }}</label>
-                  <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
-                    <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
-                    <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" />
-                    <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
-                    <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
-                  </div>
-                  @if(!empty($it['desc'] ?? null))
-                    <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
-                  @endif
+              @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ $it['label'] }}</label>
+                <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
+                  <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
+                  <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" />
+                  <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
+                  <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
                 </div>
+                @if(!empty($it['desc'] ?? null))
+                <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
+                @endif
+              </div>
               @endforeach
             </div>
           </div>
@@ -355,19 +354,19 @@ $learning   = $onlyDb($learning);
             <div class="card-header"><strong>Typography</strong></div>
             <div class="card-body">
               @foreach($typography as $it)
-                @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">{{ $it['label'] }}</label>
-                  <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
-                    <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
-                    <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" />
-                    <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
-                    <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
-                  </div>
-                  @if(!empty($it['desc'] ?? null))
-                    <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
-                  @endif
+              @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ $it['label'] }}</label>
+                <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
+                  <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
+                  <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}" />
+                  <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
+                  <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
                 </div>
+                @if(!empty($it['desc'] ?? null))
+                <div class="text-muted small mt-1">{{ $it['desc'] }}</div>
+                @endif
+              </div>
               @endforeach
             </div>
           </div>
@@ -383,18 +382,18 @@ $learning   = $onlyDb($learning);
             <div class="card-header"><strong>Learning Settings</strong></div>
             <div class="card-body">
               @foreach($learning as $it)
-                @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">{{ $it['label'] }}</label>
-                  <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
-                    <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
-                    <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}"
-                           @if(isset($it['min'])) min="{{ $it['min'] }}" @endif
-                           @if(isset($it['max'])) max="{{ $it['max'] }}" @endif />
-                    <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
-                    <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
-                  </div>
+              @php $k=$it['k']; $type=$it['type']; $val = old($k, $get($k)); @endphp
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ $it['label'] }}</label>
+                <div class="border rounded p-2 d-flex align-items-center inline-edit" data-field="{{ $k }}">
+                  <span class="flex-grow-1 value-display" data-raw="{{ $val }}">{{ $val }}</span>
+                  <input class="form-control form-control-sm d-none edit-input" type="{{ $type }}" value="{{ $val }}"
+                  @if(isset($it['min'])) min="{{ $it['min'] }}" @endif
+                  @if(isset($it['max'])) max="{{ $it['max'] }}" @endif />
+                  <small class="ms-2 text-success d-none save-indicator"><i class="fas fa-check"></i> Saved</small>
+                  <small class="ms-2 text-danger d-none error-indicator"><i class="fas fa-times"></i> Error</small>
                 </div>
+              </div>
               @endforeach
             </div>
           </div>
@@ -455,31 +454,31 @@ $learning   = $onlyDb($learning);
 
 @push('scripts')
 <script>
-const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-const API = {
-  update:'/admin/settings/general',
-  test:'/admin/settings/test',
-  reset:'/admin/settings/reset',
-  file:(t)=>`/admin/settings/${t}`,
-  testEmail:'/admin/settings/test-email'
-};
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const API = {
+    update:'/admin/settings/general',
+    test:'/admin/settings/test',
+    reset:'/admin/settings/reset',
+    file:(t)=>`/admin/settings/${t}`,
+    testEmail:'/admin/settings/test-email'
+  };
 
-const rq   = (url, opt={}) => fetch(url, opt).then(r=>{ const ct=r.headers.get('content-type')||''; return ct.includes('application/json')? r.json(): r.text(); });
-const json = (url, body={}, method='POST') => rq(url,{ method, headers:{ 'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json' }, body: JSON.stringify(body) });
-const form = (url, fd, method='POST') => rq(url,{ method, headers:{ 'X-CSRF-TOKEN':csrf }, body: fd });
+  const rq   = (url, opt={}) => fetch(url, opt).then(r=>{ const ct=r.headers.get('content-type')||''; return ct.includes('application/json')? r.json(): r.text(); });
+  const json = (url, body={}, method='POST') => rq(url,{ method, headers:{ 'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json' }, body: JSON.stringify(body) });
+  const form = (url, fd, method='POST') => rq(url,{ method, headers:{ 'X-CSRF-TOKEN':csrf }, body: fd });
 
-const toast = (msg,type='info')=>{
-  const map={success:'alert-success',error:'alert-danger',warning:'alert-warning',info:'alert-info'};
-  const n=document.createElement('div'); n.className=`alert ${map[type]||map.info} position-fixed top-0 end-0 m-3 shadow`;
-  n.textContent=msg; document.body.appendChild(n); setTimeout(()=>n.remove(),2400);
-};
+  const toast = (msg,type='info')=>{
+    const map={success:'alert-success',error:'alert-danger',warning:'alert-warning',info:'alert-info'};
+    const n=document.createElement('div'); n.className=`alert ${map[type]||map.info} position-fixed top-0 end-0 m-3 shadow`;
+    n.textContent=msg; document.body.appendChild(n); setTimeout(()=>n.remove(),2400);
+  };
 
-const setText=(el,txt)=>{ el.textContent=String(txt??''); };
+  const setText=(el,txt)=>{ el.textContent=String(txt??''); };
 
-function eventElement(e){
-  if (e && typeof e.composedPath === 'function'){
-    for (const n of e.composedPath()) if (n && n.nodeType === Node.ELEMENT_NODE) return n;
-  }
+  function eventElement(e){
+    if (e && typeof e.composedPath === 'function'){
+      for (const n of e.composedPath()) if (n && n.nodeType === Node.ELEMENT_NODE) return n;
+    }
   const t=e?.target; if (t?.nodeType===Node.ELEMENT_NODE) return t; if (t?.nodeType===Node.TEXT_NODE) return t.parentElement;
   const a=document.activeElement; return a?.nodeType===Node.ELEMENT_NODE? a : null;
 }

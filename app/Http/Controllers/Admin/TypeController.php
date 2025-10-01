@@ -43,6 +43,8 @@ class TypeController extends Controller
         $validated = $request->validate([
             'type'        => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'status_id'   => ['sometimes', 'required', 'integer', 'exists:statuses'], // ✅ ADD THIS
+
         ]);
 
         $type = Type::create($validated);

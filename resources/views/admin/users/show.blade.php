@@ -365,7 +365,7 @@
                     <div class="table-responsive qa-table">
                         <table class="table table-hover">
                             <thead>
-                                <tr><th>ID</th><th>Answered</th><th>Correct</th><th>Attempts</th><th>Kudos</th><th>Type</th><th>Test</th><th>Quiz</th><th>Date</th></tr>
+                                <tr><th>ID</th><th>Answered</th><th>Correct</th><th>Attempts</th><th>Difficulty</th><th>Kudos</th><th>Type</th><th>Test</th><th>Quiz</th><th>Date</th></tr>
                             </thead>
                             <tbody>
                                 @forelse($user->myQuestions->take(50) as $q)
@@ -374,11 +374,12 @@
                                         <td><span class="badge {{ $q->pivot->question_answered ? 'bg-success' : 'bg-warning' }}">{{ $q->pivot->question_answered ? 'Yes' : 'No' }}</span></td>
                                         <td><span class="badge {{ $q->pivot->correct ? 'bg-success' : 'bg-danger' }}">{{ $q->pivot->correct ? '✓' : '✗' }}</span></td>
                                         <td>{{ $q->pivot->attempts }}</td>
+                                        <td>{{ $q->difficulty->difficulty}}</td>
                                         <td>{{ $q->pivot->kudos }}</td>
                                         <td>{{ $q->pivot->assessment_type ?: 'N/A' }}</td>
                                         <td>
                                             @if($q->pivot->test_id)
-                                                <a href="{{ $routeOr('admin.tests.show', $q->pivot->test_id, "/admin/tests/{$q->pivot->test_id}") }}">{{ $q->pivot->test_id }}</a>
+                                                <a href="{{ route('admin.users.tests.questions', [$user->id, $q->pivot->test_id]) }}">{{ $q->pivot->test_id }}</a>
                                             @else N/A @endif
                                         </td>
                                         <td>

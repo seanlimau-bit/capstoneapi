@@ -116,6 +116,10 @@ class QAController extends Controller
             $question->load([
                 'skill.tracks.level',
                 'qaIssues' => fn($q) => $q->with('reviewer')->latest(),
+                'hints',
+                'solutions',
+                'difficulty',
+                'type',
             ]);
 
             $qaIssues      = $question->qaIssues;

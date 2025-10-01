@@ -58,7 +58,7 @@
             ],
             [
                 'value' => $track->level ? $track->level->level : 'N/A',
-                'label' => 'Maxile Level',
+                'label' => 'Level',
                 'color' => 'warning',
                 'icon' => 'layer-group'
             ]
@@ -97,11 +97,11 @@
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Maxile Level</label>
+                            <label class="form-label fw-bold">Level</label>
                             <div class="editable-field" data-field="level_id" data-type="select">
                                 <span class="field-display">
                                     @if($track->level)
-                                        <span class="badge bg-info">Level {{ $track->level->level }}</span>
+                                        <span class="badge bg-info">Level {{ $track->level->description }}</span>
                                     @else
                                         <span class="text-muted">No level assigned</span>
                                     @endif

@@ -16,7 +16,7 @@ class Track extends Model
 
     protected $hidden = ['created_at', 'updated_at','pivot'];
     protected $fillable = ['track', 'description', 'level_id', 'field_id',
-        'image', 'status_id','user_id'];
+    'image', 'status_id','user_id'];
 
     //relationship
     public function user() {                        //who created this track
@@ -41,9 +41,17 @@ class Track extends Model
         return $this->belongsTo(\App\Models\Field::class)->select('id','field','description');
     }
 
+// In Track model
     public function questions()
     {
-        return $this->hasMany(\App\Models\Question::class, 'skill_id');
+        return $this->hasManyThrough(
+            Question::class,
+        'skill_track',  // pivot table
+        'track_id',     // Foreign key on pivot table
+        'skill_id',     // Foreign key on questions table
+        'id',           // Local key on tracks table
+        'skill_id'      // Local key on pivot table
+    );
     }
 
 
@@ -91,9 +99,9 @@ class Track extends Model
     public function track_maxile()
     {
         return $this->users()
-            ->where('user_id', Auth::id())
-            ->first()
-            ?->pivot;
+        ->where('user_id', Auth::id())
+        ->first()
+        ?->pivot;
     }
 
     public function allSkillsPassed($userid, $max_track_maxile){
@@ -138,37 +146,37 @@ class Track extends Model
             'track_test_date' => new DateTime('now'),
             'track_passed' => TRUE,
             'track_maxile' => $track_maxile];
-        $this->users()->sync([$user->id=>$record]);
-    }
+            $this->users()->sync([$user->id=>$record]);
+        }
 
-    public function failTrack($user, $track_maxile){
-        $record = [
-            'track_test_date' => new DateTime('now'),
-            'track_passed' => FALSE,
-            'track_maxile' => $track_maxile];
-        $this->users()->sync([$user->id=>$record]);
-    }
+        public function failTrack($user, $track_maxile){
+            $record = [
+                'track_test_date' => new DateTime('now'),
+                'track_passed' => FALSE,
+                'track_maxile' => $track_maxile];
+                $this->users()->sync([$user->id=>$record]);
+            }
 
-    public function skillsFailed($user){
-        return $this->skills->intersect($user->skill_user()->whereSkillPassed(FALSE)->get());
-    }
+            public function skillsFailed($user){
+                return $this->skills->intersect($user->skill_user()->whereSkillPassed(FALSE)->get());
+            }
 
-    public function track_passed(){
-        return $this->users()->whereUserId(Auth::user()->id)->whereTrackPassed(TRUE)->select('track_test_date', 'track_maxile');
-    }
+            public function track_passed(){
+                return $this->users()->whereUserId(Auth::user()->id)->whereTrackPassed(TRUE)->select('track_test_date', 'track_maxile');
+            }
 
-    public function owner(){
-        return $this->user()->select('id','name');
-    }
+            public function owner(){
+                return $this->user()->select('id','name');
+            }
 
     // Method to calculate track doneNess in %
-    public function storeDoneNess($user) {
-        $totalSkillsInTrack = count($this->skills);
-        $completedSkillsInTrack = count($user->completedSkills->intersect($this->skills));
+            public function storeDoneNess($user) {
+                $totalSkillsInTrack = count($this->skills);
+                $completedSkillsInTrack = count($user->completedSkills->intersect($this->skills));
 
-        $doneNess = $totalSkillsInTrack > 0 ? ($completedSkillsInTrack / $totalSkillsInTrack) : 0;
-        $this->users()->updateExistingPivot($this->id, ['doneNess' => $doneNess]);
+                $doneNess = $totalSkillsInTrack > 0 ? ($completedSkillsInTrack / $totalSkillsInTrack) : 0;
+                $this->users()->updateExistingPivot($this->id, ['doneNess' => $doneNess]);
 
-        return $doneNess;
-    }
-}
+                return $doneNess;
+            }
+        }

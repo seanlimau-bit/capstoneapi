@@ -14,6 +14,8 @@ use App\Models\Course;
 use App\Http\Requests\UpdateRequest;
 use Illuminate\Support\Facades\Auth;
 use DB;
+use App\Services\LookupOptionsService;
+
 
 class TrackController extends Controller
 {
@@ -73,22 +75,21 @@ class TrackController extends Controller
            }
        }
        return response()->json(['message' => 'Track correctly added.', 'track'=>$track,'code'=>201]);
-   }
+    }
 
     /**
      * Display the specified resource.
      */
-    public function show(Track $track)
+    public function show(Track $track, LookupOptionsService $lookups)
     {
-        // Load track with all relationships for the show page
         $track->load(['skills.questions', 'level', 'status', 'skills.status']);
-        
-        // Get reference data for inline editing
-        $statuses = Status::select('id', 'status')->get();
-        $levels = Level::select('id', 'level', 'description')->get();
-        $fields = Field::select('id', 'field', 'description')->get();
-        
-        return view('admin.tracks.show', compact('track', 'statuses', 'levels', 'fields'));
+
+        return view('admin.tracks.show', [
+            'track' => $track,
+            'statuses' => $lookups->statuses(),
+            'levels' => $lookups->levels(),
+            'fields' => $lookups->fields()
+        ]);
     }
 
     /**

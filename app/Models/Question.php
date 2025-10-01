@@ -21,7 +21,7 @@ class Question extends Model
         'updated_at'     => 'datetime',
         'reviewed_at'    => 'datetime',
         'qa_reviewed_at' => 'datetime',
-        'published_at'   => 'datetime',   // <-- add this
+        'published_at'   => 'datetime',   
     ];
 
     public function qaIssues()
@@ -52,7 +52,7 @@ class Question extends Model
         return $this->belongsTo(\App\Models\Status::class);
     }
     
-    public function scopePublic($q) { return $q->where('status', 'Public'); }
+    public function scopePublic($q) { return $q->where('status_id', 3); }
 
     public function type() {
         return $this->belongsTo(\App\Models\Type::class);

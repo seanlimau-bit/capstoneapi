@@ -40,20 +40,39 @@ class HintController extends Controller
             'hint_level'  => ['required', 'integer', 'min:1', 'max:10'],
             'hint_text'   => ['required', 'string'],
         ]);
-
+        
         $question = Question::findOrFail($data['question_id']);
         $userId = Auth::user()->id;
-
+        
+        // Check if hint_level already exists for this question
+        $existingHint = Hint::where('question_id', $question->id)
+                            ->where('hint_level', $data['hint_level'])
+                            ->first();
+        
+        if ($existingHint) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A hint with this level already exists for this question. Please delete the previous one first.'
+                ], 422);
+            }
+            
+            return redirect()->back()
+                   ->withErrors(['hint_level' => 'A hint with this level already exists for this question. Please delete the previous one first.'])
+                   ->withInput();
+        }
+        
         $hint = new Hint();
         $hint->question_id = $question->id;
         $hint->hint_level  = $data['hint_level'];
         $hint->hint_text   = $data['hint_text'];
-        $hint->user_id     = $userId;              // <— as requested
+        $hint->user_id     = $userId;
         $hint->save();
-
+        
         if ($request->wantsJson()) {
             return response()->json(['success' => true, 'id' => $hint->id, 'data' => $hint]);
         }
+        
         return redirect()->back()->with('status', 'Hint created');
     }
 

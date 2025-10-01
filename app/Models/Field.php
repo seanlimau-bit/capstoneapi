@@ -47,23 +47,7 @@ class Field extends Model
             $query->whereIn('tracks.id', $trackIds);
         });
     }
-    /**
-     * Get all questions that belong to this field through the relationship chain
-     * Field -> Tracks -> Skills -> Questions
-     */
-    public function questions()
-    {
-        return $this->hasManyThrough(
-            Question::class,
-            Skill::class,
-            'track_id',     // Foreign key on skills table (assuming skills have track_id)
-            'skill_id',     // Foreign key on questions table
-            'id',           // Local key on fields table
-            'id'            // Local key on skills table
-        )->whereHas('skill.tracks', function ($query) {
-            $query->where('field_id', $this->id);
-        });
-    }
+
 
     /**
      * Get the user who created this field
@@ -84,10 +68,8 @@ class Field extends Model
     /**
      * Scope to get only active fields
      */
-    public function scopePublic($q)
-    {
-        return $q->whereHas('status', fn($s) => $s->where('status', 'Public'));
-    }
+    public function scopePublic($q) { return $q->where('status_id',3); }
+
 
 
     /**
@@ -127,24 +109,6 @@ class Field extends Model
         return $query->doesntHave('tracks');
     }
 
-    /**
-     * Get the count of questions for this field
-     */
-    public function getQuestionsCountAttribute()
-    {
-        return $this->questions()->count();
-    }
-
-     /**
-     * Get the count of active questions for this field
-     */
-     public function getActiveQuestionsCountAttribute()
-     {
-        return $this->questions()
-        ->whereHas('status', function ($q) {
-                        $q->where('status', 'active');  // Changed from 'name' to 'status'
-                    })->count();
-    }
 
     /**
      * Get the count of tracks for this field

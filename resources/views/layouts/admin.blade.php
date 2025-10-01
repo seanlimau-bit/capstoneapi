@@ -17,18 +17,36 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+      axios.defaults.headers.common['X-CSRF-TOKEN'] =
+        document.querySelector('meta[name="csrf-token"]')?.content || '';
+      axios.defaults.headers.common['Accept'] = 'application/json';
+      axios.defaults.withCredentials = true; // good for same-origin cookies
+    </script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
          renderKaTeX();
         });
-        
-        function renderKaTeX() {
+        window.csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+      // Simple helper for POST/PUT/PATCH/DELETE
+      window.csrfFetch = function(url, options = {}) {
+        const method = (options.method || 'GET').toUpperCase();
+        const needsBody = ['POST','PUT','PATCH','DELETE'].includes(method);
+        const headers = new Headers(options.headers || {});
+        if (needsBody) headers.set('X-CSRF-TOKEN', window.csrfToken);
+        headers.set('Accept', 'application/json');
+        return fetch(url, { credentials: 'same-origin', ...options, headers });
+      };
+
+      function renderKaTeX() {
           const elements = document.querySelectorAll('.question-field, .editable-field, .fib-content, .mcq-option, .math-render');
           elements.forEach(element => {
             renderMathInElement(element, {
               delimiters: [
-              {left: '$$', right: '$$', display: true},
+              {left: '$$', right: '$$', display:false},
               {left: '$', right: '$', display: false},
               {left: '\\(', right: '\\)', display: false},
               {left: '\\[', right: '\\]', display: true}
@@ -130,16 +148,16 @@
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.skills.*') ? 'active' : '' }}" href="{{ route('admin.skills.index') }}">
-                            <i class="fas fa-brain"></i>
-                            <span class="nav-text">Skills</span>
+                        <a class="nav-link {{ request()->routeIs('admin.tracks.*') ? 'active' : '' }}" href="{{ route('admin.tracks.index') }}">
+                            <i class="fas fa-route"></i>
+                            <span class="nav-text">Tracks</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.tracks.*') ? 'active' : '' }}" href="{{ route('admin.tracks.index') }}">
-                            <i class="fas fa-route"></i>
-                            <span class="nav-text">Tracks</span>
+                        <a class="nav-link {{ request()->routeIs('admin.skills.*') ? 'active' : '' }}" href="{{ route('admin.skills.index') }}">
+                            <i class="fas fa-brain"></i>
+                            <span class="nav-text">Skills</span>
                         </a>
                     </li>
 
@@ -200,7 +218,7 @@
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" href="{{ route('admin.reports.usage') }}">
+                        <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" href="#">
                             <i class="fas fa-chart-bar"></i>
                             <span class="nav-text">Reports</span>
                         </a>

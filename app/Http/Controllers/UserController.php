@@ -39,9 +39,7 @@ class UserController extends Controller
         
         // Apply role filter
         if ($request->filled('role_id')) {
-            $query->whereHas('roles', function($q) use ($request) {
-                $q->where('role_id', $request->role_id);
-            });
+            $query->where('role_id', $request->role_id);
         }
         
         // Apply status filter using your actual 'status' field
@@ -287,6 +285,7 @@ class UserController extends Controller
                 ->orderBy('question_user.answered_date','desc')
                 ->limit(100);
             },
+            'myquestions.difficulty',
             'testedTracks' => function($q) {
                 $q->withPivot('track_maxile','track_passed','track_test_date','doneNess')
                 ->orderBy('track_user.track_test_date','desc');
@@ -501,8 +500,7 @@ class UserController extends Controller
      */
     public function destroy(User $user, Request $request)
     {
-
-            // Prevent deletion if user has enrolled classes
+        // Prevent deletion if user has enrolled classes
         if ($user->enrolledClasses()->exists()) {
             $message = 'User has existing classes and cannot be deleted';
             if ($request->expectsJson()) {
@@ -510,18 +508,25 @@ class UserController extends Controller
             }
             return back()->withErrors($message);
         }
-
+        
+        // Prevent deletion if user has question attempts/progress
+        if (DB::table('question_user')->where('user_id', $user->id)->exists()) {
+            $message = 'User has question progress/attempts and cannot be deleted';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 400);
+            }
+            return back()->withErrors($message);
+        }
+        
         $user->delete();
-
+        
         $message = 'User deleted successfully';
         if ($request->expectsJson()) {
             return response()->json(['message' => $message]);
         }
-
         if ($request->ajax()) {
             return response()->json(['success' => true, 'message' => $message]);
         }
-
         return redirect()->route('admin.users.index')->with('success', $message);
     }
 

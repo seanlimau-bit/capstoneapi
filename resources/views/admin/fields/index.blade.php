@@ -82,7 +82,14 @@
   const QS = s => document.querySelector(s);
   const QSA = s => [...document.querySelectorAll(s)];
   const API = {
-    list:   p => fetch(u('/admin/fields', p), hdr()).then(j),
+    list:   p => {
+      const url = u('/admin/fields', p);
+      console.log('Fetching:', url.toString());
+      return fetch(url, hdr()).then(r => {
+        console.log('Response status:', r.status);
+        return j(r);
+      });
+    },
     patch:  (id, body) => fetch(`/admin/fields/${id}`, hdr('PATCH', body)).then(j),
     dup:    id => fetch(`/admin/fields/${id}/duplicate`, hdr('POST')).then(j),
     del:    id => fetch(`/admin/fields/${id}`, hdr('DELETE')).then(j),
@@ -119,17 +126,34 @@
   }
 
   async function load(page=1){
+    console.log('=== LOAD FUNCTION CALLED ===');
     renderLoading();
-    const data = await API.list({
-      page, sort:state.sort, direction:state.dir,
-      status_id: el.status.value || '', search: el.search.value || ''
-    }).catch(()=> (toast('Error loading fields','error'), { fields:[], num_pages:1, totals:{total:0}}));
-    state.rows = data.fields||[];
-    state.page = page;
-    state.pages = data.num_pages||1;
-    state.total = data.totals?.total ?? state.rows.length;
-    render();
-    updateStats(data.totals||{});
+    
+    try {
+      const data = await API.list({
+        page, sort:state.sort, direction:state.dir,
+        status_id: el.status.value || '', search: el.search.value || ''
+      });
+      
+      console.log('✅ API Response received:', data);
+      console.log('Fields:', data.fields);
+      console.log('Totals:', data.totals);
+      
+      state.rows = data.fields||[];
+      state.page = page;
+      state.pages = data.num_pages||1;
+      state.total = data.totals?.total ?? state.rows.length;
+      render();
+      updateStats(data.totals||{});
+      
+    } catch(err) {
+      console.error('❌ Load error:', err);
+      toast('Error loading fields','error');
+      state.rows = [];
+      state.total = 0;
+      render();
+      updateStats({total:0, public:0, draft:0, private:0});
+    }
   }
 
   function bind(){
@@ -285,8 +309,25 @@
     QSA('[data-bulk="true"]').forEach(i=> i.classList.toggle('disabled', disabled));
   }
 
-  function updateStats(t){ const s = { total: t.total||state.total, public:t.public||0, draft:t.draft||0, private:t.private||0 };
-    QSA('[data-stat]').forEach(e=> { const k=e.dataset.stat; if(k in s) e.textContent = s[k]; });
+  function updateStats(totals){
+    console.log('Updating stats with:', totals); // Debug log
+    
+    // Ensure we have valid numbers
+    const stats = {
+      total: parseInt(totals.total) || 0,
+      public: parseInt(totals.public) || 0,
+      draft: parseInt(totals.draft) || 0,
+      private: parseInt(totals.private) || 0
+    };
+    
+    // Update each stat element
+    QSA('[data-stat]').forEach(element => {
+      const statKey = element.dataset.stat;
+      if (statKey in stats) {
+        element.textContent = stats[statKey];
+        console.log(`Setting ${statKey} to ${stats[statKey]}`); // Debug log
+      }
+    });
   }
 
   function updateSortIcons(){
