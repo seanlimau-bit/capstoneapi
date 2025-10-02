@@ -656,35 +656,35 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/contrib/auto-render.min.js"></script>
 <script>
-  /** ====== CONSTANTS / ROUTES ====== **/
-  const CSRF_TOKEN   = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-  const QUESTION_ID  = {{ $question->id }};
-  const ROUTES = {
-    hints: {
-      store: @json(route('admin.hints.store')),
-      one: (id) => @json(url('admin/hints')) + '/' + id
-    },
-    solutions: {
-      store: @json(route('admin.solutions.store')),
-      one: (id) => @json(url('admin/solutions')) + '/' + id
-    }
-  };
+/** ====== CONSTANTS / ROUTES ====== **/
+const QUESTION_ID  = {{ $question->id }};
+const ROUTES = {
+  hints: {
+    store: @json(route('admin.hints.store')),
+    one: (id) => @json(url('admin/hints')) + '/' + id
+  },
+  solutions: {
+    store: @json(route('admin.solutions.store')),
+    one: (id) => @json(url('admin/solutions')) + '/' + id
+  }
+};
 
-  /** ====== ON LOAD ====== **/
-  document.addEventListener('DOMContentLoaded', function() {
-    window.QUESTION_ID = QUESTION_ID;
-    renderKaTeX();
-    setupInlineEditing();
-    setupDropdownSelectors();
-
-  // Add Hint box toggles
+/** ====== ON LOAD ====== **/
+document.addEventListener('DOMContentLoaded', function() {
+  window.QUESTION_ID = QUESTION_ID;
+  renderKaTeX();
+  setupInlineEditing();
+  setupDropdownSelectors();
+  setupImageInputs(); // NEW: Setup image upload handlers
+  
+  // Hint toggles
   const toggleAddHintBtn = document.getElementById('toggle-add-hint');
   const addHintBox = document.getElementById('add-hint-box');
   if (toggleAddHintBtn && addHintBox) {
-    toggleAddHintBtn.addEventListener('click', () => addHintBox.style.display = addHintBox.style.display === 'none' || addHintBox.style.display === '' ? 'block' : 'none');
+    toggleAddHintBtn.addEventListener('click', () => {
+      addHintBox.style.display = addHintBox.style.display === 'none' || !addHintBox.style.display ? 'block' : 'none';
+    });
     document.getElementById('cancel-add-hint').addEventListener('click', () => {
       addHintBox.style.display = 'none';
       document.getElementById('new-hint-text').value = '';
@@ -692,90 +692,192 @@
     });
     document.getElementById('save-new-hint').addEventListener('click', saveNewHint);
   }
-
-  // Add Solution box toggles
+  
+  // Solution toggles
   const toggleAddSolBtn = document.getElementById('toggle-add-solution');
   const addSolBox = document.getElementById('add-solution-box');
   if (toggleAddSolBtn && addSolBox) {
-    toggleAddSolBtn.addEventListener('click', () => addSolBox.style.display = addSolBox.style.display === 'none' || addSolBox.style.display === '' ? 'block' : 'none');
+    toggleAddSolBtn.addEventListener('click', () => {
+      addSolBox.style.display = addSolBox.style.display === 'none' || !addSolBox.style.display ? 'block' : 'none';
+    });
     document.getElementById('cancel-add-solution').addEventListener('click', () => {
       addSolBox.style.display = 'none';
       document.getElementById('new-solution-text').value = '';
     });
     document.getElementById('save-new-solution').addEventListener('click', saveNewSolution);
   }
-
+  
   bindHintInlineEditing();
   bindSolutionInlineEditing();
 });
 
-  /** ====== HINTS ====== **/
-  async function saveNewHint() {
-    const hintText = document.getElementById('new-hint-text').value.trim();
-    const hintLevel = +document.getElementById('new-hint-level').value || 1;
-    if (!hintText) { showToast('Hint text is required', 'error'); return; }
+/** ====== IMAGE UPLOAD - NEW IMPLEMENTATION ====== **/
+let currentImageContext = null;
 
+function setupImageInputs() {
+    const questionImageInput = document.createElement('input');
+    questionImageInput.type = 'file';
+    questionImageInput.id = 'questionImageInput';
+    questionImageInput.accept = 'image/*';
+    questionImageInput.style.display = 'none';
+    document.body.appendChild(questionImageInput);
+
+    questionImageInput.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+        const csrf = document.querySelector('meta[name="csrf-token"]').content;
+        
+        try {
+            const response = await fetch(`/admin/questions/${QUESTION_ID}/image`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+            });
+            const data = await response.json();
+            if (data.success) {
+                showToast('Image uploaded!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(data.message || 'Upload failed', 'error');
+            }
+        } catch (error) {
+            showToast('Upload failed', 'error');
+        }
+        e.target.value = '';
+    });
+}
+
+// Keep these simple
+function addQuestionImage() { document.getElementById('questionImageInput').click(); }
+function changeQuestionImage() { document.getElementById('questionImageInput').click(); }
+
+function addAnswerImage(questionId, optionIndex) {
+  currentImageContext = { type: 'answer', questionId, optionIndex };
+  document.getElementById('answerImageInput').click();
+}
+
+function changeAnswerImage(questionId, optionIndex) {
+  currentImageContext = { type: 'answer', questionId, optionIndex };
+  document.getElementById('answerImageInput').click();
+}
+
+function updateImageUploadStatus(message, status) {
+  console.log(`[Image Upload] ${message}`);
+}
+
+
+function removeQuestionImage(questionId) {
+  if (!confirm('Remove question image?')) return;
+  removeImage('question', questionId);
+}
+
+function removeAnswerImage(questionId, optionIndex) {
+  if (!confirm(`Remove Option ${['A','B','C','D'][optionIndex]} image?`)) return;
+  removeImage('answer', questionId, optionIndex);
+}
+
+function removeImage(type, questionId, optionIndex = null) {
+  const url = type === 'question' 
+    ? `/admin/questions/${questionId}/image`
+    : `/admin/questions/${questionId}/answers/${optionIndex}/image`;
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  
+  fetch(url, {
+    method: 'DELETE',
+    headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast('Image removed!', 'success');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showToast(data.message || 'Remove failed', 'error');
+    }
+  })
+  .catch(() => showToast('Remove failed', 'error'));
+}
+
+function closeImagePreview() {
+  document.getElementById('imagePreviewModal').style.display = 'none';
+  delete window.pendingQuestionImageUpload;
+  delete window.pendingAnswerImageUpload;
+  currentImageContext = null;
+  const uploadBtn = document.querySelector('[onclick="confirmImageUpload()"]');
+  uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload Image';
+  uploadBtn.disabled = false;
+}
+
+/** ====== HINTS ====== **/
+async function saveNewHint() {
+  const hintText = document.getElementById('new-hint-text').value.trim();
+  const hintLevel = +document.getElementById('new-hint-level').value || 1;
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  
+  if (!hintText) { showToast('Hint text required', 'error'); return; }
+  
+  try {
+    const res = await fetch(ROUTES.hints.store, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_id: QUESTION_ID, hint_level: hintLevel, hint_text: hintText })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to save hint');
+    showToast('Hint added', 'success');
+    location.reload();
+  } catch (err) {
+    showToast(err.message || 'Error adding hint', 'error');
+  }
+}
+
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('.delete-hint')) {
+    const btn = e.target.closest('.delete-hint');
+    const id = btn.dataset.hintId;
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    if (!id || !confirm('Delete this hint?')) return;
+    
     try {
-      const res = await fetch(ROUTES.hints.store, {
-        method: 'POST',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: QUESTION_ID, hint_level: hintLevel, hint_text: hintText })
+      const res = await fetch(ROUTES.hints.one(id), {
+        method: 'DELETE',
+        headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to save hint');
-      showToast('Hint added', 'success');
+      if (!res.ok) throw new Error(data.message || 'Failed to delete hint');
+      showToast('Hint deleted', 'success');
       location.reload();
     } catch (err) {
-      console.error(err);
-      showToast(err.message || 'Error adding hint', 'error');
+      showToast(err.message || 'Error deleting hint', 'error');
     }
   }
+});
 
-  document.addEventListener('click', async (e) => {
-    if (e.target.closest && e.target.closest('.delete-hint')) {
-      const btn = e.target.closest('.delete-hint');
-      const id  = btn.dataset.hintId;
-      if (!id) return;
-      if (!confirm('Delete this hint?')) return;
-
-      try {
-        const res = await fetch(ROUTES.hints.one(id), {
-          method: 'DELETE',
-          headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' }
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Failed to delete hint');
-        showToast('Hint deleted', 'success');
-        location.reload();
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || 'Error deleting hint', 'error');
-      }
-    }
-  });
-
-  function bindHintInlineEditing() {
-  // level
+function bindHintInlineEditing() {
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  
   document.querySelectorAll('.editable-hint-level').forEach(el => {
     el.addEventListener('click', () => startInlineEdit(el, 'number', async (newVal) => {
       const id = el.dataset.hintId;
       const res = await fetch(ROUTES.hints.one(id), {
         method: 'PATCH',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ hint_level: +newVal })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Update failed');
     }));
   });
-
-  // text
+  
   document.querySelectorAll('.editable-hint-text').forEach(el => {
     el.addEventListener('click', () => startInlineEdit(el, 'textarea', async (newVal) => {
       const id = el.dataset.hintId;
       const res = await fetch(ROUTES.hints.one(id), {
         method: 'PATCH',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ hint_text: newVal })
       });
       const data = await res.json();
@@ -787,70 +889,55 @@
 /** ====== SOLUTIONS ====== **/
 async function saveNewSolution() {
   const text = document.getElementById('new-solution-text').value.trim();
-  if (!text) { showToast('Solution text is required', 'error'); return; }
-
-  // Supports both modes:
-  // 1) create: POST with question_id + solution
-  // 2) update existing skeleton: PATCH with solution_id + solution (if you pre-provide data-solution-id somewhere)
-  const box = document.getElementById('add-solution-box');
-  const maybeId = box?.dataset?.solutionId || null;
-
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  if (!text) { showToast('Solution text required', 'error'); return; }
+  
   try {
-    if (maybeId) {
-      const res = await fetch(ROUTES.solutions.one(maybeId), {
-        method: 'PATCH',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ solution: text })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to update solution');
-    } else {
-      const res = await fetch(ROUTES.solutions.store, {
-        method: 'POST',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question_id: QUESTION_ID, solution: text /* default status on backend */ })
+    const res = await fetch(ROUTES.solutions.store, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_id: QUESTION_ID, solution: text })
     });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to save solution');
-    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to save solution');
     showToast('Solution saved', 'success');
     location.reload();
   } catch (err) {
-    console.error(err);
     showToast(err.message || 'Error saving solution', 'error');
   }
 }
 
 document.addEventListener('click', async (e) => {
-  if (e.target.closest && e.target.closest('.delete-solution')) {
+  if (e.target.closest('.delete-solution')) {
     const btn = e.target.closest('.delete-solution');
-    const id  = btn.dataset.solutionId;
-    if (!id) return;
-    if (!confirm('Delete this solution?')) return;
-
+    const id = btn.dataset.solutionId;
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    if (!id || !confirm('Delete this solution?')) return;
+    
     try {
       const res = await fetch(ROUTES.solutions.one(id), {
         method: 'DELETE',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' }
+        headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to delete solution');
       showToast('Solution deleted', 'success');
       location.reload();
     } catch (err) {
-      console.error(err);
       showToast(err.message || 'Error deleting solution', 'error');
     }
   }
 });
 
 function bindSolutionInlineEditing() {
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  
   document.querySelectorAll('.editable-solution').forEach(el => {
     el.addEventListener('click', () => startInlineEdit(el, 'textarea', async (newVal) => {
       const id = el.dataset.solutionId;
       const res = await fetch(ROUTES.solutions.one(id), {
         method: 'PATCH',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ solution: newVal })
       });
       const data = await res.json();
@@ -859,53 +946,29 @@ function bindSolutionInlineEditing() {
   });
 }
 
-// Status selector for solutions (uses same statuses as question)
-document.addEventListener('change', async (e) => {
-  if (e.target && e.target.classList.contains('solution-status-selector')) {
-    const id = e.target.dataset.solutionId;
-    const statusId = e.target.value;
-    try {
-      const res = await fetch(ROUTES.solutions.one(id), {
-        method: 'PATCH',
-        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status_id: statusId })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to update status');
-      e.target.style.borderColor = '#198754';
-      setTimeout(() => e.target.style.borderColor = '', 1200);
-      showToast('Solution status updated', 'success');
-    } catch (err) {
-      console.error(err);
-      showToast(err.message || 'Error updating status', 'error');
-    }
-  }
-});
-
-/** ====== GENERIC INLINE EDITOR (reused) ====== **/
+/** ====== INLINE EDITOR ====== **/
 function startInlineEdit(containerEl, kind = 'text', onSave, opts = {}) {
   const originalHTML = containerEl.innerHTML;
   const originalText = containerEl.innerText.trim();
-  const isTextarea   = kind === 'textarea';
-  const inputHTML    = isTextarea
-  ? `<textarea class="form-control" rows="4" autofocus>${originalText}</textarea>`
-  : `<input class="form-control" type="${kind}" value="${originalText}" autofocus />`;
-
+  const isTextarea = kind === 'textarea';
+  const inputHTML = isTextarea
+    ? `<textarea class="form-control" rows="4" autofocus>${originalText}</textarea>`
+    : `<input class="form-control" type="${kind}" value="${originalText}" autofocus />`;
+  
   containerEl.innerHTML = inputHTML;
   const inputEl = containerEl.querySelector(isTextarea ? 'textarea' : 'input');
   inputEl.focus();
-
+  
   const finish = async (save) => {
     if (save) {
       const newVal = inputEl.value;
       try {
         await onSave(newVal);
         containerEl.innerHTML = opts.htmlSafe === false
-        ? newVal.replace(/\n/g, '<br>')
-        : `${newVal}<i class="fas fa-edit text-muted ms-2 edit-icon"></i>`;
+          ? newVal.replace(/\n/g, '<br>')
+          : `${newVal}<i class="fas fa-edit text-muted ms-2 edit-icon"></i>`;
         showToast('Saved', 'success');
       } catch (err) {
-        console.error(err);
         containerEl.innerHTML = originalHTML;
         showToast(err.message || 'Save failed', 'error');
       }
@@ -913,7 +976,7 @@ function startInlineEdit(containerEl, kind = 'text', onSave, opts = {}) {
       containerEl.innerHTML = originalHTML;
     }
   };
-
+  
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !isTextarea) { e.preventDefault(); finish(true); }
     if (e.key === 'Escape') { e.preventDefault(); finish(false); }
@@ -921,44 +984,41 @@ function startInlineEdit(containerEl, kind = 'text', onSave, opts = {}) {
   inputEl.addEventListener('blur', () => finish(true));
 }
 
-/** ====== QUESTION FIELD UPDATES (existing) ====== **/
+/** ====== QUESTION FIELD UPDATES ====== **/
 function setupInlineEditing() {
   document.querySelectorAll('.editable-field').forEach(field => {
-    // skip the ones we explicitly bind for hints/solutions
     if (field.classList.contains('editable-hint-level') ||
-      field.classList.contains('editable-hint-text')  ||
-      field.classList.contains('editable-solution')) return;
-
-      field.addEventListener('click', function() {
-        const fieldName   = this.dataset.field;
-        const fieldType   = this.dataset.type || 'text';
-        const currentVal  = fieldType === 'html'
+        field.classList.contains('editable-hint-text') ||
+        field.classList.contains('editable-solution')) return;
+    
+    field.addEventListener('click', function() {
+      const fieldName = this.dataset.field;
+      const fieldType = this.dataset.type || 'text';
+      const currentVal = fieldType === 'html'
         ? this.querySelector('.fib-content')?.innerHTML?.trim() ?? ''
         : this.textContent.trim();
-
-        showInlineEditor(this, fieldName, fieldType, currentVal);
-      });
+      showInlineEditor(this, fieldName, fieldType, currentVal);
+    });
   });
 }
 
 function showInlineEditor(element, fieldName, fieldType, currentValue) {
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
   const isHtml = fieldType === 'html';
   const isTextarea = fieldType === 'textarea' || isHtml;
-
   const input = isTextarea
-  ? `<textarea class="form-control" rows="3" autofocus>${currentValue}</textarea>`
-  : `<input type="text" class="form-control" value="${currentValue}" autofocus>`;
-
+    ? `<textarea class="form-control" rows="3" autofocus>${currentValue}</textarea>`
+    : `<input type="text" class="form-control" value="${currentValue}" autofocus>`;
+  
   element.innerHTML = input;
-
   const inputEl = element.querySelector(isTextarea ? 'textarea' : 'input');
   inputEl.focus();
-
+  
   const saveEdit = async () => {
     const newValue = inputEl.value;
     if (newValue !== currentValue) {
       try {
-        await updateQuestionField(fieldName, newValue);
+        await updateQuestionField(fieldName, newValue, csrf);
         location.reload();
       } catch (error) {
         cancelEdit();
@@ -967,265 +1027,136 @@ function showInlineEditor(element, fieldName, fieldType, currentValue) {
       cancelEdit();
     }
   };
-
+  
   const cancelEdit = () => {
     if (fieldType === 'html') {
-      element.innerHTML = `
-      <div class="fib-content">${currentValue}</div>
-      <i class="fas fa-code text-muted ms-2 edit-icon"></i>
-      `;
+      element.innerHTML = `<div class="fib-content">${currentValue}</div><i class="fas fa-code text-muted ms-2 edit-icon"></i>`;
     } else {
       element.innerHTML = `${currentValue}<i class="fas fa-edit text-muted ms-2 edit-icon"></i>`;
     }
   };
-
+  
   inputEl.addEventListener('blur', saveEdit);
   inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      saveEdit();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      cancelEdit();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
   });
 }
 
 function setupDropdownSelectors() {
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  
   document.querySelectorAll('select[data-field]').forEach(select => {
     select.addEventListener('change', async (e) => {
       const fieldName = e.target.dataset.field;
-      const newValue  = e.target.value;
-
+      const newValue = e.target.value;
       if (newValue !== undefined) {
         try {
-          await updateQuestionField(fieldName, newValue);
+          await updateQuestionField(fieldName, newValue, csrf);
           e.target.style.borderColor = '#198754';
           setTimeout(() => e.target.style.borderColor = '', 2000);
         } catch (error) {
-          // revert visually if needed
+          // handle error
         }
       }
     });
   });
 }
 
-async function updateQuestionField(fieldName, value) {
+async function updateQuestionField(fieldName, value, csrf) {
   try {
     const response = await fetch(`/admin/questions/${QUESTION_ID}/update-field`, {
       method: 'POST',
       headers: {
-        'X-CSRF-TOKEN': CSRF_TOKEN,
+        'X-CSRF-TOKEN': csrf,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ field: fieldName, value, _method: 'PATCH' })
     });
-
     const data = await response.json();
     if (!data.success) throw new Error(data.message || 'Update failed');
-
-    showToast('Field updated successfully', 'success');
+    showToast('Field updated', 'success');
     setTimeout(() => renderKaTeX(), 100);
     return data;
   } catch (err) {
-    console.error('Update error:', err);
     showToast(err.message || 'Update failed', 'error');
     throw err;
   }
 }
 
-/** ====== IMAGE HANDLERS (existing) ====== **/
-let currentImageUpload = null;
-let currentImageType = null;
-let currentQuestionId = QUESTION_ID;
-
-function addQuestionImage(questionId) { openImageUploader('question', questionId, 'Question Image'); }
-function changeQuestionImage(questionId) { openImageUploader('question', questionId, 'Question Image'); }
-function removeQuestionImage(questionId) {
-  if (confirm('Are you sure you want to remove the question image?')) {
-    removeImage('question', questionId);
-  }
-}
-function addAnswerImage(questionId, optionIndex) {
-  const optionLetter = ['A','B','C','D'][optionIndex];
-  openImageUploader('answer', questionId, `Option ${optionLetter} Image`, optionIndex);
-}
-function changeAnswerImage(questionId, optionIndex) {
-  const optionLetter = ['A','B','C','D'][optionIndex];
-  openImageUploader('answer', questionId, `Option ${optionLetter} Image`, optionIndex);
-}
-function removeAnswerImage(questionId, optionIndex) {
-  const optionLetter = ['A','B','C','D'][optionIndex];
-  if (confirm(`Are you sure you want to remove the image for Option ${optionLetter}?`)) {
-    removeImage('answer', questionId, optionIndex);
-  }
-}
-function openImageUploader(type, questionId, title, optionIndex = null) {
-  currentImageType = type;
-  currentQuestionId = questionId;
-  if (optionIndex !== null) currentImageType = `answer_${optionIndex}`;
-  document.getElementById('previewTitle').textContent = title;
-
-  const input = document.getElementById('imageUpload');
-  input.onchange = function(e) {
-    const file = e.target.files[0];
-    if (file) showImagePreview(file);
-  };
-  input.click();
-}
-function showImagePreview(file) {
-  const maxSize = 6 * 1024 * 1024;
-  const allowedTypes = ['image/jpeg','image/jpg','image/png','image/gif','image/webp'];
-  if (!allowedTypes.includes(file.type)) { alert('Invalid file type. Please select a JPG, PNG, GIF, or WebP image.'); return; }
-  if (file.size > maxSize) { alert('File too large. Maximum size is 6MB.'); return; }
-  currentImageUpload = file;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('previewImage').src = e.target.result;
-    const fileSize = (file.size/1024/1024).toFixed(2);
-    document.getElementById('fileInfo').innerHTML = `<strong>File:</strong> ${file.name}<br><strong>Size:</strong> ${fileSize} MB<br><strong>Type:</strong> ${file.type}`;
-    document.getElementById('imagePreviewModal').style.display = 'block';
-  };
-  reader.readAsDataURL(file);
-}
-function confirmImageUpload() {
-  if (!currentImageUpload) return;
-  const formData = new FormData();
-  formData.append('image', currentImageUpload);
-
-  let url;
-  if (currentImageType === 'question') {
-    url = `/admin/questions/${currentQuestionId}/image`;
-  } else if (currentImageType.startsWith('answer_')) {
-    const optionIndex = currentImageType.split('_')[1];
-    url = `/admin/questions/${currentQuestionId}/answers/${optionIndex}/image`;
-  }
-
-  const uploadBtn = document.querySelector('[onclick="confirmImageUpload()"]');
-  uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
-  uploadBtn.disabled = true;
-
-  fetch(url, {
-    method: 'POST',
-    headers: { 'X-CSRF-TOKEN': CSRF_TOKEN },
-    body: formData
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.success) {
-      showToast('Image uploaded successfully!', 'success');
-      closeImagePreview();
-      setTimeout(() => location.reload(), 1000);
-    } else {
-      showToast(data.message || 'Upload failed', 'error');
-      uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload Image';
-      uploadBtn.disabled = false;
-    }
-  })
-  .catch(err => {
-    console.error('Upload error:', err);
-    showToast('Upload failed', 'error');
-    uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload Image';
-    uploadBtn.disabled = false;
-  });
-}
-function removeImage(type, questionId, optionIndex = null) {
-  let url;
-  if (type === 'question') url = `/admin/questions/${questionId}/image`;
-  else if (type === 'answer') url = `/admin/questions/${questionId}/answers/${optionIndex}/image`;
-
-  fetch(url, {
-    method: 'DELETE',
-    headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' }
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.success) {
-      showToast('Image removed successfully!', 'success');
-      setTimeout(() => location.reload(), 1000);
-    } else {
-      showToast(data.message || 'Remove failed', 'error');
-    }
-  })
-  .catch(err => {
-    console.error('Remove error:', err);
-    showToast('Remove failed', 'error');
-  });
-}
-function closeImagePreview() {
-  document.getElementById('imagePreviewModal').style.display = 'none';
-  currentImageUpload = null;
-  currentImageType = null;
-  const uploadBtn = document.querySelector('[onclick="confirmImageUpload()"]');
-  uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload Image';
-  uploadBtn.disabled = false;
-}
-
-/** ====== OTHER HELPERS ====== **/
+/** ====== OTHER ACTIONS ====== **/
 function deleteQuestion(questionId) {
-  if (!confirm('Are you sure you want to delete this question? This action cannot be undone.')) return;
+  if (!confirm('Delete this question? This cannot be undone.')) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  
   fetch(`/admin/questions/${questionId}`, {
     method: 'DELETE',
-    headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' }
+    headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
   })
   .then(r => r.json())
   .then(data => {
     if (data.success) {
-      showToast('Question deleted successfully!', 'success');
-      setTimeout(() => { window.location.href = '/admin/questions'; }, 1500);
+      showToast('Question deleted', 'success');
+      setTimeout(() => window.location.href = '/admin/questions', 1500);
     } else {
-      showToast(data.message || 'Error deleting question', 'error');
+      showToast(data.message || 'Delete failed', 'error');
     }
   })
-  .catch(err => { console.error('Error:', err); showToast('Error deleting question', 'error'); });
+  .catch(() => showToast('Delete failed', 'error'));
 }
+
 function duplicateQuestion(questionId) {
-  if (!confirm('Are you sure you want to duplicate this question? A copy will be created.')) return;
-  const duplicateBtn = document.querySelector('[onclick*="duplicateQuestion"]');
-  if (duplicateBtn) {
-    duplicateBtn.disabled = true;
-    duplicateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Duplicating...';
+  if (!confirm('Duplicate this question?')) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  const btn = document.querySelector('[onclick*="duplicateQuestion"]');
+  
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Duplicating...';
   }
+  
   fetch(`/admin/questions/${questionId}/duplicate`, {
     method: 'POST',
-    headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' }
+    headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
   })
   .then(r => r.json())
   .then(data => {
     if (data.success) {
-      showToast('Question duplicated successfully', 'success');
-      if (data.redirect_url) window.location.href = data.redirect_url; else location.reload();
+      showToast('Question duplicated', 'success');
+      if (data.redirect_url) window.location.href = data.redirect_url;
+      else location.reload();
     } else {
-      showToast(data.message || 'Failed to duplicate question', 'error');
-      if (duplicateBtn) {
-        duplicateBtn.disabled = false;
-        duplicateBtn.innerHTML = '<i class="fas fa-copy me-1"></i>Duplicate Question';
+      showToast(data.message || 'Duplication failed', 'error');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-copy me-1"></i>Duplicate Question';
       }
     }
   })
-  .catch(err => {
-    console.error('Duplication error:', err);
-    showToast('Error duplicating question', 'error');
-    if (duplicateBtn) {
-      duplicateBtn.disabled = false;
-      duplicateBtn.innerHTML = '<i class="fas fa-copy me-1"></i>Duplicate Question';
+  .catch(() => {
+    showToast('Duplication failed', 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-copy me-1"></i>Duplicate Question';
     }
   });
 }
+
 function previewQuestion(questionId) {
   window.open(`/admin/questions/${questionId}/preview`, '_blank', 'width=800,height=600');
 }
+
 function showToast(message, type = 'info') {
   const toastClass = type === 'success' ? 'alert-success' :
-  type === 'error'   ? 'alert-danger'  : 'alert-info';
+                     type === 'error' ? 'alert-danger' : 'alert-info';
   const toast = document.createElement('div');
   toast.className = `alert ${toastClass} alert-dismissible fade show position-fixed`;
-  toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+  toast.style.cssText = 'top:20px;right:20px;z-index:9999;min-width:300px;';
   toast.innerHTML = `${message}<button type="button" class="btn-close" onclick="this.parentNode.remove()"></button>`;
   document.body.appendChild(toast);
-  setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
+  setTimeout(() => toast.remove(), 5000);
 }
+
 </script>
 @endpush

@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\StatusController;
 use App\Http\Controllers\Admin\UnitController;
 use App\Http\Controllers\Admin\HintController;
 use App\Http\Controllers\Admin\SolutionController;
+use App\Http\Controllers\Admin\ImageUploadController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,7 +46,10 @@ Route::get('/awaiting-access', function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () {
-    
+    // Universal image upload endpoint
+    Route::post('/upload/image', [ImageUploadController::class, 'upload'])
+        ->name('admin.image.upload');
+
     // ---------------- QA (qa middleware) ----------------
     Route::prefix('qa')->middleware(['qa'])->name('qa.')->group(function () {
         Route::get('/', [QAController::class, 'index'])->name('index');

@@ -57,8 +57,9 @@
   }
 </script>
 @if(isset($siteSettings['favicon']) && $siteSettings['favicon'])
-<link rel="icon" type="image/x-icon" href="{{ asset($siteSettings['favicon']) }}">
-<link rel="shortcut icon" href="{{ asset($siteSettings['favicon']) }}">
+  <link rel="icon" type="image/x-icon" href="{{ asset($siteSettings['favicon']) }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('storage/favicons/favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('storage/favicons/favicon-16x16.png') }}">
 @endif
 
 <!-- Dynamic Theme CSS Variables from Database -->
@@ -310,6 +311,7 @@
             @endif
 
             @yield('content')
+
         </main>
     </div>
 </div>
@@ -441,7 +443,7 @@
    // Logout confirmation function
    function confirmLogout(event) {
     event.preventDefault();
-    
+
     if (confirm('Are you sure you want to logout?')) {
         document.getElementById('logout-form').submit();
     }

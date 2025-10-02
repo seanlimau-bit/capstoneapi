@@ -128,67 +128,67 @@ class QuestionController extends Controller
     return view('admin.questions.index', compact('questions', 'skill', 'totals', 'filterOptions'));
 }
 
-        public function search(Request $request)
-        {
-            $query = Question::with(['skill.tracks.level', 'difficulty', 'type', 'author']);
+public function search(Request $request)
+{
+    $query = Question::with(['skill.tracks.level', 'difficulty', 'type', 'author']);
 
-            if ($request->skill) {
-                $query->where('skill_id', $request->skill);
-            }
+    if ($request->skill) {
+        $query->where('skill_id', $request->skill);
+    }
 
-            if ($request->level) {
-                $query->whereHas('skill.tracks', function ($q) use ($request) {
-                    $q->where('level_id', $request->level);
-                });
-            }
+    if ($request->level) {
+        $query->whereHas('skill.tracks', function ($q) use ($request) {
+            $q->where('level_id', $request->level);
+        });
+    }
 
-            if ($request->keyword) {
-                $query->where('question', 'LIKE', '%' . $request->keyword . '%');
-            }
+    if ($request->keyword) {
+        $query->where('question', 'LIKE', '%' . $request->keyword . '%');
+    }
 
-            $questions = $query->paginate(20);
+    $questions = $query->paginate(20);
 
-            return response()->json([
-                'questions' => $questions->items(),
-                'pagination' => [
-                    'next_page_url' => $questions->nextPageUrl(),
-                    'prev_page_url' => $questions->previousPageUrl(),
-                    'current_page' => $questions->currentPage(),
-                    'last_page' => $questions->lastPage()
-                ]
-            ]);
-        }
+    return response()->json([
+        'questions' => $questions->items(),
+        'pagination' => [
+            'next_page_url' => $questions->nextPageUrl(),
+            'prev_page_url' => $questions->previousPageUrl(),
+            'current_page' => $questions->currentPage(),
+            'last_page' => $questions->lastPage()
+        ]
+    ]);
+}
 
-        public function create()
-        {
-            $data = $this->getFormData();
+public function create()
+{
+    $data = $this->getFormData();
 
-            if (request()->expectsJson()) {
-                return response()->json($data);
-            }
+    if (request()->expectsJson()) {
+        return response()->json($data);
+    }
 
-            return view('admin.questions.create', $data);
-        }
+    return view('admin.questions.create', $data);
+}
 
-        public function store(Request $request)
-        {
-            $validated = $request->validate([
-                'skill_id' => 'required|exists:skills,id',
-                'difficulty_id' => 'required|exists:difficulties,id',
-                'type_id' => 'required|exists:types,id',
-                'question' => 'required|string|max:2000',
-                'answer0' => 'required|string|max:255',
-                'answer1' => 'required|string|max:255',
-                'answer2' => 'required|string|max:255',
-                'answer3' => 'required|string|max:255',
-                'correct_answer' => 'required|integer|between:0,3',
-                'explanation' => 'nullable|string|max:1000',
-                'calculator' => 'nullable|in:scientific,basic',
-            ]);
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'skill_id' => 'required|exists:skills,id',
+        'difficulty_id' => 'required|exists:difficulties,id',
+        'type_id' => 'required|exists:types,id',
+        'question' => 'required|string|max:2000',
+        'answer0' => 'required|string|max:255',
+        'answer1' => 'required|string|max:255',
+        'answer2' => 'required|string|max:255',
+        'answer3' => 'required|string|max:255',
+        'correct_answer' => 'required|integer|between:0,3',
+        'explanation' => 'nullable|string|max:1000',
+        'calculator' => 'nullable|in:scientific,basic',
+    ]);
 
-            DB::beginTransaction();
-            try {
-                $validated['user_id'] = auth()->id();
+    DB::beginTransaction();
+    try {
+        $validated['user_id'] = auth()->id();
                     $validated['status_id'] = 3; // Active
                     $validated['qa_status'] = 'unreviewed';
 
@@ -433,8 +433,8 @@ class QuestionController extends Controller
                     }
 
                     return redirect()
-                        ->route('admin.questions.show', $question)
-                        ->with('success', 'Question updated successfully');
+                    ->route('admin.questions.show', $question)
+                    ->with('success', 'Question updated successfully');
 
                 } catch (\Exception $e) {
                     DB::rollBack();
@@ -574,38 +574,60 @@ class QuestionController extends Controller
 
             public function uploadQuestionImage(Request $request, Question $question)
             {
-                $request->validate([
-                    'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:6144'
-                ]);
-
                 try {
+                    $request->validate([
+                        'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:6144'
+                    ]);
+                    
                     $image = $request->file('image');
                     $filename = time() . '_' . $question->id . '_question.' . $image->getClientOriginalExtension();
                     $path = $image->storeAs('uploads/questions', $filename, 'public');
-
-                    // Remove old image if exists
+                    
+        // Remove old image if exists
                     if ($question->question_image) {
                         $oldPath = str_replace('/storage/', '', $question->question_image);
                         if (Storage::disk('public')->exists($oldPath)) {
                             Storage::disk('public')->delete($oldPath);
                         }
                     }
-
+                    
                     $question->question_image = '/storage/' . $path;
                     $question->save();
-
+                    
                     return response()->json([
                         'success' => true,
                         'message' => 'Question image uploaded successfully',
                         'image_url' => asset('storage/' . $path)
                     ]);
-
-                } catch (\Exception $e) {
-                    Log::error('Question image upload failed: ' . $e->getMessage());
-
+                    
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    $errors = $e->errors();
+                    $message = 'Image upload failed. ';
+                    
+                    if (isset($errors['image'])) {
+                        $errorMsg = $errors['image'][0];
+                        
+                        if (str_contains($errorMsg, 'max')) {
+                            $message .= 'File is too large (max 6MB). Please try a smaller image.';
+                        } elseif (str_contains($errorMsg, 'mimes') || str_contains($errorMsg, 'image')) {
+                            $message .= 'Invalid file type. Please use JPG, PNG, GIF, or WebP format.';
+                        } else {
+                            $message .= 'Please try a different image.';
+                        }
+                    }
+                    
+                    Log::warning('Image validation failed', ['errors' => $errors]);
+                    
                     return response()->json([
                         'success' => false,
-                        'message' => 'Upload failed: ' . $e->getMessage()
+                        'message' => $message
+                    ], 422);
+                    
+                } catch (\Exception $e) {
+                    Log::error('Question image upload failed: ' . $e->getMessage());
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Upload failed. Please try a different image or contact support.'
                     ], 500);
                 }
             }
@@ -839,4 +861,4 @@ class QuestionController extends Controller
                 return view('admin.skills.questions.generate', $data);
             }
 
-}
+        }
