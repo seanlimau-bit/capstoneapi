@@ -2,251 +2,251 @@
 @section('title', 'Skills Management')
 
 @push('styles')
-    <style>
-        .img-picker{position:relative;display:inline-block}
-        .img-picker img,.img-picker video{cursor:pointer;border:2px solid #dee2e6;border-radius:6px;transition:border-color .15s;object-fit:cover}
-        .img-picker img:hover,.img-picker video:hover{border-color:var(--primary-color,#0d6efd)}
-        .img-picker .btn-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;padding:0;border-radius:50%;background:#dc3545;color:#fff;border:2px solid #fff;display:none}
-        .img-picker:hover .btn-remove{display:block}
+<style>
+    .img-picker{position:relative;display:inline-block}
+    .img-picker img,.img-picker video{cursor:pointer;border:2px solid #dee2e6;border-radius:6px;transition:border-color .15s;object-fit:cover}
+    .img-picker img:hover,.img-picker video:hover{border-color:var(--primary-color,#0d6efd)}
+    .img-picker .btn-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;padding:0;border-radius:50%;background:#dc3545;color:#fff;border:2px solid #fff;display:none}
+    .img-picker:hover .btn-remove{display:block}
 
-        .pick-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1055;overflow:auto}
-        .pick-modal .content{background:#fff;margin:5% auto;padding:20px;width:92%;max-width:1000px;border-radius:10px}
-        .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-height:460px;overflow:auto;padding:10px;border:1px solid #dee2e6;border-radius:6px}
-        .pick-grid img,.pick-grid video{width:100%;height:110px;object-fit:cover;cursor:pointer;border:2px solid transparent;border-radius:8px;transition:all .12s}
-        .pick-grid img:hover,.pick-grid video:hover{border-color:var(--primary-color,#0d6efd);transform:scale(1.02)}
-        .pick-grid .selected{border-color:var(--primary-color,#0d6efd);box-shadow:0 0 8px rgba(13,110,253,.45)}
+    .pick-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1055;overflow:auto}
+    .pick-modal .content{background:#fff;margin:5% auto;padding:20px;width:92%;max-width:1000px;border-radius:10px}
+    .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-height:460px;overflow:auto;padding:10px;border:1px solid #dee2e6;border-radius:6px}
+    .pick-grid img,.pick-grid video{width:100%;height:110px;object-fit:cover;cursor:pointer;border:2px solid transparent;border-radius:8px;transition:all .12s}
+    .pick-grid img:hover,.pick-grid video:hover{border-color:var(--primary-color,#0d6efd);transform:scale(1.02)}
+    .pick-grid .selected{border-color:var(--primary-color,#0d6efd);box-shadow:0 0 8px rgba(13,110,253,.45)}
 
-        th.sortable{cursor:pointer;user-select:none}
-        td [contenteditable]{outline:0}
-        .ce-dirty{background:rgba(255,193,7,.15)}
-        .nowrap{white-space:nowrap}
+    th.sortable{cursor:pointer;user-select:none}
+    td [contenteditable]{outline:0}
+    .ce-dirty{background:rgba(255,193,7,.15)}
+    .nowrap{white-space:nowrap}
 
-        /* stacked tracks */
-        .track-stack .item{display:block;margin:0 0 4px 0}
+    /* stacked tracks */
+    .track-stack .item{display:block;margin:0 0 4px 0}
 
-        .loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5rem 0}
-    </style>
+    .loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5rem 0}
+</style>
 @endpush
 
 @section('content')
-    <div class="container-fluid">
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">Skills Management</h1>
+            <div class="text-muted">Images from <code>/images/skills</code> & videos from <code>/videos</code></div>
+        </div>
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#createModal">
+            <i class="fas fa-plus me-1"></i>Create New Skill
+        </button>
+    </div>
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <select class="form-select" id="trackFilter">
+                <option value="">All Tracks</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" id="levelFilter">
+                <option value="">All Levels</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" id="statusFilter">
+                <option value="">All Status</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <div class="input-group">
+                <input type="search" class="form-control" id="searchInput" placeholder="Search skills, ids, tracks, levels...">
+                <button class="btn btn-outline-secondary" id="btnClear">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div id="loadingSkills" class="loading-wrap d-none">
+                <div class="spinner-border text-primary"></div>
+                <div class="mt-2 text-muted small">Loading skills…</div>
+            </div>
+            <table class="table table-hover align-middle mb-0" id="grid">
+                <thead class="table-light">
+                    <tr>
+                        <th class="sortable nowrap" data-sort="id">ID</th>
+                        <th class="nowrap">Image</th>
+                        <th class="nowrap">Videos</th>
+                        <th class="sortable" data-sort="skill">Skill</th>
+                        <th class="sortable" data-sort="description">Description</th>
+                        <th class="sortable nowrap" data-sort="tracks">Tracks</th>
+                        <th class="sortable nowrap" data-sort="questions_count">Questions</th>
+                        <th class="sortable nowrap" data-sort="status_id">Status</th>
+                        <th class="sortable nowrap" data-sort="created_at">Created</th>
+                        <th width="150">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+        <div class="card-footer d-flex justify-content-between small">
+            <span>Showing <span id="info-start">0</span>–<span id="info-end">0</span> of <span id="info-total">0</span></span>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Create Skill Modal -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" id="createForm">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Skill</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <label class="form-label">Skill <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="skill" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" name="description" rows="2"></textarea>
+                </div>
+                <div class="mt-2">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status_id" id="createStatus"></select>
+                </div>
+                <div class="mt-2">
+                    <label class="form-label">Image (optional)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="image" id="createImage" placeholder="images/skills/xxx.png">
+                        <button class="btn btn-outline-secondary" type="button" id="btnPickCreateImage">Pick</button>
+                    </div>
+                    <div class="form-text">Images must live under <code>public/images/skills</code>.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" type="submit" id="btnCreate">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Image Picker -->
+<div class="pick-modal" id="imgPicker" aria-modal="true" role="dialog">
+    <div class="content">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h1 class="h5 mb-1">Skills Management</h1>
-                <div class="text-muted">Images from <code>/images/skills</code> & videos from <code>/videos</code></div>
-            </div>
-            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#createModal">
-                <i class="fas fa-plus me-1"></i>Create New Skill
-            </button>
+            <h5 class="mb-0">Select Skill Image</h5>
+            <button class="btn-close" type="button" id="imgClose"></button>
         </div>
-
-        <div class="row g-2 mb-3">
-            <div class="col-md-3">
-                <select class="form-select" id="trackFilter">
-                    <option value="">All Tracks</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" id="levelFilter">
-                    <option value="">All Levels</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" id="statusFilter">
-                    <option value="">All Status</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <div class="input-group">
-                    <input type="search" class="form-control" id="searchInput" placeholder="Search skills, ids, tracks, levels...">
-                    <button class="btn btn-outline-secondary" id="btnClear">Clear</button>
-                </div>
+        <div class="row g-2">
+            <div class="col-md-8"><input type="search" class="form-control" id="imgSearch" placeholder="Search images..."></div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-outline-danger" id="imgRemove"><i class="fas fa-trash me-1"></i>Remove Image</button>
             </div>
         </div>
+        <div class="pick-grid mt-3" id="imgGrid"></div>
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <button class="btn btn-secondary" id="imgCancel">Cancel</button>
+            <button class="btn btn-primary" id="imgSelect">Select</button>
+        </div>
+    </div>
+</div>
 
-        <div class="card">
-            <div class="card-body p-0">
-                <div id="loadingSkills" class="loading-wrap d-none">
-                    <div class="spinner-border text-primary"></div>
-                    <div class="mt-2 text-muted small">Loading skills…</div>
-                </div>
-                <table class="table table-hover align-middle mb-0" id="grid">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="sortable nowrap" data-sort="id">ID</th>
-                            <th class="nowrap">Image</th>
-                            <th class="nowrap">Videos</th>
-                            <th class="sortable" data-sort="skill">Skill</th>
-                            <th class="sortable" data-sort="description">Description</th>
-                            <th class="sortable nowrap" data-sort="tracks">Tracks</th>
-                            <th class="sortable nowrap" data-sort="questions_count">Questions</th>
-                            <th class="sortable nowrap" data-sort="status_id">Status</th>
-                            <th class="sortable nowrap" data-sort="created_at">Created</th>
-                            <th width="150">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody"></tbody>
-                </table>
+<!-- Video Picker -->
+<div class="pick-modal" id="vidPicker" aria-modal="true" role="dialog">
+    <div class="content">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Select Skill Video</h5>
+            <button class="btn-close" type="button" id="vidClose"></button>
+        </div>
+        <div class="row g-2">
+            <div class="col-md-8"><input type="search" class="form-control" id="vidSearch" placeholder="Search videos..."></div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-outline-danger" id="vidRemove" disabled title="Detach from list below"><i class="fas fa-trash me-1"></i>Remove Video</button>
             </div>
-            <div class="card-footer d-flex justify-content-between small">
-                <span>Showing <span id="info-start">0</span>–<span id="info-end">0</span> of <span id="info-total">0</span></span>
-                <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+        <div class="pick-grid mt-3" id="vidGrid"></div>
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <button class="btn btn-secondary" id="vidCancel">Cancel</button>
+            <button class="btn btn-primary" id="vidSelect">Attach</button>
+        </div>
+    </div>
+</div>
+
+<!-- Generate Questions Modal -->
+<div class="modal fade" id="genModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Generate Questions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="genSkillId">
+                <div class="alert alert-info">
+                    <strong>Skill:</strong> <span id="genSkillName"></span><br>
+                    <small>Current questions: <span id="genCurrentQ">0</span></small>
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Number of questions</label>
+                        <select class="form-select" id="genCount">
+                            <option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Difficulty</label>
+                        <select class="form-select" id="genDiff">
+                            <option value="auto">Auto (Mixed)</option>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label">Additional instructions</label>
+                    <textarea class="form-control" id="genInstr" rows="2" placeholder="Optional..."></textarea>
+                </div>
+                <div class="progress mt-3 d-none" id="genProgress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" id="btnGenerate">Generate</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Create Skill Modal -->
-    <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <form class="modal-content" id="createForm">
-                <div class="modal-header">
-                    <h5 class="modal-title">Create Skill</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-2">
-                        <label class="form-label">Skill <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="skill" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" name="description" rows="2"></textarea>
-                    </div>
-                    <div class="mt-2">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" name="status_id" id="createStatus"></select>
-                    </div>
-                    <div class="mt-2">
-                        <label class="form-label">Image (optional)</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" name="image" id="createImage" placeholder="images/skills/xxx.png">
-                            <button class="btn btn-outline-secondary" type="button" id="btnPickCreateImage">Pick</button>
-                        </div>
-                        <div class="form-text">Images must live under <code>public/images/skills</code>.</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" type="submit" id="btnCreate">Create</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Image Picker -->
-    <div class="pick-modal" id="imgPicker" aria-modal="true" role="dialog">
-        <div class="content">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Select Skill Image</h5>
-                <button class="btn-close" type="button" id="imgClose"></button>
+<!-- Video Player Modal -->
+<div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Preview Video</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="row g-2">
-                <div class="col-md-8"><input type="search" class="form-control" id="imgSearch" placeholder="Search images..."></div>
-                <div class="col-md-4 text-end">
-                    <button class="btn btn-outline-danger" id="imgRemove"><i class="fas fa-trash me-1"></i>Remove Image</button>
-                </div>
-            </div>
-            <div class="pick-grid mt-3" id="imgGrid"></div>
-            <div class="mt-3 d-flex justify-content-end gap-2">
-                <button class="btn btn-secondary" id="imgCancel">Cancel</button>
-                <button class="btn btn-primary" id="imgSelect">Select</button>
+            <div class="modal-body">
+                <video id="playVideo" class="w-100 rounded" controls playsinline preload="metadata" style="max-height:70vh"></video>
             </div>
         </div>
     </div>
-
-    <!-- Video Picker -->
-    <div class="pick-modal" id="vidPicker" aria-modal="true" role="dialog">
-        <div class="content">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Select Skill Video</h5>
-                <button class="btn-close" type="button" id="vidClose"></button>
-            </div>
-            <div class="row g-2">
-                <div class="col-md-8"><input type="search" class="form-control" id="vidSearch" placeholder="Search videos..."></div>
-                <div class="col-md-4 text-end">
-                    <button class="btn btn-outline-danger" id="vidRemove" disabled title="Detach from list below"><i class="fas fa-trash me-1"></i>Remove Video</button>
-                </div>
-            </div>
-            <div class="pick-grid mt-3" id="vidGrid"></div>
-            <div class="mt-3 d-flex justify-content-end gap-2">
-                <button class="btn btn-secondary" id="vidCancel">Cancel</button>
-                <button class="btn btn-primary" id="vidSelect">Attach</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Generate Questions Modal -->
-    <div class="modal fade" id="genModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Generate Questions</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="genSkillId">
-                    <div class="alert alert-info">
-                        <strong>Skill:</strong> <span id="genSkillName"></span><br>
-                        <small>Current questions: <span id="genCurrentQ">0</span></small>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label">Number of questions</label>
-                            <select class="form-select" id="genCount">
-                                <option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Difficulty</label>
-                            <select class="form-select" id="genDiff">
-                                <option value="auto">Auto (Mixed)</option>
-                                <option value="easy">Easy</option>
-                                <option value="medium">Medium</option>
-                                <option value="hard">Hard</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <label class="form-label">Additional instructions</label>
-                        <textarea class="form-control" id="genInstr" rows="2" placeholder="Optional..."></textarea>
-                    </div>
-                    <div class="progress mt-3 d-none" id="genProgress">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%"></div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" id="btnGenerate">Generate</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Video Player Modal -->
-    <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Preview Video</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <video id="playVideo" class="w-100 rounded" controls playsinline preload="metadata" style="max-height:70vh"></video>
-                </div>
-            </div>
-        </div>
-    </div>
+</div>
 @endsection
 
 @push('scripts')
-    {{-- Hydrate data from controller --}}
-    <script>
-        window.__skills = @json($skills);
-        window.__maps   = @json($maps);
-    </script>
+{{-- Hydrate data from controller --}}
+<script>
+    window.__skills = @json($skills);
+    window.__maps   = @json($maps);
+</script>
 
-    <script>
-        (() => {
+<script>
+    (() => {
             // ---------- Constants ----------
             const IMG_PREFIX = 'images/skills/';
             const VID_PREFIX = 'videos/';
@@ -266,10 +266,13 @@
                 return h;
             };
             const req = (url, method = 'GET', body = null) =>
-                fetch(url, { method, headers: headers(method), body: body && enc(body) })
-                    .then(async r => r.ok ? r.json() : Promise.reject((await r.json().catch(() => ({}))).message || `HTTP ${r.status}`));
-            const webUrl = p => p ? `/${p}` : '/images/site-logo.svg';
-
+            fetch(url, { method, headers: headers(method), body: body && enc(body) })
+            .then(async r => r.ok ? r.json() : Promise.reject((await r.json().catch(() => ({}))).message || `HTTP ${r.status}`));
+            const webUrl = p => {
+                if (!p) return '/images/site-logo.svg';
+                const segments = p.split('/').map(seg => encodeURIComponent(seg));
+                return '/' + segments.join('/');
+            };
             // ---------- API ----------
             const api = {
                 create: (body) => req('/admin/skills', 'POST', body),
@@ -522,7 +525,7 @@
                     normalizeStr(trackNames).includes(s) ||
                     normalizeStr(levelDescs).includes(s) ||
                     normalizeStr(statusName).includes(s)
-                );
+                    );
             }
 
             function applyFilters(){
@@ -605,7 +608,7 @@
             function renderLoading() {
                 showLoading(true);
                 el.tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4">
-                  <div class="spinner-border text-primary"></div><div class="mt-2">Loading...</div></td></tr>`;
+                <div class="spinner-border text-primary"></div><div class="mt-2">Loading...</div></td></tr>`;
             }
 
             function render() {
@@ -628,21 +631,21 @@
                     return `<tr data-id="${id}">
                     <td class="nowrap">${esc(String(id))}</td>
                     <td>
-                      <div class="img-picker" title="Click to change image" data-action="pick-image">
-                        <img src="${imgU}" width="60" height="46" alt="" onerror="this.src='/images/site-logo.svg'">
-                        <button class="btn-remove" data-action="pick-image" title="Change/Remove image">×</button>
-                      </div>
+                    <div class="img-picker" title="Click to change image" data-action="pick-image">
+                    <img src="${imgU}" width="60" height="46" alt="" onerror="this.src='/images/site-logo.svg'">
+                    <button class="btn-remove" data-action="pick-image" title="Change/Remove image">×</button>
+                    </div>
                     </td>
                     <td style="min-width:220px">
-                      <div class="img-picker mb-2" title="Click to attach video" data-action="pick-video" style="width:90px;height:46px">
-                        <div class="d-flex align-items-center justify-content-center bg-light rounded px-2" style="width:90px;height:46px">
-                          <span class="small text-muted">+ Video</span>
-                        </div>
-                        <button class="btn-remove" data-action="pick-video" title="Attach video">+</button>
-                      </div>
-                      <div class="d-flex flex-column gap-1" data-role="video-list">
-                        ${vids.map(v => renderVideoItemHtml(v.id, v.video_link)).join('')}
-                      </div>
+                    <div class="img-picker mb-2" title="Click to attach video" data-action="pick-video" style="width:90px;height:46px">
+                    <div class="d-flex align-items-center justify-content-center bg-light rounded px-2" style="width:90px;height:46px">
+                    <span class="small text-muted">+ Video</span>
+                    </div>
+                    <button class="btn-remove" data-action="pick-video" title="Attach video">+</button>
+                    </div>
+                    <div class="d-flex flex-column gap-1" data-role="video-list">
+                    ${vids.map(v => renderVideoItemHtml(v.id, v.video_link)).join('')}
+                    </div>
                     </td>
                     <td contenteditable="true" data-field="skill">${esc(r.skill)}</td>
                     <td contenteditable="true" data-field="description">${esc(r.description || '')}</td>
@@ -651,13 +654,13 @@
                     <td class="nowrap"><span class="badge bg-${statusColor}">${esc(statusName || String(r.status_id || ''))}</span></td>
                     <td class="nowrap">${esc(fmtDate(r.created_at))}</td>
                     <td>
-                      <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-info" data-action="view" title="View"><i class="fas fa-eye"></i></button>
-                        <button class="btn btn-outline-success" data-action="generate" title="Generate Questions"><i class="fas fa-wand-magic-sparkles"></i></button>
-                        <button class="btn btn-outline-danger" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>
-                      </div>
+                    <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-info" data-action="view" title="View"><i class="fas fa-eye"></i></button>
+                    <button class="btn btn-outline-success" data-action="generate" title="Generate Questions"><i class="fas fa-wand-magic-sparkles"></i></button>
+                    <button class="btn btn-outline-danger" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
                     </td>
-                  </tr>`;
+                    </tr>`;
                 }).join('');
                 paginate(); drawSortIcons(); showLoading(false);
             }
@@ -666,23 +669,23 @@
                 const url = webUrl(videoLink);
                 const short = esc(videoLink);
                 return `<div class="d-flex align-items-center gap-2" data-video-item>
-                  <button class="btn btn-sm btn-outline-primary" data-action="play-video" data-url="${esc(url)}"><i class="fas fa-play me-1"></i>Play</button>
-                  <small class="text-muted text-truncate" style="max-width:160px">${short}</small>
-                  <button class="btn btn-sm btn-outline-danger" data-action="delete-video" data-video-id="${esc(String(videoId))}" title="Detach"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-sm btn-outline-primary" data-action="play-video" data-url="${esc(url)}"><i class="fas fa-play me-1"></i>Play</button>
+                <small class="text-muted text-truncate" style="max-width:160px">${short}</small>
+                <button class="btn btn-sm btn-outline-danger" data-action="delete-video" data-video-id="${esc(String(videoId))}" title="Detach"><i class="fas fa-trash"></i></button>
                 </div>`;
             }
 
             function paginate() {
                 const make = (label, page, disabled = false, active = false) =>
-                    `<li class="page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}">
-                       <a class="page-link" href="#" data-page="${page || ''}">${label}</a>
-                     </li>`;
+                `<li class="page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}">
+                <a class="page-link" href="#" data-page="${page || ''}">${label}</a>
+                </li>`;
                 const p = S.page, n = S.pages, items = [];
                 items.push(make('«', p - 1, p <= 1));
                 const s = Math.max(1, p - 2), e = Math.min(n, p + 2);
                 if (s > 1) { items.push(make('1', 1)); if (s > 2) items.push(make('…', null, true)); }
                 for (let i = s; i <= e; i++) items.push(make(String(i), i, false, i === p));
-                if (e < n) { if (e < n - 1) items.push(make('…', null, true)); items.push(make(String(n), n)); }
+                    if (e < n) { if (e < n - 1) items.push(make('…', null, true)); items.push(make(String(n), n)); }
                 items.push(make('»', p + 1, p >= n));
                 el.pag.innerHTML = items.join('');
                 const start = S.total ? (p - 1) * S.per + 1 : 0, end = S.total ? Math.min(p * S.per, S.total) : 0;
@@ -828,8 +831,8 @@
                 S.currentImgId = id;
                 el.img.grid.innerHTML = S.images.map(f => `
                   <div data-path="${esc(f.path)}" title="${esc(f.name)}">
-                    <img src="${esc(f.url)}" alt="${esc(f.name)}">
-                    <div class="small text-truncate mt-1">${esc(f.name)}</div>
+                  <img src="${esc(f.url)}" alt="${esc(f.name)}">
+                  <div class="small text-truncate mt-1">${esc(f.name)}</div>
                   </div>`).join('');
                 el.img.modal.style.display = 'block';
             }
@@ -837,11 +840,11 @@
                 S.currentVidId = id;
                 el.vid.grid.innerHTML = S.videos.map(f => `
                   <div data-path="${esc(f.path)}" title="${esc(f.name)}">
-                    <video src="${esc(f.url)}#t=0.1" muted playsinline preload="metadata"></video>
-                    <div class="small text-truncate mt-1">${esc(f.name)}</div>
+                  <video src="${esc(f.url)}#t=0.1" muted playsinline preload="metadata"></video>
+                  <div class="small text-truncate mt-1">${esc(f.name)}</div>
                   </div>`).join('');
                 el.vid.modal.style.display = 'block';
             }
         })();
     </script>
-@endpush
+    @endpush
