@@ -75,16 +75,16 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
           @endif
       </div>
   </div>
-<div class="d-flex gap-2">
-  <a href="{{ route('admin.qa.index') }}" class="btn btn-outline-secondary">
-    <i class="fas fa-arrow-left me-1"></i>Back to QA Dashboard
-  </a>
-  <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#helpModal">
-    <i class="fas fa-question-circle me-1"></i>QA Guidelines
-  </button>
-  <a href="{{ route('admin.qa.export') }}" class="btn btn-outline-primary">
-    <i class="fas fa-download me-1"></i>Export Report
-  </a>
+  <div class="d-flex gap-2">
+      <a href="{{ route('admin.qa.index') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>Back to QA Dashboard
+    </a>
+    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#helpModal">
+        <i class="fas fa-question-circle me-1"></i>QA Guidelines
+    </button>
+    <a href="{{ route('admin.qa.export') }}" class="btn btn-outline-primary">
+        <i class="fas fa-download me-1"></i>Export Report
+    </a>
 </div></div>
 </div>
 
@@ -567,17 +567,17 @@ method="POST" class="mt-2">
   </div>
 
   <div class="d-flex gap-2 mb-3">
-    <button type="button" class="btn btn-outline-primary flex-grow-1" onclick="assignToMe({{ $question->id }})">
-      <i class="fas fa-user-plus me-1"></i> Assign to me
-  </button>
-  <a class="btn btn-outline-dark" href="{{ route('admin.qa.next', ['after' => $question->id, 'status' => 'unreviewed']) }}">
-      <i class="fas fa-forward me-1"></i> Next
-  </a>
-</div>
+      <a class="btn btn-outline-dark" href="{{ route('admin.qa.previous', ['before' => $question->id]) }}">
+          <i class="fas fa-backward me-1"></i> Prev
+      </a>
+      <a class="btn btn-outline-dark" href="{{ route('admin.qa.next', ['after' => $question->id, 'status' => 'unreviewed']) }}">
+          <i class="fas fa-forward me-1"></i> Next
+      </a>
+  </div>
 
-<label class="form-label fw-semibold">Reviewer Notes</label>
-<textarea id="qaNotes" class="form-control mb-2" rows="3" placeholder="Add context for the author or other reviewers">{{ $question->qa_notes }}</textarea>
-<button type="button" class="btn btn-outline-success w-100" onclick="saveNotes({{ $question->id }})">
+  <label class="form-label fw-semibold">Reviewer Notes</label>
+  <textarea id="qaNotes" class="form-control mb-2" rows="3" placeholder="Add context for the author or other reviewers">{{ $question->qa_notes }}</textarea>
+  <button type="button" class="btn btn-outline-success w-100" onclick="saveNotes({{ $question->id }})">
     <i class="fas fa-save me-1"></i> Save Notes
 </button>
 @else

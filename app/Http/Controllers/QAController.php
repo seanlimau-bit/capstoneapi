@@ -22,15 +22,15 @@ class QAController extends Controller
     {
         // Base builder (unchanged)
         $query = Question::query()
-            ->with(['skill'])
-            ->withCount('qaIssues')
-            ->withCount([
-                'qaIssues as open_qa_issues_count' => function ($q) {
-                    $q->where('status', 'open');
-                },
-            ])
+        ->with(['skill'])
+        ->withCount('qaIssues')
+        ->withCount([
+            'qaIssues as open_qa_issues_count' => function ($q) {
+                $q->where('status', 'open');
+            },
+        ])
             // only questions whose Skill is public
-            ->whereHas('skill', fn($s) => $s->public());
+        ->whereHas('skill', fn($s) => $s->public());
 
         // Approved Today window based on app TZ
         $tz    = config('app.timezone', 'UTC');
@@ -39,7 +39,7 @@ class QAController extends Controller
 
         if ($request->boolean('today')) {
             $query->where('qa_status', 'approved')
-                  ->whereBetween(DB::raw('COALESCE(reviewed_at, updated_at)'), [$start, $end]);
+            ->whereBetween(DB::raw('COALESCE(reviewed_at, updated_at)'), [$start, $end]);
         }
 
         // Filters
@@ -75,8 +75,8 @@ class QAController extends Controller
         }
 
         $questions = $query->orderBy($sort, 'desc')
-            ->paginate(25)
-            ->appends($request->query());
+        ->paginate(25)
+        ->appends($request->query());
 
         // Stats (mirror the public-skill constraint)
         $statsBase = Question::query()->whereHas('skill', fn($s) => $s->public());
@@ -87,8 +87,8 @@ class QAController extends Controller
             'flagged'        => (clone $statsBase)->where('qa_status', 'flagged')->count(),
             'needs_revision' => (clone $statsBase)->where('qa_status', 'needs_revision')->count(),
             'approved'       => (clone $statsBase)->where('qa_status', 'approved')
-                                                  ->whereBetween($todayExpr, [$start, $end])
-                                                  ->count(),
+            ->whereBetween($todayExpr, [$start, $end])
+            ->count(),
         ];
 
         // Filter options
@@ -126,14 +126,14 @@ class QAController extends Controller
             $reviewHistory = $this->getReviewHistory($question->id);
 
             $nextQuestion = Question::where('id', '>', $question->id)
-                ->where('qa_status', '!=', 'approved')
-                ->orderBy('id')
-                ->first();
+            ->where('qa_status', '!=', 'approved')
+            ->orderBy('id')
+            ->first();
 
             $previousQuestion = Question::where('id', '<', $question->id)
-                ->where('qa_status', '!=', 'approved')
-                ->orderBy('id', 'desc')
-                ->first();
+            ->where('qa_status', '!=', 'approved')
+            ->orderBy('id', 'desc')
+            ->first();
 
             return view('admin.qa.show', compact(
                 'question',
@@ -157,38 +157,36 @@ class QAController extends Controller
         $afterId = (int) $request->integer('after', 0);
         $userId  = auth()->id();
 
-        // Find the next *unreviewed* question that is either unassigned
-        // or already assigned to the current user.
-        // Prefer unassigned first to avoid collisions.
+    // Find the next *unreviewed* question
         $q = Question::query()
-            ->when($afterId > 0, fn ($qq) => $qq->where('id', '>', $afterId))
-            ->where('qa_status', 'unreviewed')
-            ->where(function ($qq) use ($userId) {
-                $qq->whereNull('qa_reviewer_id')
-                   ->orWhere('qa_reviewer_id', $userId);
-            })
-            ->orderByRaw('qa_reviewer_id IS NOT NULL') // unassigned first
-            ->orderBy('id', 'asc');
+        ->when($afterId > 0, fn ($qq) => $qq->where('id', '>', $afterId))
+        ->where('qa_status', 'unreviewed')
+        ->orderBy('id', 'asc');
 
         $next = $q->first();
 
-        if (!$next) {
-            return redirect()
-                ->route('admin.qa.index', ['status' => 'unreviewed'])
-                ->with('success', 'No more unreviewed questions available.');
+    // If no questions found after current ID, try from the beginning
+        if (!$next && $afterId > 0) {
+            $next = Question::where('qa_status', 'unreviewed')
+            ->orderBy('id', 'asc')
+            ->first();
         }
 
-        // OPTIONAL: soft-claim if currently unassigned (reduces race conditions)
-        if (is_null($next->qa_reviewer_id)) {
-            // Only claim if still unassigned *right now*
-            $updated = Question::where('id', $next->id)
-                ->whereNull('qa_reviewer_id')
-                ->update(['qa_reviewer_id' => $userId]);
+        if (!$next) {
+            return redirect()
+            ->route('admin.qa.index', ['status' => 'unreviewed'])
+            ->with('success', 'No unreviewed questions available.');
+        }
 
-            // If another reviewer grabbed it in the meantime, just proceed;
-            // the show page is still viewable, and first action will reassign.
+    // OPTIONAL: soft-claim if currently unassigned (reduces race conditions)
+        if (is_null($next->qa_reviewer_id)) {
+        // Only claim if still unassigned *right now*
+            $updated = Question::where('id', $next->id)
+            ->whereNull('qa_reviewer_id')
+            ->update(['qa_reviewer_id' => $userId]);
+
             if ($updated) {
-                // Touch history (optional)
+            // Touch history (optional)
                 $this->logReviewAction($next->id, 'assign', 'Auto-assigned via Next');
             }
         }
@@ -197,20 +195,36 @@ class QAController extends Controller
     }
 
 
-    /**
-     * Assign to me
-     * POST /admin/qa/questions/{question}/assign
-     */
-    public function assignToMe(Question $question)
+    public function previous(Request $request)
     {
-        $question->qa_reviewer_id = Auth::id();
-        $question->save();
-
-        $this->logReviewAction($question->id, 'assign', 'Assigned to reviewer');
-
-        return response()->json(['success' => true, 'message' => 'Assigned to you.']);
+        $beforeId = (int) $request->integer('before', PHP_INT_MAX);
+        $userId   = auth()->id();
+        
+    // Find the previous question that THIS USER has reviewed
+        $q = Question::query()
+        ->when($beforeId < PHP_INT_MAX, fn ($qq) => $qq->where('id', '<', $beforeId))
+        ->where('qa_reviewer_id', $userId)  // Only questions reviewed by current user
+        ->whereIn('qa_status', ['approved', 'flagged', 'needs_revision', 'ai_generated'])  // Already reviewed
+        ->orderBy('id', 'desc');
+        
+        $prev = $q->first();
+        
+    // If no questions found before current ID, wrap to the end
+        if (!$prev && $beforeId < PHP_INT_MAX) {
+            $prev = Question::where('qa_reviewer_id', $userId)
+            ->whereIn('qa_status', ['approved', 'flagged', 'needs_revision', 'ai_generated'])
+            ->orderBy('id', 'desc')
+            ->first();
+        }
+        
+        if (!$prev) {
+            return redirect()
+            ->route('admin.qa.index')
+            ->with('info', 'No previous reviewed questions found.');
+        }
+        
+        return redirect()->route('admin.qa.questions.review', $prev->id);
     }
-
     /**
      * Approve => Public
      */
@@ -239,24 +253,24 @@ class QAController extends Controller
                 'success' => false,
                 'message' => 'Another reviewer must approve your own QA edit.'
             ], 403);
-        }
+    }
 
         // Block approval while there are open QA issues (consistent with bulkApprove)
-        $openIssues = $question->qaIssues()->where('status', 'open')->count();
-        if ($openIssues > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => "Cannot approve: {$openIssues} open issue(s) remain."
-            ], 422);
-        }
+    $openIssues = $question->qaIssues()->where('status', 'open')->count();
+    if ($openIssues > 0) {
+        return response()->json([
+            'success' => false,
+            'message' => "Cannot approve: {$openIssues} open issue(s) remain."
+        ], 422);
+    }
 
         // --- Approve & publish ---------------------------------------------------
         // Approve in QA, set public visibility, stamp reviewer times.
-        $question->qa_status       = 'approved';
-        $question->reviewed_by     = $user->id;
-        $question->reviewed_at     = now();
-        $question->qa_reviewer_id  = $user->id;
-        $question->qa_reviewed_at  = now();
+    $question->qa_status       = 'approved';
+    $question->reviewed_by     = $user->id;
+    $question->reviewed_at     = now();
+    $question->qa_reviewer_id  = $user->id;
+    $question->qa_reviewed_at  = now();
         $question->status_id       = 3; // Public
 
         if (\Schema::hasColumn('questions', 'published_at')) {
@@ -498,9 +512,9 @@ class QAController extends Controller
     {
         try {
             return DB::table('review_history')
-                ->where('question_id', $questionId)
-                ->orderBy('created_at', 'desc')
-                ->get();
+            ->where('question_id', $questionId)
+            ->orderBy('created_at', 'desc')
+            ->get();
         } catch (\Throwable $e) {
             return collect();
         }

@@ -53,6 +53,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     // ---------------- QA (qa middleware) ----------------
     Route::prefix('qa')->middleware(['qa'])->name('qa.')->group(function () {
         Route::get('/', [QAController::class, 'index'])->name('index');
+        Route::get('/previous', [QAController::class, 'previous'])->name('previous');
         Route::get('/next', [QAController::class, 'next'])->name('next');
 
         Route::get('/export', [QAController::class, 'export'])
