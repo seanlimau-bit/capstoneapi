@@ -168,6 +168,33 @@ class QuestionGenerationService
         $prompt .= "- Use KaTeX $$...$$ sparingly where it clarifies notation.\n";
         $prompt .= "- Difficulty ids in 1..3 only.\n";
         $prompt .= "- MCQ: exactly 4 options in 'answers', 'correct_answer' is the index 0..3.\n";
+        $prompt .= "**PEDAGOGY RULES - HINTS & SOLUTIONS**\n";
+        $prompt .= "Each question must include:\n\n";
+
+        $prompt .= "**HINTS (exactly 3 levels):**\n";
+        $prompt .= "- Level 1: Strategic nudge that activates prior knowledge or suggests an approach. Does NOT give steps or numbers. Use phrases like 'Think about...', 'Imagine you are...', 'What strategy...'\n";
+        $prompt .= "- Level 2: Guided steps that break down the first major step or show partial work. Provides concrete starting point. Student still completes remaining work.\n";
+        $prompt .= "- Level 3: Nearly complete solution showing most steps with clear reasoning. Student only needs final step or connection.\n";
+        $prompt .= "- Use age-appropriate language for {$ageBand}\n";
+        $prompt .= "- Encourage students to 'be in' the problem (e.g., 'Imagine YOU are...' for word problems)\n";
+        $prompt .= "- Build confidence through scaffolding, not cheerleading\n\n";
+
+        $prompt .= "**SOLUTIONS (at least 1 method):**\n";
+        $prompt .= "- Must include: 'method' (clear strategy name), 'steps' (array of clear actions), 'final_answer' (must match correct_answer field)\n";
+        $prompt .= "- Write steps as a teacher explaining to the student\n";
+        $prompt .= "- Show mathematical thinking, not just calculations\n";
+        $prompt .= "- For K-2: use concrete language, reference visual models\n";
+        $prompt .= "- For 3-6: introduce mathematical vocabulary appropriately\n";
+        $prompt .= "- Each step should be one clear, actionable instruction\n";
+        $prompt .= "- Final answer must exactly match the correct_answer value\n\n";
+
+        $prompt .= "**OTHER REQUIREMENTS:**\n";
+        $prompt .= "- Include clear 'explanation' (why this answer is correct, student-friendly)\n";
+        $prompt .= "- Use KaTeX $$...$$ sparingly, only where it clarifies notation\n";
+        $prompt .= "- Difficulty ids must be 1, 2, or 3 only\n";
+        $prompt .= "- MCQ: exactly 4 options in 'answers', 'correct_answer' is index 0..3\n";
+        $prompt .= "- FIB: 'answers' array of numeric strings, 'correct_answer' must be numeric\n";
+        $prompt .= "- Keep contexts culturally neutral and age-appropriate for {$ageBand}\n\n";
         $prompt .= "- FIB numbers: 'answers' must be an array of numeric strings for the blanks, 'correct_answer' must be numeric. Provide solutions with steps.\n";
         $prompt .= "- Keep contexts culturally neutral and age appropriate.\n\n";
 
@@ -177,135 +204,145 @@ class QuestionGenerationService
 
         $prompt .= "**STRICT OUTPUT JSON**\n";
         $prompt .= <<<JSON
-{
-  "questions": [
-    {
-      "skill_id": {$skill->id},
-      "source": "AI by skill",
-      "qa_status": "ai_generated",
-      "status_id": 3,
-      "type_id": 1,
-      "difficulty_id": 2,
-      "question": "Question text",
-      "answers": ["A","B","C","D"],
-      "correct_answer": 0,
-      "explanation": "Student-friendly explanation.",
-      "hints": [
-        {"hint_level":1,"hint_text":"gentle nudge"},
-        {"hint_level":2,"hint_text":"more specific clue"},
-        {"hint_level":3,"hint_text":"nearly the steps"}
-      ],
-      "solutions": [
-        {"method":"standard","steps":["step 1","step 2"],"final_answer":"A"}
+        {
+          "questions": [
+            {
+              "skill_id": {$skill->id},
+              "source": "AI by skill",
+              "qa_status": "ai_generated",
+              "status_id": 3,
+              "type_id": 1,
+              "difficulty_id": 2,
+              "question": "Question text",
+              "answers": ["A","B","C","D"],
+              "correct_answer": 0,
+              "explanation": "Student-friendly explanation.",
+              "hints": [
+                {"hint_level":1,"hint_text":"gentle nudge"},
+                {"hint_level":2,"hint_text":"more specific clue"},
+                {"hint_level":3,"hint_text":"nearly the steps"}
+            ],
+              "solutions": [
+                {"method":"standard","steps":["step 1","step 2"],"final_answer":"A"}
+            ]
+          }
       ]
+      }
+      JSON;
+      $prompt .= "\nReturn exactly {$count} items in \"questions\". JSON only.";
+
+      return $prompt;
+  }
+
+  protected function buildVariationPrompt(Question $original, int $n, string $ageBand, string $readingLvl, string $focusAreas): string
+  {
+    $skill     = $original->skill;
+    $diffLabel = optional($original->difficulty)->difficulty ?? 'Medium';
+    $typeLabel = optional($original->type)->type ?? 'MCQ';
+    $diffId    = (int) ($original->difficulty_id ?? 2);
+    $typeId    = (int) ($original->type_id ?? 1);
+
+    $prompt = "Create EXACTLY {$n} VARIATIONS of the question below.\n";
+    $prompt .= "Keep SAME type_id={$typeId} ({$typeLabel}) and SAME difficulty_id={$diffId} ({$diffLabel}). Change surface details, numbers, or contexts only. Audience {$ageBand}, reading level {$readingLvl}.";
+    if ($focusAreas) {
+        $prompt .= " Focus areas: {$focusAreas}.";
     }
-  ]
-}
-JSON;
-        $prompt .= "\nReturn exactly {$count} items in \"questions\". JSON only.";
+    $prompt .= "\n\n";
 
-        return $prompt;
+    $prompt .= "Skill: {$skill->skill}\n";
+    $prompt .= "Skill Description: {$skill->description}\n";
+    $prompt .= "Original Question: {$original->question}\n";
+    if ($typeId === 1) {
+        $prompt .= "Original Answers: [\"{$original->answer0}\", \"{$original->answer1}\", \"{$original->answer2}\", \"{$original->answer3}\"]\n";
+        if (is_numeric($original->correct_answer)) {
+            $prompt .= "Original Correct Index: {$original->correct_answer}\n";
+        }
     }
-
-    protected function buildVariationPrompt(Question $original, int $n, string $ageBand, string $readingLvl, string $focusAreas): string
-    {
-        $skill     = $original->skill;
-        $diffLabel = optional($original->difficulty)->difficulty ?? 'Medium';
-        $typeLabel = optional($original->type)->type ?? 'MCQ';
-        $diffId    = (int) ($original->difficulty_id ?? 2);
-        $typeId    = (int) ($original->type_id ?? 1);
-
-        $prompt = "Create EXACTLY {$n} VARIATIONS of the question below.\n";
-        $prompt .= "Keep SAME type_id={$typeId} ({$typeLabel}) and SAME difficulty_id={$diffId} ({$diffLabel}). Change surface details, numbers, or contexts only. Audience {$ageBand}, reading level {$readingLvl}.";
-        if ($focusAreas) {
-            $prompt .= " Focus areas: {$focusAreas}.";
-        }
-        $prompt .= "\n\n";
-
-        $prompt .= "Skill: {$skill->skill}\n";
-        $prompt .= "Skill Description: {$skill->description}\n";
-        $prompt .= "Original Question: {$original->question}\n";
-        if ($typeId === 1) {
-            $prompt .= "Original Answers: [\"{$original->answer0}\", \"{$original->answer1}\", \"{$original->answer2}\", \"{$original->answer3}\"]\n";
-            if (is_numeric($original->correct_answer)) {
-                $prompt .= "Original Correct Index: {$original->correct_answer}\n";
-            }
-        }
-        $prompt .= "\n**REQUIRED FIELDS FOR EVERY VARIATION**\n";
-        $prompt .= "- 'explanation' (age appropriate)\n- exactly 3 'hints' with hint_level 1..3\n- 'solutions' with at least one method, steps, and final_answer\n";
-        $prompt .= "- MCQ: answers length 4, correct_answer index 0..3\n- FIB numbers: answers array includes numeric strings for blanks, correct_answer is numeric\n\n";
-
-        $prompt .= "**STRICT OUTPUT JSON**\n";
-        if ($typeId === 1) {
-            $prompt .= <<<JSON
-{
-  "variations": [
-    {
-      "type_id": 1,
-      "difficulty_id": {$diffId},
-      "question": "Reworded text",
-      "answers": ["opt1","opt2","opt3","opt4"],
-      "correct_answer": 0,
-      "explanation": "Student-friendly explanation.",
-      "hints": [
-        {"hint_level":1,"hint_text":"nudge"},
-        {"hint_level":2,"hint_text":"clue"},
-        {"hint_level":3,"hint_text":"almost there"}
-      ],
-      "solutions": [
-        {"method":"standard","steps":["s1","s2"],"final_answer":"opt1"}
+    $prompt .= "\n**REQUIRED FIELDS FOR EVERY VARIATION**\n";
+    $prompt .= "- 'explanation' (age appropriate)\n- exactly 3 'hints' with hint_level 1..3\n- 'solutions' with at least one method, steps, and final_answer\n";
+    $prompt .= "- MCQ: answers length 4, correct_answer index 0..3\n- FIB numbers: answers array includes numeric strings for blanks, correct_answer is numeric\n\n";
+    $prompt .= "\n**REQUIRED FIELDS FOR EVERY VARIATION**\n";
+    $prompt .= "- 'explanation': Age-appropriate explanation of why the answer is correct\n";
+    $prompt .= "- 'hints': Exactly 3 hints following progressive scaffolding:\n";
+    $prompt .= "  * Level 1: Strategic nudge (activates knowledge, suggests approach)\n";
+    $prompt .= "  * Level 2: Guided steps (shows first major step or partial work)\n";
+    $prompt .= "  * Level 3: Nearly complete (shows most steps, student finishes)\n";
+    $prompt .= "- 'solutions': At least 1 method with clear steps array and final_answer\n";
+    $prompt .= "- Use age-appropriate language for {$ageBand}\n";
+    $prompt .= "- Encourage student to 'be in' the problem when relevant\n";
+    $prompt .= "- MCQ: 4 answers, correct_answer index 0..3\n";
+    $prompt .= "- FIB: numeric answers array, numeric correct_answer\n\n";
+    $prompt .= "**STRICT OUTPUT JSON**\n";
+    if ($typeId === 1) {
+        $prompt .= <<<JSON
+        {
+          "variations": [
+            {
+              "type_id": 1,
+              "difficulty_id": {$diffId},
+              "question": "Reworded text",
+              "answers": ["opt1","opt2","opt3","opt4"],
+              "correct_answer": 0,
+              "explanation": "Student-friendly explanation.",
+              "hints": [
+                {"hint_level":1,"hint_text":"nudge"},
+                {"hint_level":2,"hint_text":"clue"},
+                {"hint_level":3,"hint_text":"almost there"}
+            ],
+              "solutions": [
+                {"method":"standard","steps":["s1","s2"],"final_answer":"opt1"}
+            ]
+          }
       ]
-    }
+      }
+      JSON;
+      $prompt .= "\nReturn exactly {$n} items in \"variations\". JSON only.";
+  } else {
+    $prompt .= <<<JSON
+    {
+      "variations": [
+        {
+          "type_id": {$typeId},
+          "difficulty_id": {$diffId},
+          "question": "Text with [?] where numeric answers go",
+          "answers": ["12"],
+          "correct_answer": 12,
+          "explanation": "Student-friendly explanation.",
+          "hints": [
+            {"hint_level":1,"hint_text":"nudge"},
+            {"hint_level":2,"hint_text":"clue"},
+            {"hint_level":3,"hint_text":"almost there"}
+        ],
+          "solutions": [
+            {"method":"standard","steps":["s1","s2"],"final_answer":"12"}
+        ]
+      }
   ]
+  }
+  JSON;
+  $prompt .= "\nReturn exactly {$n} items in \"variations\". JSON only.";
 }
-JSON;
-            $prompt .= "\nReturn exactly {$n} items in \"variations\". JSON only.";
-        } else {
-            $prompt .= <<<JSON
+
+return $prompt;
+}
+
+/* ----------------- Parsing + Strong Validation ----------------- */
+
+protected function parseQuestionsOrFail(array $json): array
 {
-  "variations": [
-    {
-      "type_id": {$typeId},
-      "difficulty_id": {$diffId},
-      "question": "Text with [?] where numeric answers go",
-      "answers": ["12"],
-      "correct_answer": 12,
-      "explanation": "Student-friendly explanation.",
-      "hints": [
-        {"hint_level":1,"hint_text":"nudge"},
-        {"hint_level":2,"hint_text":"clue"},
-        {"hint_level":3,"hint_text":"almost there"}
-      ],
-      "solutions": [
-        {"method":"standard","steps":["s1","s2"],"final_answer":"12"}
-      ]
+    if (!isset($json['questions']) || !is_array($json['questions']) || empty($json['questions'])) {
+        throw new \Exception('AI response missing non-empty "questions" array');
     }
-  ]
+    return $json['questions'];
 }
-JSON;
-            $prompt .= "\nReturn exactly {$n} items in \"variations\". JSON only.";
-        }
 
-        return $prompt;
+protected function parseVariationsOrFail(array $json): array
+{
+    if (!isset($json['variations']) || !is_array($json['variations']) || empty($json['variations'])) {
+        throw new \Exception('AI response missing non-empty "variations" array');
     }
-
-    /* ----------------- Parsing + Strong Validation ----------------- */
-
-    protected function parseQuestionsOrFail(array $json): array
-    {
-        if (!isset($json['questions']) || !is_array($json['questions']) || empty($json['questions'])) {
-            throw new \Exception('AI response missing non-empty "questions" array');
-        }
-        return $json['questions'];
-    }
-
-    protected function parseVariationsOrFail(array $json): array
-    {
-        if (!isset($json['variations']) || !is_array($json['variations']) || empty($json['variations'])) {
-            throw new \Exception('AI response missing non-empty "variations" array');
-        }
-        return $json['variations'];
-    }
+    return $json['variations'];
+}
 
     /**
      * Normalize keys and require explanation, exactly 3 hints, and ≥1 solution.
@@ -625,29 +662,29 @@ JSON;
         $skill->loadMissing('tracks');
 
         $q = Question::where('skill_id', $skill->id)
-            ->whereIn('qa_status', ['approved', 'unreviewed'])
-            ->with(['skill', 'difficulty', 'type'])
-            ->limit(3)
-            ->get();
+        ->whereIn('qa_status', ['approved', 'unreviewed'])
+        ->with(['skill', 'difficulty', 'type'])
+        ->limit(3)
+        ->get();
 
         if ($q->isEmpty() && $skill->tracks->isNotEmpty()) {
             $trackIds = $skill->tracks->pluck('id');
             $q = Question::whereHas('skill', function ($query) use ($trackIds) {
                 $query->whereHas('tracks', fn($qq) => $qq->whereIn('id', $trackIds));
             })
-                ->where('skill_id', '!=', $skill->id)
-                ->whereIn('qa_status', ['approved', 'unreviewed'])
-                ->with(['skill', 'difficulty', 'type'])
-                ->limit(3)
-                ->get();
+            ->where('skill_id', '!=', $skill->id)
+            ->whereIn('qa_status', ['approved', 'unreviewed'])
+            ->with(['skill', 'difficulty', 'type'])
+            ->limit(3)
+            ->get();
         }
 
         if ($q->isEmpty()) {
             $q = Question::whereIn('qa_status', ['approved', 'unreviewed'])
-                ->with(['skill', 'difficulty', 'type'])
-                ->latest()
-                ->limit(3)
-                ->get();
+            ->with(['skill', 'difficulty', 'type'])
+            ->latest()
+            ->limit(3)
+            ->get();
         }
 
         return $q->map(fn($qq) => [
