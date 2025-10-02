@@ -21,10 +21,11 @@ class ImageUploadController extends Controller
     {
         $request->validate([
         'image' => 'required|image|mimes:jpeg,jpg,png,webp,svg|max:10240', // 10MB max
-        'type' => 'required|in:logo,favicon,login_background,question_image,profile_picture,skill_image',
+        'type' => 'required|in:logo,favicon,login_background,question_image,profile_picture,skill_image,track_image',
         'question_id' => 'nullable|integer',
         'user_id' => 'nullable|integer',
-        'skill_id' => 'nullable|integer|exists:skills,id', // ADD THIS
+        'skill_id' => 'nullable|integer|exists:skills,id',
+        'track_id' => 'nullable|integer|exists:tracks,id',
     ]);
 
         try {
@@ -53,9 +54,12 @@ class ImageUploadController extends Controller
                 case 'profile_picture':
                 $this->handleProfilePictureUpload($result, $request);
                 break;
-            case 'skill_image': // ADD THIS CASE
-            $this->handleSkillImageUpload($result, $request);
-            break;
+                case 'skill_image': // ADD THIS CASE
+                $this->handleSkillImageUpload($result, $request);
+                break;
+                case 'track_image':
+                $this->handleTrackImageUpload($result, $request);
+                break;
         }
         
         return response()->json([
@@ -77,6 +81,28 @@ class ImageUploadController extends Controller
             'message' => $e->getMessage()
         ], 422);
     }
+}
+
+protected function handleTrackImageUpload($result, $request)
+{
+    $trackId = $request->input('track_id');
+    
+    if (!$trackId) {
+        throw new \Exception('Track ID is required for track image upload');
+    }
+    
+    $track = \App\Models\Track::findOrFail($trackId);
+    
+    // Delete old image if exists
+    if ($track->image) {
+        $oldPath = storage_path('app/public/' . $track->image);
+        if (file_exists($oldPath)) {
+            @unlink($oldPath);
+        }
+    }
+    
+    $track->image = $result['path'];
+    $track->save();
 }
 
 protected function handleSkillImageUpload($result, $request)

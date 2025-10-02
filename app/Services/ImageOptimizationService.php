@@ -51,11 +51,18 @@ class ImageOptimizationService
             'max_size_kb' => 150,
         ],
         'skill_image' => [ 
-        'max_width' => 600,
-        'max_height' => 400,
-        'quality' => 85,
-        'format' => 'webp',
-        'max_size_kb' => 500,
+            'max_width' => 600,
+            'max_height' => 400,
+            'quality' => 85,
+            'format' => 'webp',
+            'max_size_kb' => 500,
+        ],
+        'track_image' => [
+            'max_width' => 600,
+            'max_height' => 400,
+            'quality' => 85,
+            'format' => 'webp',
+            'max_size_kb' => 500,
         ],
         'default' => [
             'max_width' => 1200,
@@ -165,6 +172,7 @@ class ImageOptimizationService
             'login_background' => 'backgrounds',
             'profile_picture' => 'profiles',
             'skill_image' => 'skills',
+            'track_image' => 'tracks',
             default => 'images',
         };
     }

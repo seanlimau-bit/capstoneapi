@@ -362,7 +362,44 @@ class UserController extends Controller
 
         return redirect()->route('admin.users.show', $user)->with('success', 'User updated successfully');
     }
+public function inlineUpdate(Request $request, User $user)
+{
+    // Prevent non-admins with modify permission from elevating privileges
+    if ($request->filled('role_id') && !auth()->user()->hasPermission('manage_roles')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'You do not have permission to change user roles.'
+        ], 403);
+    }
+    
+    // Prevent user from demoting their own role
+    if ($user->id === auth()->id() && $request->filled('role_id')) {
+        $newRole = Role::find($request->role_id);
+        if ($newRole && !in_array($newRole->role, ['System Admin', 'Administrator'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot change your own admin role.'
+            ], 403);
+        }
+    }
 
+    $validated = $request->validate([
+        'field' => 'required|string',
+        'value' => 'nullable'
+    ]);
+
+    // Map field to actual column name if needed
+    $field = $validated['field'];
+    $value = $validated['value'];
+
+    $user->update([$field => $value]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'User updated successfully',
+        'user' => $user->fresh()
+    ]);
+}
     /**
      * Remove the specified user
      */

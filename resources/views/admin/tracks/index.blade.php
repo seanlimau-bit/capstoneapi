@@ -2,238 +2,297 @@
 
 @section('title', 'Track Management')
 
+@push('styles')
+<style>
+    .img-picker{position:relative;display:inline-block}
+    .img-picker img{cursor:pointer;border:2px solid #dee2e6;border-radius:6px;transition:border-color .15s;object-fit:cover}
+    .img-picker img:hover{border-color:var(--primary-color,#0d6efd)}
+    .img-picker .btn-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;padding:0;border-radius:50%;background:#dc3545;color:#fff;border:2px solid #fff;display:none}
+    .img-picker:hover .btn-remove{display:block}
+    .img-upload-zone{border:2px dashed #dee2e6;border-radius:8px;padding:1rem;text-align:center;cursor:pointer;transition:all .2s}
+    .img-upload-zone:hover{border-color:var(--primary-color,#0d6efd);background:#f8f9fa}
+    .img-upload-zone.dragging{border-color:var(--primary-color,#0d6efd);background:#e7f1ff}
+    .pick-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1055;overflow:auto}
+    .pick-modal .content{background:#fff;margin:5% auto;padding:20px;width:92%;max-width:600px;border-radius:10px}
+</style>
+@endpush
 @section('content')
 <div class="container-fluid">
     {{-- Page Header --}}
     @include('admin.components.page-header', [
-        'title' => 'Track Management',
-        'subtitle' => 'Manage educational tracks, levels, and skills',
-        'icon' => 'route',
-        'breadcrumbs' => [
-            ['title' => 'Tracks', 'url' => '']
-        ],
-        'actions' => [
-            [
-                'text' => 'Add Track',
-                'url' => route('admin.tracks.create'),
-                'icon' => 'plus',
-                'class' => 'success'
-            ],
-            [
-                'text' => 'Actions',
-                'type' => 'dropdown',
-                'icon' => 'ellipsis-v',
-                'class' => 'outline-secondary',
-                'items' => [
-                    ['text' => 'Import Tracks', 'icon' => 'upload', 'onclick' => 'showImportModal()'],
-                    ['text' => 'Export All', 'icon' => 'download', 'onclick' => 'exportTracks()'],
-                    'divider',
-                    ['text' => 'Bulk Operations', 'icon' => 'cogs', 'onclick' => 'showBulkOperations()']
-                ]
-            ]
-        ]
+    'title' => 'Track Management',
+    'subtitle' => 'Manage educational tracks, levels, and skills',
+    'icon' => 'route',
+    'breadcrumbs' => [
+    ['title' => 'Tracks', 'url' => '']
+    ],
+    'actions' => [
+    [
+    'text' => 'Add Track',
+    'url' => route('admin.tracks.create'),
+    'icon' => 'plus',
+    'class' => 'success'
+    ],
+    [
+    'text' => 'Actions',
+    'type' => 'dropdown',
+    'icon' => 'ellipsis-v',
+    'class' => 'outline-secondary',
+    'items' => [
+    ['text' => 'Import Tracks', 'icon' => 'upload', 'onclick' => 'showImportModal()'],
+    ['text' => 'Export All', 'icon' => 'download', 'onclick' => 'exportTracks()'],
+    'divider',
+    ['text' => 'Bulk Operations', 'icon' => 'cogs', 'onclick' => 'showBulkOperations()']
+    ]
+    ]
+    ]
     ])
 
     {{-- Stats --}}
     @include('admin.components.stats-row', [
-        'stats' => [
-            [
-                'value' => $tracks->count(),
-                'label' => 'Total Tracks',
-                'color' => 'primary',
-                'icon' => 'route',
-                'id' => 'totalTracksCount'
-            ],
-            [
-                'value' => $tracks->where('status_id', 3)->count(),
-                'label' => 'Active Tracks',
-                'color' => 'success',
-                'icon' => 'check-circle',
-                'id' => 'activeTracksCount'
-            ],
-            [
-                'value' => $tracks->sum(function($track) { return $track->skills ? $track->skills->count() : 0; }),
-                'label' => 'Total Skills',
-                'color' => 'info',
-                'icon' => 'brain',
-                'id' => 'totalSkillsCount'
-            ],
-            [
-                'value' => $tracks->where('status_id', 4)->count(),
-                'label' => 'Draft Tracks',
-                'color' => 'warning',
-                'icon' => 'edit',
-                'id' => 'draftTracksCount'
-            ]
-        ]
+    'stats' => [
+    [
+    'value' => $tracks->count(),
+    'label' => 'Total Tracks',
+    'color' => 'primary',
+    'icon' => 'route',
+    'id' => 'totalTracksCount'
+    ],
+    [
+    'value' => $tracks->where('status_id', 3)->count(),
+    'label' => 'Active Tracks',
+    'color' => 'success',
+    'icon' => 'check-circle',
+    'id' => 'activeTracksCount'
+    ],
+    [
+    'value' => $tracks->sum(function($track) { return $track->skills ? $track->skills->count() : 0; }),
+    'label' => 'Total Skills',
+    'color' => 'info',
+    'icon' => 'brain',
+    'id' => 'totalSkillsCount'
+    ],
+    [
+    'value' => $tracks->where('status_id', 4)->count(),
+    'label' => 'Draft Tracks',
+    'color' => 'warning',
+    'icon' => 'edit',
+    'id' => 'draftTracksCount'
+    ]
+    ]
     ])
 
     {{-- Filters --}}
     @component('admin.components.filters-card', ['items' => $tracks])
-        <div class="col-md-3">
-            <label class="form-label fw-bold">Status</label>
-            <select class="form-select" id="statusFilter">
-                <option value="">All Statuses</option>
-                @foreach($tracks->pluck('status')->filter()->unique('id')->sortBy('status') as $status)
-                    <option value="{{ strtolower($status->status) }}">{{ ucfirst($status->status) }}</option>
-                @endforeach
-            </select>
+    <div class="col-md-3">
+        <label class="form-label fw-bold">Status</label>
+        <select class="form-select" id="statusFilter">
+            <option value="">All Statuses</option>
+            @foreach($tracks->pluck('status')->filter()->unique('id')->sortBy('status') as $status)
+            <option value="{{ strtolower($status->status) }}">{{ ucfirst($status->status) }}</option>
+            @endforeach
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold">Level</label>
+        <select class="form-select" id="levelFilter">
+            <option value="">All Levels</option>
+            @foreach($levels as $level)
+            <option value="{{ $level->description }}">{{ $level->description }}</option>
+            @endforeach
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">Search</label>
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Search tracks or descriptions..." id="searchInput">
+            <span class="input-group-text">
+                <i class="fas fa-search"></i>
+            </span>
         </div>
-        <div class="col-md-3">
-            <label class="form-label fw-bold">Level</label>
-            <select class="form-select" id="levelFilter">
-                <option value="">All Levels</option>
-                @foreach($levels as $level)
-                    <option value="{{ $level->description }}">{{ $level->description }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-md-4">
-            <label class="form-label fw-bold">Search</label>
-            <div class="input-group">
-                <input type="text" class="form-control" placeholder="Search tracks or descriptions..." id="searchInput">
-                <span class="input-group-text">
-                    <i class="fas fa-search"></i>
-                </span>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">&nbsp;</label>
-            <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
-                <i class="fas fa-times me-1"></i>Clear
-            </button>
-        </div>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">&nbsp;</label>
+        <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+            <i class="fas fa-times me-1"></i>Clear
+        </button>
+    </div>
     @endcomponent
 
     {{-- Table --}}
     @if($tracks->isEmpty())
-        @include('admin.components.empty-state', [
-            'icon' => 'route',
-            'title' => 'No Tracks Found',
-            'message' => 'Create your first track to get started'
-        ])
+    @include('admin.components.empty-state', [
+    'icon' => 'route',
+    'title' => 'No Tracks Found',
+    'message' => 'Create your first track to get started'
+    ])
     @else
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Tracks Overview</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0" id="tracksTable">
-                        <thead class="table-light">
-                            <tr>
-                                <th data-sort="id" class="sortable">Id</th>
-                                <th data-sort="track" class="sortable">Track</th>
-                                <th data-sort="description" class="sortable" width="320">Description</th>
-                                <th data-sort="level" class="sortable" width="150">Level</th>
-                                <th data-sort="skills" class="sortable" width="80">Skills</th>
-                                <th data-sort="status" class="sortable" width="120">Status</th>
-                                <th data-sort="created" class="sortable" width="140">Created</th>
-                                <th width="120">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @php
-                                $statusConfig = [
-                                    'Public' => ['class' => 'success', 'icon' => 'globe'],
-                                    'Draft' => ['class' => 'warning', 'icon' => 'edit'],
-                                    'Only Me' => ['class' => 'info', 'icon' => 'lock'],
-                                    'Restricted' => ['class' => 'secondary', 'icon' => 'ban']
-                                ];
-                                $allStatusLabels = array_keys($statusConfig);
-                            @endphp
-                            @foreach($tracks as $track)
-                                @php
-                                    $statusText = $track->status->status ?? 'Unknown';
-                                    $statusMeta = $statusConfig[$statusText] ?? ['class' => 'secondary', 'icon' => 'question'];
-                                @endphp
-                                <tr class="item-row"
-                                    data-id="{{ $track->id }}"
-                                    data-status="{{ $track->status ? strtolower($statusText) : 'unknown' }}"
-                                    data-level="{{ $track->level->description ?? '' }}"
-                                    data-name="{{ strtolower($track->track) }}"
-                                    data-description="{{ strtolower($track->description ?? '') }}"
-                                    data-skills="{{ $track->skills ? $track->skills->count() : 0 }}"
-                                    data-created="{{ $track->created_at->timestamp }}">
-                                    {{-- Id --}}
-                                    <td class="text-muted fw-semibold">{{ $track->id }}</td>
-
-                                    {{-- Track (editable text) --}}
-                                    <td data-editable="true" data-field="track" data-edit="text">
-                                        <h6 class="mb-0 track-name searchable">{{ $track->track }}</h6>
-                                    </td>
-
-                                    {{-- Description (editable text) --}}
-                                    <td data-editable="true" data-field="description" data-edit="text">
-                                        <small class="text-muted track-desc searchable">
-                                            @if(strlen($track->description ?? '') > 160)
-                                                {{ substr($track->description, 0, 160) }}...
-                                            @else
-                                                {{ $track->description ?? 'No description' }}
-                                            @endif
-                                        </small>
-                                    </td>
-
-                                    {{-- Level (editable select) --}}
-                                    <td data-editable="true" data-field="level_description" data-edit="select"
-                                        data-options='@json($levels->pluck("description"))'>
-                                        @if($track->level)
-                                            <span class="badge bg-info">{{ $track->level->description }}</span>
-                                        @else
-                                            <span class="text-muted">No level assigned</span>
-                                        @endif
-                                    </td>
-
-                                    {{-- Skills (read-only) --}}
-                                    <td>
-                                        @if($track->skills && $track->skills->count() > 0)
-                                            <span class="badge bg-primary">{{ $track->skills->count() }}</span>
-                                        @else
-                                            <span class="text-muted">0</span>
-                                        @endif
-                                    </td>
-
-                                    {{-- Status (editable select) --}}
-                                    <td data-editable="true" data-field="status" data-edit="select" data-options='@json($allStatusLabels)'>
-                                        <span class="badge bg-{{ $statusMeta['class'] }}">
-                                            <i class="fas fa-{{ $statusMeta['icon'] }} me-1"></i>{{ $statusText }}
-                                        </span>
-                                    </td>
-
-                                    {{-- Created --}}
-                                    <td><small class="text-muted">{{ $track->created_at->format('M j, Y') }}</small></td>
-
-                                    {{-- Actions --}}
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{{ route('admin.tracks.show', $track) }}" class="btn btn-outline-info" title="View Track">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <button class="btn btn-outline-secondary" onclick="copyTrack({{ $track->id }})" title="Duplicate Track">
-                                                <i class="fas fa-copy"></i>
-                                            </button>
-                                            <button class="btn btn-outline-danger" onclick="deleteTrack({{ $track->id }})" title="Delete Track">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                {{-- No Results --}}
-                <div id="noResults" class="d-none text-center py-5">
-                    @include('admin.components.empty-state', [
-                        'icon' => 'search',
-                        'title' => 'No matching results',
-                        'message' => 'Try adjusting your search filters'
-                    ])
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Tracks Overview</h5>
         </div>
-    @endif
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="tracksTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th data-sort="id" class="sortable">Id</th>
+                            <th width="80">Image</th> 
+                            <th data-sort="track" class="sortable">Track</th>
+                            <th data-sort="description" class="sortable" width="320">Description</th>
+                            <th data-sort="level" class="sortable" width="150">Level</th>
+                            <th data-sort="skills" class="sortable" width="80">Skills</th>
+                            <th data-sort="status" class="sortable" width="120">Status</th>
+                            <th data-sort="created" class="sortable" width="140">Created</th>
+                            <th width="120">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @php
+                        $statusConfig = [
+                        'Public' => ['class' => 'success', 'icon' => 'globe'],
+                        'Draft' => ['class' => 'warning', 'icon' => 'edit'],
+                        'Only Me' => ['class' => 'info', 'icon' => 'lock'],
+                        'Restricted' => ['class' => 'secondary', 'icon' => 'ban']
+                        ];
+                        $allStatusLabels = array_keys($statusConfig);
+                        @endphp
+                        @foreach($tracks as $track)
+                        @php
+                        $statusText = $track->status->status ?? 'Unknown';
+                        $statusMeta = $statusConfig[$statusText] ?? ['class' => 'secondary', 'icon' => 'question'];
+                        @endphp
+                        <tr class="item-row"
+                        data-id="{{ $track->id }}"
+                        data-status="{{ $track->status ? strtolower($statusText) : 'unknown' }}"
+                        data-level="{{ $track->level->description ?? '' }}"
+                        data-name="{{ strtolower($track->track) }}"
+                        data-description="{{ strtolower($track->description ?? '') }}"
+                        data-skills="{{ $track->skills ? $track->skills->count() : 0 }}"
+                        data-created="{{ $track->created_at->timestamp }}">
+                        {{-- Id --}}
+                        <td class="text-muted fw-semibold">{{ $track->id }}</td>
+                        {{-- Image --}}
+                        <td>
+                            <div class="img-picker" title="Click to upload image" data-action="upload-image" data-track-id="{{ $track->id }}">
+                                <img src="{{ $track->image ? asset('storage/' . $track->image) : asset('images/site-logo.svg') }}" 
+                                width="60" height="46" alt="" 
+                                onerror="this.src='/images/site-logo.svg'">
+                                <button class="btn-remove" title="Upload/Change image">↑</button>
+                            </div>
+                        </td>
+
+                        {{-- Track (editable text) --}}
+                        <td data-editable="true" data-field="track" data-edit="text">
+                            <h6 class="mb-0 track-name searchable">{{ $track->track }}</h6>
+                        </td>
+
+                        {{-- Description (editable text) --}}
+                        <td data-editable="true" data-field="description" data-edit="text">
+                            <small class="text-muted track-desc searchable">
+                                @if(strlen($track->description ?? '') > 160)
+                                {{ substr($track->description, 0, 160) }}...
+                                @else
+                                {{ $track->description ?? 'No description' }}
+                                @endif
+                            </small>
+                        </td>
+
+                        {{-- Level (editable select) --}}
+                        <td data-editable="true" data-field="level_description" data-edit="select"
+                        data-options='@json($levels->pluck("description"))'>
+                        @if($track->level)
+                        <span class="badge bg-info">{{ $track->level->description }}</span>
+                        @else
+                        <span class="text-muted">No level assigned</span>
+                        @endif
+                    </td>
+
+                    {{-- Skills (read-only) --}}
+                    <td>
+                        @if($track->skills && $track->skills->count() > 0)
+                        <span class="badge bg-primary">{{ $track->skills->count() }}</span>
+                        @else
+                        <span class="text-muted">0</span>
+                        @endif
+                    </td>
+
+                    {{-- Status (editable select) --}}
+                    <td data-editable="true" data-field="status" data-edit="select" data-options='@json($allStatusLabels)'>
+                        <span class="badge bg-{{ $statusMeta['class'] }}">
+                            <i class="fas fa-{{ $statusMeta['icon'] }} me-1"></i>{{ $statusText }}
+                        </span>
+                    </td>
+
+                    {{-- Image Upload Modal --}}
+                    <div class="pick-modal" id="imgUploadModal" aria-modal="true" role="dialog">
+                        <div class="content" style="max-width:600px">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0">Upload Track Image</h5>
+                                <button class="btn-close" type="button" id="imgUploadClose"></button>
+                            </div>
+
+                            <div class="img-upload-zone" id="uploadZone">
+                                <input type="file" id="imgFileInput" accept="image/*" style="display:none">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-2"></i>
+                                <p class="mb-1">Click to browse or drag & drop</p>
+                                <small class="text-muted">PNG, JPG, WebP • Max 500KB • Recommended 600x400px</small>
+                            </div>
+
+                            <div id="uploadPreview" class="mt-3 d-none">
+                                <img id="previewImg" src="" alt="Preview" class="img-fluid rounded" style="max-height:200px">
+                                <div class="mt-2">
+                                    <small class="text-muted" id="fileInfo"></small>
+                                </div>
+                            </div>
+
+                            <div class="progress mt-3 d-none" id="uploadProgress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%" id="uploadProgressBar"></div>
+                            </div>
+
+                            <div class="mt-3 d-flex justify-content-between gap-2">
+                                <button class="btn btn-outline-danger" id="imgRemoveBtn">Remove Current Image</button>
+                                <div>
+                                    <button class="btn btn-secondary" id="imgUploadCancel">Cancel</button>
+                                    <button class="btn btn-primary" id="imgUploadBtn" disabled>Upload</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {{-- Created --}}
+                    <td><small class="text-muted">{{ $track->created_at->format('M j, Y') }}</small></td>
+
+                    {{-- Actions --}}
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ route('admin.tracks.show', $track) }}" class="btn btn-outline-info" title="View Track">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <button class="btn btn-outline-secondary" onclick="copyTrack({{ $track->id }})" title="Duplicate Track">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteTrack({{ $track->id }})" title="Delete Track">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    {{-- No Results --}}
+    <div id="noResults" class="d-none text-center py-5">
+        @include('admin.components.empty-state', [
+        'icon' => 'search',
+        'title' => 'No matching results',
+        'message' => 'Try adjusting your search filters'
+        ])
+    </div>
+</div>
+</div>
+@endif
 </div>
 
 {{-- Copy Track Modal --}}
@@ -276,12 +335,10 @@
 @push('scripts')
 <script src="{{ asset('js/admin/admin.js') }}"></script>
 <script>
-/**
- * Tracks page: filters, sorting, inline editing (Track, Description, Level, Status)
- * - Level & Status use dropdowns
- * - Optimistic PATCH saves
- * - Stable sorting + debounced filtering
- */
+// ===== SHARED CSRF TOKEN =====
+const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+// ===== TRACKS TABLE: FILTERS, SORTING, INLINE EDITING =====
 (function() {
   const table = document.getElementById('tracksTable');
   if (!table) return;
@@ -418,8 +475,6 @@
   applySort(sortState.key, sortState.dir);
 
   // INLINE EDITING
-  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
   async function patchTrack(trackId, payload) {
     const res = await fetch(`/admin/tracks/${trackId}`, {
       method: 'PATCH',
@@ -561,7 +616,178 @@
 
 })();
 
-// ===== Existing helpers (unchanged) =====
+// ===== IMAGE UPLOAD MODULE =====
+(function() {
+    let currentTrackId = null;
+    let selectedFile = null;
+
+    const uploadModal = document.getElementById('imgUploadModal');
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('imgFileInput');
+    const uploadPreview = document.getElementById('uploadPreview');
+    const previewImg = document.getElementById('previewImg');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
+    const uploadBtn = document.getElementById('imgUploadBtn');
+    const uploadClose = document.getElementById('imgUploadClose');
+    const uploadCancel = document.getElementById('imgUploadCancel');
+    const imgRemoveBtn = document.getElementById('imgRemoveBtn');
+
+    // Open upload modal
+    document.addEventListener('click', (e) => {
+        const picker = e.target.closest('[data-action="upload-image"]');
+        if (picker) {
+            currentTrackId = picker.dataset.trackId;
+            selectedFile = null;
+            fileInput.value = '';
+            uploadPreview.classList.add('d-none');
+            uploadProgress.classList.add('d-none');
+            uploadBtn.disabled = true;
+            uploadModal.style.display = 'block';
+        }
+    });
+
+    // Upload zone click
+    uploadZone?.addEventListener('click', () => fileInput.click());
+
+    // Drag and drop
+    uploadZone?.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragging');
+    });
+    uploadZone?.addEventListener('dragleave', () => uploadZone.classList.remove('dragging'));
+    uploadZone?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragging');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            handleFileSelect();
+        }
+    });
+
+    // File selection
+    fileInput?.addEventListener('change', handleFileSelect);
+
+    function handleFileSelect() {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            AdminToast?.show?.('Please select an image file', 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        const maxSize = 500 * 1024;
+        if (file.size > maxSize) {
+            AdminToast?.show?.(`File too large. Maximum size: 500KB`, 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        selectedFile = file;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewImg.src = e.target.result;
+            uploadPreview.classList.remove('d-none');
+            fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)}KB)`;
+            uploadBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Upload
+    uploadBtn?.addEventListener('click', async () => {
+        if (!selectedFile || !currentTrackId) return;
+
+        uploadBtn.disabled = true;
+        uploadProgress.classList.remove('d-none');
+        
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress = Math.min(90, progress + 10);
+            uploadProgressBar.style.width = progress + '%';
+        }, 200);
+
+        const fd = new FormData();
+        fd.append('image', selectedFile);
+        fd.append('type', 'track_image');
+        fd.append('track_id', currentTrackId);
+
+        try {
+            const response = await fetch('/admin/upload/image', {
+                method: 'POST',
+                body: fd,
+                headers: {
+                    'X-CSRF-TOKEN': csrf,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+            
+            const result = await response.json();
+            clearInterval(interval);
+            uploadProgressBar.style.width = '100%';
+            
+            // Update image in table
+            const img = document.querySelector(`[data-track-id="${currentTrackId}"] img`);
+            if (img) img.src = `/storage/${result.path}?v=${Date.now()}`;
+            
+            AdminToast?.show?.('Image uploaded successfully', 'success');
+            setTimeout(() => {
+                uploadModal.style.display = 'none';
+                currentTrackId = null;
+                selectedFile = null;
+            }, 500);
+        } catch (err) {
+            clearInterval(interval);
+            AdminToast?.show?.(err.message || 'Upload failed', 'error');
+            uploadBtn.disabled = false;
+        }
+    });
+
+    // Remove image
+    imgRemoveBtn?.addEventListener('click', async () => {
+        if (!currentTrackId) return;
+        if (!confirm('Remove the current image?')) return;
+
+        try {
+            const response = await fetch(`/admin/tracks/${currentTrackId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ field: 'image', value: null })
+            });
+
+            if (!response.ok) throw new Error('Failed to remove image');
+            
+            const img = document.querySelector(`[data-track-id="${currentTrackId}"] img`);
+            if (img) img.src = '/images/site-logo.svg';
+            
+            AdminToast?.show?.('Image removed', 'success');
+            uploadModal.style.display = 'none';
+        } catch (err) {
+            AdminToast?.show?.(err.message || 'Failed to remove image', 'error');
+        }
+    });
+
+    // Close modal
+    const closeModal = () => {
+        uploadModal.style.display = 'none';
+        currentTrackId = null;
+        selectedFile = null;
+    };
+    uploadClose?.addEventListener('click', closeModal);
+    uploadCancel?.addEventListener('click', closeModal);
+})();
+
+// ===== GLOBAL HELPER FUNCTIONS =====
 window.adminConfig = {
   filters: [
     {id: 'statusFilter', key: 'status', type: 'select'},
@@ -601,7 +827,7 @@ function executeCopyTrack() {
   fetch(`/admin/tracks/${trackId}/duplicate`, {
     method: 'POST',
     headers: {
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+      'X-CSRF-TOKEN': csrf,
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
@@ -628,7 +854,7 @@ function deleteTrack(trackId) {
   fetch(`/admin/tracks/${trackId}`, {
     method: 'DELETE',
     headers: {
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+      'X-CSRF-TOKEN': csrf,
       'Accept': 'application/json'
     }
   })
@@ -662,7 +888,7 @@ function deleteTrackWithDependencies(trackId) {
   fetch(`/admin/tracks/${trackId}`, {
     method: 'DELETE',
     headers: {
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+      'X-CSRF-TOKEN': csrf,
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },

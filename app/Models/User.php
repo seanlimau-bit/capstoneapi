@@ -38,7 +38,7 @@ class User extends Authenticatable implements AuthenticatableContract, Authoriza
     protected $fillable = [
         'name', 'firstname', 'lastname', 'email', 'email_verified', 'image',
         'maxile_level', 'game_level', 'mastercode', 'contact', 'password',
-        'is_admin', 'phone_number', 'date_of_birth', 'status',
+        'is_admin', 'phone_number', 'date_of_birth', 'status', 'role_id',
            'partner_id', 'partner_subscriber_id', 'access_type', 'billing_method',
         'features', 'partner_verified', 'partner_status_updated_at','otp_code','otp_expires_at',
         'trial_expires_at', 'suspended_at', 'cancelled_at'
