@@ -48,7 +48,7 @@ Route::get('/awaiting-access', function () {
 Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () {
     // Universal image upload endpoint
     Route::post('/upload/image', [ImageUploadController::class, 'upload'])
-        ->name('admin.image.upload');
+        ->name('image.upload');
 
     // ---------------- QA (qa middleware) ----------------
     Route::prefix('qa')->middleware(['qa'])->name('qa.')->group(function () {

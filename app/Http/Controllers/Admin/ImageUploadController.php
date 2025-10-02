@@ -20,66 +20,87 @@ class ImageUploadController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,jpg,png,webp,svg|max:10240', // 10MB max
-            'type' => 'required|in:logo,favicon,login_background,question_image,profile_picture',
-            'question_id' => 'nullable|integer',
-            'user_id' => 'nullable|integer',
-        ]);
+        'image' => 'required|image|mimes:jpeg,jpg,png,webp,svg|max:10240', // 10MB max
+        'type' => 'required|in:logo,favicon,login_background,question_image,profile_picture,skill_image',
+        'question_id' => 'nullable|integer',
+        'user_id' => 'nullable|integer',
+        'skill_id' => 'nullable|integer|exists:skills,id', // ADD THIS
+    ]);
 
         try {
             $type = $request->input('type');
-            
-            // Optimize the image
+
+        // Optimize the image
             $result = $this->imageOptimizer->optimize(
                 $request->file('image'),
                 $type
             );
 
-            // Handle different types
+        // Handle different types
             switch ($type) {
                 case 'logo':
-                    $this->handleLogoUpload($result);
-                    break;
-
+                $this->handleLogoUpload($result);
+                break;
                 case 'favicon':
-                    $this->handleFaviconUpload($result);
-                    break;
-
+                $this->handleFaviconUpload($result);
+                break;
                 case 'login_background':
-                    $this->handleBackgroundUpload($result);
-                    break;
-
+                $this->handleBackgroundUpload($result);
+                break;
                 case 'question_image':
-                    $this->handleQuestionImageUpload($result, $request);
-                    break;
-
+                $this->handleQuestionImageUpload($result, $request);
+                break;
                 case 'profile_picture':
-                    $this->handleProfilePictureUpload($result, $request);
-                    break;
-            }
+                $this->handleProfilePictureUpload($result, $request);
+                break;
+            case 'skill_image': // ADD THIS CASE
+            $this->handleSkillImageUpload($result, $request);
+            break;
+        }
+        
+        return response()->json([
+            'success' => true,
+            'url' => $result['url'] . '?v=' . time(),
+            'path' => $result['path'],
+            'message' => 'Image uploaded successfully!',
+            'stats' => [
+                'original_size' => $this->formatBytes($result['original_size']),
+                'optimized_size' => $this->formatBytes($result['size']),
+                'saved' => $this->formatBytes($result['saved_bytes']),
+                'dimensions' => $result['dimensions']['width'] . '×' . $result['dimensions']['height'],
+            ],
+            'css_version' => in_array($type, ['logo', 'favicon', 'login_background']) ? time() : null,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ], 422);
+    }
+}
 
-            return response()->json([
-                'success' => true,
-                'url' => $result['url'] . '?v=' . time(),
-                'path' => $result['path'],
-                'message' => 'Image uploaded successfully!',
-                'stats' => [
-                    'original_size' => $this->formatBytes($result['original_size']),
-                    'optimized_size' => $this->formatBytes($result['size']),
-                    'saved' => $this->formatBytes($result['saved_bytes']),
-                    'dimensions' => $result['dimensions']['width'] . '×' . $result['dimensions']['height'],
-                ],
-                'css_version' => in_array($type, ['logo', 'favicon', 'login_background']) ? time() : null,
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
+protected function handleSkillImageUpload($result, $request)
+{
+    $skillId = $request->input('skill_id');
+    
+    if (!$skillId) {
+        throw new \Exception('Skill ID is required for skill image upload');
+    }
+    
+    $skill = \App\Models\Skill::findOrFail($skillId);
+    
+    // Delete old image if exists
+    if ($skill->image) {
+        $oldPath = storage_path('app/public/' . $skill->image);
+        if (file_exists($oldPath)) {
+            @unlink($oldPath);
         }
     }
-
+    
+    // Update skill with new image path
+    $skill->image = $result['path'];
+    $skill->save();
+}
     /**
      * Handle logo upload
      */
@@ -170,11 +191,11 @@ class ImageUploadController extends Controller
 
             // Update user avatar
             DB::table('users')
-                ->where('id', $userId)
-                ->update([
-                    'avatar' => $result['path'],
-                    'updated_at' => now()
-                ]);
+            ->where('id', $userId)
+            ->update([
+                'avatar' => $result['path'],
+                'updated_at' => now()
+            ]);
         }
     }
 

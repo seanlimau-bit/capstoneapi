@@ -462,7 +462,7 @@ class SkillController extends Controller
     public function linkVideo(Request $request, Skill $skill)
     {
         $data = $request->validate([
-            'video_link' => ['required', 'string', 'exists:videos,video_link'],
+            'video_link' => ['required', 'string'],
             'status_id' => ['sometimes', 'nullable', 'integer', 'exists:statuses,id'],
             'sort_order' => ['sometimes', 'nullable', 'integer'],
         ]);

@@ -104,7 +104,7 @@
             data-id="{{ $question->id }}"
             data-type="html"
             title="Click to edit HTML content">
-            <div class="fib-content">
+            <div class="fib-content large">
               {!! $question->question !!}
             </div>
             <i class="fas fa-code text-muted ms-2 edit-icon"></i>
