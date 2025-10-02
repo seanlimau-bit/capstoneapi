@@ -33,7 +33,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
                 <h1 class="h5 mb-1">Skills Management</h1>
-                <div class="text-muted">Images from <code>public/images/skills</code> & videos from <code>public/videos</code></div>
+                <div class="text-muted">Images from <code>/images/skills</code> & videos from <code>/videos</code></div>
             </div>
             <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#createModal">
                 <i class="fas fa-plus me-1"></i>Create New Skill
