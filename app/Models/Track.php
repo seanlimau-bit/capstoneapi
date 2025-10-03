@@ -35,7 +35,7 @@ class Track extends Model
         return $this->belongsTo(\App\Models\Status::class);
     }
     
-    public function scopePublic($q) { return $q->where('status', 'Public'); }
+    public function scopePublic($q) { return $q->where('status_id', 3); }
 
     public function field(){
         return $this->belongsTo(\App\Models\Field::class)->select('id','field','description');

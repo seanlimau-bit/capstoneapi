@@ -1144,7 +1144,7 @@ function duplicateQuestion(questionId) {
 }
 
 function previewQuestion(questionId) {
-  window.open(`/admin/questions/${questionId}/preview`, '_blank', 'width=800,height=600');
+    window.open(`/admin/questions/${questionId}/preview`, '_blank', 'width=800,height=600');
 }
 
 function showToast(message, type = 'info') {

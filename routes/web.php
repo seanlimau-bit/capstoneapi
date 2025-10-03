@@ -40,6 +40,25 @@ Route::get('/awaiting-access', function () {
     return view('auth.awaiting-access');
 })->middleware('auth')->name('auth.awaiting-access');
 
+Route::get('/media/{path}', function (Request $request, $path) {
+    abort_unless(Storage::disk('public')->exists($path), 404);
+
+    $mime = Storage::disk('public')->mimeType($path);
+    $stream = Storage::disk('public')->readStream($path);
+
+    return response()->stream(function () use ($stream) {
+        fpassthru($stream);
+    }, 200, [
+        'Content-Type' => $mime,
+        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+        'Access-Control-Allow-Headers' => '*',
+        'Cache-Control' => 'public, max-age=31536000',
+    ]);
+})->where('path', '.*');
+Route::get('/storage/{path}', fn($path) => redirect("/media/{$path}", 302))
+    ->where('path', '.*');
+
 /*
 |--------------------------------------------------------------------------
 | Admin
@@ -75,6 +94,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
         Route::prefix('questions/{question}')->name('questions.')->group(function () {
             Route::get('/', [QAController::class, 'show'])->name('show');
             Route::get('/review', [QAController::class, 'reviewQuestion'])->name('review');
+            Route::get('/preview', [QuestionController::class, 'preview'])->name('preview');
 
             Route::post('/approve', [QAController::class, 'approveQuestion'])
                 ->middleware('qa:qa_approve_p2p3')

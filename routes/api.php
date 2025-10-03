@@ -4,6 +4,7 @@ use App\Http\Controllers\OTPController;
 use App\Http\Controllers\VisitorController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Api\TrackController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,6 +46,7 @@ Route::post('/mastercode', [VisitorController::class, 'mastercode']);
 Route::post('/diagnostic', [VisitorController::class, 'diagnostic']);
 Route::post('/subscribe', [VisitorController::class, 'subscribe']);
 
+Route::get('/tracks', [App\Http\Controllers\API\TrackController::class, 'index']);
 /*
 |--------------------------------------------------------------------------
 | Protected Routes (Require Sanctum Token)
@@ -73,7 +75,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('courses/{course}', [App\Http\Controllers\CourseController::class, 'copy']);
     Route::apiResource('courses.houses', App\Http\Controllers\CourseHouseController::class);
     Route::apiResource('courses.users', App\Http\Controllers\CourseUserController::class);
-    Route::apiResource('courses.tracks', App\Http\Controllers\CourseTrackController::class);
 
     // === Quiz Management ===
     Route::apiResource('quizzes', App\Http\Controllers\QuizController::class);
@@ -92,8 +93,6 @@ Route::middleware('auth:sanctum')->group(function () {
 //    Route::post('skills/search', [App\Http\Controllers\SkillController::class, 'search']);
     Route::apiResource('skills.questions', App\Http\Controllers\SkillQuestionsController::class);
 
-    // === Track Management ===
-    Route::apiResource('tracks', App\Http\Controllers\TrackController::class);
     Route::apiResource('tracks.questions', App\Http\Controllers\TrackQuestionsController::class);
     Route::apiResource('tracks.skills', App\Http\Controllers\TrackSkillController::class);
     Route::get('skills/{skill}/tracks', [App\Http\Controllers\TrackSkillController::class, 'list_tracks']);
@@ -109,7 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('tests', App\Http\Controllers\TestController::class);
     Route::post('/test/protected/{type}', [App\Http\Controllers\DiagnosticController::class, 'index']);
     Route::post('/test/answers', [App\Http\Controllers\AnswerController::class, 'answer']);
-    Route::get('/test/trackquestions/{track}', [App\Http\Controllers\FieldTrackQuestionController::class, 'index']);
+    Route::get('/test/trackquestions/{track}', [App\Http\Controllers\TrackTestController::class, 'index']);
     Route::post('/loginInfo', [App\Http\Controllers\DiagnosticController::class, 'login']);
 
     // === System Resources ===

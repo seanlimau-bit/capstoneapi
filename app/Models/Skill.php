@@ -17,7 +17,7 @@ class Skill extends Model
     // Relationships
     public function videos()
     {
-        return $this->belongsToMany(Video::class, 'skill_video', 'skill_id', 'video_id')
+        return $this->belongsToMany(Video::class)
         ->withPivot(['status_id', 'sort_order'])
         ->withTimestamps();
     }

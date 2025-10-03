@@ -1,21 +1,67 @@
-<IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
+# ----------------------------------------------------------------------
+# Disable content negotiation quirks and directory indexes
+# ----------------------------------------------------------------------
+<IfModule mod_negotiation.c>
+    Options -MultiViews -Indexes
+</IfModule>
 
+# ----------------------------------------------------------------------
+# Core rewrites for Laravel
+# ----------------------------------------------------------------------
+<IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Handle Authorization Header
+    # Preserve Authorization header for PHP (JWT, Sanctum, etc.)
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Redirect Trailing Slashes If Not A Folder
+    # Normalize trailing slashes (redirect "/foo/" -> "/foo")
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
-    # Send Requests To Front Controller
+    # ------------------------------------------------------------------
+    # CORS targeting for /storage/* (served statically, bypasses PHP)
+    # We mark such requests with an environment flag that mod_headers uses.
+    # ------------------------------------------------------------------
+    RewriteCond %{REQUEST_URI} ^/storage/
+    RewriteRule ^ - [E=IS_STORAGE:1]
+
+    # If you ever trigger preflight on /storage (rare for plain GET), you
+    # can uncomment this to return a clean 204 quickly:
+    # RewriteCond %{REQUEST_METHOD} =OPTIONS
+    # RewriteCond %{REQUEST_URI} ^/storage/
+    # RewriteRule ^ - [R=204,L]
+
+    # Send all other requests to the front controller
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+# ----------------------------------------------------------------------
+# CORS headers for static files under /storage/*
+# ----------------------------------------------------------------------
+<IfModule mod_headers.c>
+    # Simple, cookie-free images/scripts/fonts: wildcard is fine.
+    Header set Access-Control-Allow-Origin "*" env=IS_STORAGE
+    Header set Access-Control-Allow-Methods "GET, OPTIONS" env=IS_STORAGE
+    Header set Access-Control-Allow-Headers "*" env=IS_STORAGE
+    Header set Vary "Origin" env=IS_STORAGE
+
+    # Optional hardening and cache friendliness
+    # Cache static assets normally, even with CORS:
+    <FilesMatch "\.(?:png|jpe?g|gif|webp|svg|ico|bmp|avif|mp4|webm|css|js|woff2?)$">
+        Header unset Pragma
+        Header unset Expires
+    </FilesMatch>
+</IfModule>
+
+# ----------------------------------------------------------------------
+# Standard Laravel front controller fallback if mod_rewrite is missing
+# ----------------------------------------------------------------------
+<IfModule !mod_rewrite.c>
+    <IfModule mod_alias.c>
+        RedirectMatch 302 ^/$ /index.php
+    </IfModule>
 </IfModule>

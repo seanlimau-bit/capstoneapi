@@ -37,8 +37,8 @@ class Video extends Model
     public function skills()
     {
         return $this->belongsToMany(Skill::class, 'skill_video', 'video_id', 'skill_id')
-            ->withPivot(['status_id', 'sort_order'])
-            ->withTimestamps();
+        ->withPivot(['status_id', 'sort_order'])
+        ->withTimestamps();
     }
 
     // Belongs-to: videos.status_id → statuses.id
@@ -47,7 +47,10 @@ class Video extends Model
         return $this->belongsTo(Status::class, 'status_id');
     }
 
-    public function scopePublic($q) { return $q->where('status', 'Public'); }
+    public function scopePublic($q) 
+    { 
+    return $q->where('videos.status_id', 3); // Specify table name
+    }
 
     // Belongs-to: videos.user_id → users.id
     public function author()

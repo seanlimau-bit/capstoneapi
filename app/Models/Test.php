@@ -19,7 +19,7 @@ class Test extends Model
     public function questions(){
         return $this->belongsToMany(\App\Models\Question::class, 'question_user')->withPivot('correct','question_answered','answered_date', 'attempts', 'user_id')->withTimestamps();
     }
- 
+
     public function user() {
         return $this->belongsTo(\App\Models\User::class);
     }
@@ -40,24 +40,31 @@ class Test extends Model
         return $this->belongsTo(\App\Models\User::class);
     }
 
-    public function buildResponseFor(\App\Models\User $user)
+    public function buildResponseFor($user, $limit = null)
     {
-        $questions = $this->uncompletedQuestions()
-            ->with('skill.tracks.level', 'skill.links')
-            ->take(config('app.questions_per_quiz'))
-            ->get();
-     
-         return response()->json([
-            'message' => 'Request executed successfully',
-            'test' => $this->id,
-            'questions' => $questions,
-            'lives' => $user->lives()->first()?->lives_remaining ?? 0,
-            'kudos' => $this->kudos ?? 0,
-            'maxile' => $user->maxile_level ?? 0,
-            'code' => 201
-        ]);
-    }
+        $query = $this->questions()
+        ->wherePivot('user_id', $user->id)
+        ->wherePivot('question_answered', false)
+        ->with([
+            'skill.videos' => function($query) {
+                $query->wherePivot('status_id', 3) // Filter pivot table (skill_video)
+                      ->where('videos.status_id', 3) // Filter videos table
+                      ->orderBy('skill_video.sort_order');
+                  }
+              ]);
 
+        if ($limit) {
+            $query->limit($limit);
+        }
+
+        $questions = $query->get();
+
+        return [
+            'test_id' => $this->id,
+            'test_name' => $this->test,
+            'questions' => $questions
+        ];
+    }
     public function houses(){
         return $this->belongsToMany(\App\Models\Test::class)->withTimestamps();
     }
@@ -300,18 +307,18 @@ return                $this->level_id =  (!count($this->questions) || !$this->le
                 ->inRandomOrder() // Order by random
                 ->first(); // Take the first one after randomizing
 
-            if ($randomQuestion) {
-                $randomQuestions->push($randomQuestion);
+                if ($randomQuestion) {
+                    $randomQuestions->push($randomQuestion);
+                }
             }
+
+            return $randomQuestions;
         }
 
-        return $randomQuestions;
-    }
-
-    public function completeTest($message, $user){
-        $attempts = $this->attempts($user->id);
-        $attempts = $attempts ? $attempts->attempts : 0;
-        $maxile = $user->calculateUserMaxile($this);
+        public function completeTest($message, $user){
+            $attempts = $this->attempts($user->id);
+            $attempts = $attempts ? $attempts->attempts : 0;
+            $maxile = $user->calculateUserMaxile($this);
         $user->enrolclass($maxile); //enrol in class of maxile reached
         $kudos_earned = $this->testee()->first()->pivot->kudos;
         $user->game_level = $user->game_level + $kudos_earned;  // add kudos

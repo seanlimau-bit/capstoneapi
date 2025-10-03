@@ -189,55 +189,58 @@ public function store(Request $request)
     DB::beginTransaction();
     try {
         $validated['user_id'] = auth()->id();
-                    $validated['status_id'] = 3; // Active
-                    $validated['qa_status'] = 'unreviewed';
+        $validated['status_id'] = 3; // Active
+        $validated['qa_status'] = 'unreviewed';
 
-                    $question = Question::create($validated);
+        $question = Question::create($validated);
 
-                    DB::commit();
+        DB::commit();
 
-                    if ($request->expectsJson()) {
-                        return response()->json([
-                            'success' => true,
-                            'message' => 'Question created successfully',
-                            'question' => $question->load(['skill', 'difficulty', 'type'])
-                        ], 201);
-                    }
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Question created successfully',
+                'question' => $question->load(['skill', 'difficulty', 'type'])
+            ], 201);
+        }
 
-                    return redirect()->route('admin.questions.index')
-                    ->with('success', 'Question created successfully');
+        return redirect()->route('admin.questions.index')
+        ->with('success', 'Question created successfully');
 
-                } catch (\Exception $e) {
-                    DB::rollback();
-                    Log::error('Question creation failed', ['error' => $e->getMessage()]);
+    } catch (\Exception $e) {
+        DB::rollback();
+        Log::error('Question creation failed', ['error' => $e->getMessage()]);
 
-                    if ($request->expectsJson()) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Failed to create question: ' . $e->getMessage()
-                        ], 500);
-                    }
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create question: ' . $e->getMessage()
+            ], 500);
+        }
 
-                    return back()->withInput()->with('error', 'Failed to create question');
-                }
-            }
+        return back()->withInput()->with('error', 'Failed to create question');
+    }
+}
 
-            public function show(Question $question, LookupOptionsService $opts)
-            {
-                $question->load(['skill.tracks.field','difficulty','type','status','author','hints','solutions.author']);
+public function show(Question $question, LookupOptionsService $opts)
+{
+    $question->load(['skill.tracks.field','difficulty','type','status','author','hints','solutions.author']);
 
-                $dropdowns = $opts->questionShowOptions();
+    $dropdowns = $opts->questionShowOptions();
 
-                $data = array_merge(['question' => $question], $dropdowns);
+    $data = array_merge(['question' => $question], $dropdowns);
 
-                if (request()->expectsJson()) {
-                    return response()->json($data);
-                }
+    if (request()->expectsJson()) {
+        return response()->json($data);
+    }
 
-                return view('admin.questions.show', $data);
-            }
+    return view('admin.questions.show', $data);
+}
 
-
+public function preview(Question $question)
+{
+    return view('admin.questions.preview', compact('question'));
+}
             /**
              * Update a specific field of a question (for inline editing)
              */
