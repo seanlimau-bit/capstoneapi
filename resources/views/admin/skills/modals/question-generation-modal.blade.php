@@ -2,7 +2,7 @@
 <div class="modal fade" id="questionGenerationModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form id="questionGenerationForm" method="POST" action="{{ route('admin.questions.generateQuestions') }}">
+      <form id="questionGenerationForm" method="POST" action="{{ route('admin.questions.generateQuestions') }}"onsubmit="return SkillManager.generateVariations(event);">
         @csrf
         <div class="modal-header">
           <h5 class="modal-title">Generate Questions</h5>
@@ -47,7 +47,7 @@
         </div>
 
         <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Generate</button>
+          <button id="generateBtn" type="submit" class="btn btn-primary">Generate</button>
         </div>
       </form>
     </div>

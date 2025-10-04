@@ -440,7 +440,7 @@
             linkVideo: '/admin/skills/{{ $skill->id }}/link-video',
             deleteVideo: '/admin/skills/{{ $skill->id }}/videos',
             getVideos: '/admin/assets/videos'
-        }
+        }   
     };
 
     static currentQuestionForVariation = null;
@@ -707,115 +707,89 @@
         }
     }
 
-    static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? null), questionText = null) {
-      if (!questionText) questionText = `Question #${questionId}`;
-
-      const modalId = 'questionGenerationModal';
-
-      // 1) Preferred helper (if your reusable partial exposes it)
-      if (window.QuestionGeneration && window.QuestionGeneration[modalId]) {
-        window.QuestionGeneration[modalId].open({ questionId, questionText, skillId });
-        return;
-    }
-
-      // 2) Directly target your current modal DOM
-      const partialEl = document.getElementById(modalId);
-      if (partialEl) {
-        // Write the question id into YOUR field id
-        const qIdEl = document.getElementById('selectedQuestionId');
-        if (qIdEl) qIdEl.value = questionId;
-
-        // Flip radios to "Question"
-        const srcQn = partialEl.querySelector('input[name="source"][value="question"]');
-        if (srcQn) srcQn.checked = true;
-
-        // If you want to also prefill skillId when present (optional)
-        const skillHidden = partialEl.querySelector('input[name="skill_id"]');
-        if (skillHidden && skillId != null) skillHidden.value = skillId;
-
-        new bootstrap.Modal(partialEl).show();
-        return;
-    }
-
-      // 3) Legacy fallback (keep if you still support the old modal)
-      const legacyEl = document.getElementById('questionVariationModal');
-      if (legacyEl) {
-        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-        const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-
-        setVal('originalQuestionId', questionId);
-        if (skillId != null) setVal('originalSkillId', skillId);
-        setTxt('originalQuestionText', questionText);
-
-        new bootstrap.Modal(legacyEl).show();
-        return;
-    }
-
+static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? null), questionText = null) {
+  const modalEl = document.getElementById('questionGenerationModal');
+  
+  if (!modalEl) {
     console.error('Question generation modal not found.');
     this.showToast('Question generation modal is not available on this page.', 'error');
-    }
+    return;
+  }
 
+  // Set the question ID
+  const qIdEl = document.getElementById('selectedQuestionId');
+  if (qIdEl) qIdEl.value = questionId;
 
-static async generateVariations() {
-    const questionId = document.getElementById('originalQuestionId').value;
-    const skillId = document.getElementById('originalSkillId').value;
-    const questionCount = document.getElementById('variationCount').value;
-    const difficulty = document.getElementById('variationDifficulty').value;
-    const focusAreas = document.getElementById('variationFocusAreas').value;
-    const includeExplanations = document.getElementById('includeVariationExplanations').checked;
+  // Set source to "Question"
+  const srcQn = modalEl.querySelector('input[name="source"][value="question"]');
+  if (srcQn) srcQn.checked = true;
 
-    if (!questionId || !skillId) {
-        this.showToast('Error: Missing required information', 'error');
-        return;
-    }
+  // Optionally set skill ID if present
+  const skillHidden = modalEl.querySelector('input[name="skill_id"]');
+  if (skillHidden && skillId != null) skillHidden.value = skillId;
 
-    const requestData = {
-        question_id: parseInt(questionId),
-        skill_id: parseInt(skillId),
-        generation_method: 'ai_variation',
-        question_count: parseInt(questionCount),
-        difficulty_distribution: difficulty,
-        question_types: 'same',
-        focus_areas: focusAreas || '',
-        include_explanations: includeExplanations ? 'on' : ''
-    };
-
-    const generateBtn = document.getElementById('generateVariationsBtn');
-    const originalText = generateBtn.innerHTML;
-    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
-    generateBtn.disabled = true;
-
-    try {
-        const response = await this.makeRequest(this.config.routes.questionsGenerate, 'POST', requestData);
-
-        generateBtn.innerHTML = originalText;
-        generateBtn.disabled = false;
-
-        if (response.success) {
-           const generationModal = bootstrap.Modal.getInstance(document.getElementById('questionGenerationModal'));
-
-           generationModal.hide();
-
-           this.showToast(`Successfully generated ${response.questions_created || questionCount} question variations!`, 'success');
-
-           setTimeout(() => {
-            window.location.reload();
-        }, 1500);
-       } else {
-        this.showToast(response.message || 'Error generating variations', 'error');
-    }
-} catch (error) {
-    generateBtn.innerHTML = originalText;
-    generateBtn.disabled = false;
-
-    if (error.errors) {
-        const errorMessages = Object.values(error.errors).flat().join(', ');
-        this.showToast(`Validation errors: ${errorMessages}`, 'error');
-    } else {
-        this.showToast(`Error: ${error.message || 'Unknown error'}`, 'error');
-    }
+  // Open the modal
+  new bootstrap.Modal(modalEl).show();
 }
-}
+
+
+    static async generateVariations(e) {
+      e?.preventDefault?.(); // stop normal POST
+
+      const form        = document.getElementById('questionGenerationForm');
+      const spinner     = document.getElementById('loadingSpinner');
+      const generateBtn = document.getElementById('generateBtn');
+      const originalBtnHTML = generateBtn ? generateBtn.innerHTML : '';
+
+      // 1) UI -> Generating…
+      spinner?.classList.remove('d-none');
+      if (generateBtn) {
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = `
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          Generating…
+        `;
+      }
+
+      try {
+        // 2) Send to backend
+        const fd = new FormData(form); // includes @csrf and all inputs
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: fd // important: no manual Content-Type for FormData
+        });
+
+        // 3) Handle response
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json') ? await res.json() : { success:false, message:`Unexpected response (${res.status})` };
+
+        if (data.success) {
+          const made = data.questions_created ?? data.count_used ?? Number(fd.get('question_count') || 0);
+          const ids  = Array.isArray(data.question_ids) ? ` (${data.question_ids.join(', ')})` : '';
+          this.showToast(`Created ${made} questions${ids}`, 'success');
+          bootstrap.Modal.getInstance(document.getElementById('questionGenerationModal'))?.hide();
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          this.showToast(data.message || 'Error generating questions', 'error');
+        }
+      } catch (err) {
+        this.showToast(err?.message || 'Unknown error', 'error');
+      } finally {
+        // 4) UI -> restore
+        spinner?.classList.add('d-none');
+        if (generateBtn) {
+          generateBtn.disabled = false;
+          generateBtn.innerHTML = originalBtnHTML;
+        }
+      }
+
+      return false; // keep the browser on the page
+    }
+
 
     // === TRACK MANAGEMENT ===
     static showAddTrack() {
