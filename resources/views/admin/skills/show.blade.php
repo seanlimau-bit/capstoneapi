@@ -734,7 +734,7 @@ static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? nu
 
 
     static async generateVariations(e) {
-      e?.preventDefault?.(); 
+      e?.preventDefault?.(); // stop normal POST
 
       const form        = document.getElementById('questionGenerationForm');
       const spinner     = document.getElementById('loadingSpinner');
