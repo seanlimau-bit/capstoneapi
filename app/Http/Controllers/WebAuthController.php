@@ -8,14 +8,17 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use App\Mail\SendOtpMail;
 use App\Models\User;
+use App\Models\Config;
 use App\Models\Role;
 use Twilio\Rest\Client;
+
 
 class WebAuthController extends Controller
 {
     public function showLogin()
     {
-        return view('auth.login');
+        $site = Config::first();
+        return view('auth.login', ['site' => $site]);
     }
 
     public function showVerify(Request $request)
@@ -29,148 +32,156 @@ class WebAuthController extends Controller
         ]);
     }
 
-public function sendOtp(Request $request)
-{
-    \Log::info('=== SendOTP Started ===');
-    \Log::info('Request data:', $request->all());
+    public function sendOtp(Request $request)
+    {
+        \Log::info('=== SendOTP Started ===');
+        \Log::info('Request data:', $request->all());
 
-    try {
-        $request->validate([
-            'identifier' => 'required|string',
-            'channel' => 'required|in:email,sms,whatsapp'
-        ]);
-        \Log::info('Validation passed');
+        try {
+            $request->validate([
+                'identifier' => 'required|string',
+                'channel' => 'required|in:email,sms,whatsapp'
+            ]);
+            \Log::info('Validation passed');
 
-        $identifier = $request->identifier;
-        $channel = $request->channel;
-        \Log::info("Identifier: {$identifier}, Channel: {$channel}");
+            $identifier = $request->identifier;
+            $channel = $request->channel;
+            \Log::info("Identifier: {$identifier}, Channel: {$channel}");
 
-        // Validate identifier based on channel
-        $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL);
-        \Log::info('Is email: ' . ($isEmail ? 'yes' : 'no'));
+            // Validate identifier based on channel
+            $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL);
+            \Log::info('Is email: ' . ($isEmail ? 'yes' : 'no'));
 
-        if ($channel === 'email' && !$isEmail) {
-            \Log::warning('Email required but not valid');
-            return back()->withInput()->with('error', 'Please provide a valid email address');
-        }
+            if ($channel === 'email' && !$isEmail) {
+                \Log::warning('Email required but not valid');
+                return back()->withInput()->with('error', 'Please provide a valid email address');
+            }
 
-        if (in_array($channel, ['sms', 'whatsapp']) && $isEmail) {
-            \Log::warning('Phone required but email provided');
-            return back()->withInput()->with('error', 'Please provide a phone number for SMS/WhatsApp');
-        }
+            if (in_array($channel, ['sms', 'whatsapp']) && $isEmail) {
+                \Log::warning('Phone required but email provided');
+                return back()->withInput()->with('error', 'Please provide a phone number for SMS/WhatsApp');
+            }
 
-        // Find or create user
-        \Log::info('Finding or creating user...');
-        $user = User::firstOrCreate(
-            $isEmail ? ['email' => $identifier] : ['phone_number' => $identifier],
-            [
-                'status' => 'active',
-                'access_type' => 'free',
-                'signup_channel' => 'direct',
-                'role_id' => 6,
-                'diagnostic' => true,
-                'payment_method' => 'free',
-            ]
-        );
-        \Log::info('User found/created: ' . $user->id);
+            // Find or create user
+            \Log::info('Finding or creating user...');
+            $user = User::firstOrCreate(
+                $isEmail ? ['email' => $identifier] : ['phone_number' => $identifier],
+                [
+                    'status' => 'active',
+                    'access_type' => 'free',
+                    'signup_channel' => 'direct',
+                    'role_id' => 6,
+                    'diagnostic' => true,
+                    'payment_method' => 'free',
+                ]
+            );
+            \Log::info('User found/created: ' . $user->id);
 
-        // Generate OTP
-        $otp = rand(100000, 999999);
-        \Log::info("Generated OTP: {$otp}");
+            // Generate OTP
+            $otp = rand(100000, 999999);
+            \Log::info("Generated OTP: {$otp}");
 
-        $user->update([
-            'otp_code' => $otp,
-            'otp_expires_at' => now()->addMinutes(10)
-        ]);
-        \Log::info('OTP saved to database');
+            $user->update([
+                'otp_code' => $otp,
+                'otp_expires_at' => now()->addMinutes(10)
+            ]);
+            \Log::info('OTP saved to database');
 
-        // Send OTP
-        \Log::info("Attempting to send via {$channel}...");
-        switch ($channel) {
-            case 'email':
+            // Send OTP
+            \Log::info("Attempting to send via {$channel}...");
+            switch ($channel) {
+                case 'email':
                 Mail::to($user->email)->send(new SendOtpMail($otp));
                 \Log::info('Email sent successfully');
                 break;
 
-            case 'sms':
+                case 'sms':
                 $this->sendSmsOtp($user->phone_number, $otp);
                 \Log::info('SMS sent successfully');
                 break;
 
-            case 'whatsapp':
+                case 'whatsapp':
                 $this->sendWhatsAppOtp($user->phone_number, $otp);
                 \Log::info('WhatsApp sent successfully');
                 break;
+            }
+
+            \Log::info('Redirecting to verify page...');
+            return redirect()->route('auth.verify', [
+                'identifier' => $identifier,
+                'channel' => $channel
+            ])->with('success', 'Verification code sent successfully');
+
+        } catch (\Exception $e) {
+            \Log::error('SendOTP Exception: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return back()->withInput()->with('error', 'Error: ' . $e->getMessage());
         }
-
-        \Log::info('Redirecting to verify page...');
-        return redirect()->route('auth.verify', [
-            'identifier' => $identifier,
-            'channel' => $channel
-        ])->with('success', 'Verification code sent successfully');
-
-    } catch (\Exception $e) {
-        \Log::error('SendOTP Exception: ' . $e->getMessage());
-        \Log::error('Stack trace: ' . $e->getTraceAsString());
-        return back()->withInput()->with('error', 'Error: ' . $e->getMessage());
     }
-}
 
-public function verifyOtp(Request $request)
-{
-    $request->validate([
-        'identifier' => 'required|string',
-        'otp_code' => 'required|string|size:6'
-    ]);
-    
-    $isEmail = filter_var($request->identifier, FILTER_VALIDATE_EMAIL);
-    $user = User::where($isEmail ? 'email' : 'phone_number', $request->identifier)
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'identifier' => 'required|string',
+            'otp_code' => 'required|string|size:6'
+        ]);
+        
+        $isEmail = filter_var($request->identifier, FILTER_VALIDATE_EMAIL);
+        $user = User::where($isEmail ? 'email' : 'phone_number', $request->identifier)
         ->where('otp_code', $request->otp_code)
         ->where('otp_expires_at', '>', now())
         ->first();
-        
-    if (!$user) {
-        return back()
+
+        if (!$user) {
+            return back()
             ->withErrors(['otp_code' => 'Invalid or expired verification code'])
             ->withInput(['identifier' => $request->identifier]);
-    }
-    
-    // Check if this is a new user (no role assigned yet)
-    $isNewUser = !$user->role_id;
-    
-    if ($isNewUser) {
-        // Assign default role for new users - use a basic "Pending" or "Student" role
-        $defaultRoleId = Role::where('role', 'LIKE', '%Student%')->first()?->id ?? 6;
+        }
+            // Set email as verified if contact is email and not already verified
+        if ($isEmail && !$user->email_verified) {
+            $user->update([
+                'email_verified' => 1,
+                'email_verified_at' => now()
+            ]);
+        }
         
+        // Check if this is a new user (no role assigned yet)
+        $isNewUser = !$user->role_id;
+        
+        if ($isNewUser) {
+            // Assign default role for new users - use a basic "Pending" or "Student" role
+            $defaultRoleId = Role::where('role', 'LIKE', '%Student%')->first()?->id ?? 6;
+            
+            $user->update([
+                'role_id' => $defaultRoleId,
+                'status' => 'pending', // Not 'active' until admin approves
+            ]);
+        }
+        
+        // Mark verified and clear OTP
         $user->update([
-            'role_id' => $defaultRoleId,
-            'status' => 'pending', // Not 'active' until admin approves
+            'email_verified' => true,
+            'email_verified_at' => now(),
+            'activated_at' => $user->activated_at ?? now(),
+            'otp_code' => null,
+            'otp_expires_at' => null
         ]);
+        
+        Auth::login($user);
+        
+        // Route based on permissions
+        if ($user->canAccessAdmin()) {
+            return redirect()->route('admin.dashboard.index');
+        }
+        
+        if ($user->canAccessQA()) {
+            return redirect()->route('admin.qa.index');
+        }
+        
+        // New users without admin/QA access - show awaiting access page
+        return redirect()->route('auth.awaiting-access');
     }
-    
-    // Mark verified and clear OTP
-    $user->update([
-        'email_verified' => true,
-        'email_verified_at' => now(),
-        'activated_at' => $user->activated_at ?? now(),
-        'otp_code' => null,
-        'otp_expires_at' => null
-    ]);
-    
-    Auth::login($user);
-    
-    // Route based on permissions
-    if ($user->canAccessAdmin()) {
-        return redirect()->route('admin.dashboard.index');
-    }
-    
-    if ($user->canAccessQA()) {
-        return redirect()->route('admin.qa.index');
-    }
-    
-    // New users without admin/QA access - show awaiting access page
-    return redirect()->route('auth.awaiting-access');
-}
+
     private function sendSmsOtp($phoneNumber, $otp)
     {
         $twilio = new Client(

@@ -393,4 +393,13 @@ class Question extends Model
     {
         return self::qaStatusOptions()[$this->qa_status] ?? (string) $this->qa_status;
     }
+    public function reports()
+    {
+        return $this->hasMany(QuestionReport::class);
+    }
+
+    public function pendingReports()
+    {
+        return $this->reports()->where('status', 'pending');
+    }
 }

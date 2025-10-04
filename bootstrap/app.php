@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -12,26 +13,24 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        apiPrefix: '/api',
+        apiPrefix: 'api',  // Changed from '/api' to 'api'
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // REMOVE this line - it's causing the 500 error
-        // $middleware->append(\App\Http\Middleware\CorsImageMiddleware::class);
+ //       $middleware->api(prepend: [
+ //           \App\Http\Middleware\CorsMiddleware::class,
+   //     ]);
         
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \App\Http\Middleware\CorsMiddleware::class,
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
         ]);
-
         
         $middleware->alias([
-            'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
+            'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'cors.image' => \App\Http\Middleware\CorsImageMiddleware::class,
             'qa' => \App\Http\Middleware\QAMiddleware::class,
             'can.manage.users' => \App\Http\Middleware\CanManageUsers::class,
-
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -30,13 +30,6 @@
 
   <div class="auth-card">
     <div class="auth-head">
-      <div class="brand-mark">
-        @if(isset($siteSettings['site_logo']) && $siteSettings['site_logo'] && file_exists(public_path($siteSettings['site_logo'])))
-          <img src="{{ asset($siteSettings['site_logo']) }}" alt="Logo" style="height: 30px; width: auto; filter: brightness(0) invert(1);">
-        @else
-          <i class="fas fa-graduation-cap"></i>
-        @endif
-      </div>
       <div>
         <h1 class="auth-title">@yield('title')</h1>
         <div class="auth-sub">@yield('subtitle')</div>
@@ -50,23 +43,6 @@
           <div>{{ session('error') }}</div>
         </div>
       @endif
-      @if(session('success'))
-        <div class="alert alert-success d-flex align-items-center" role="alert">
-          <i class="fas fa-check-circle me-2"></i>
-          <div>{{ session('success') }}</div>
-        </div>
-      @endif
-
-      <div class="alert alert-info mb-4">
-        @if(filter_var($identifier ?? '', FILTER_VALIDATE_EMAIL))
-          <i class="fas fa-envelope me-2"></i>
-          Code sent to <strong>{{ $identifier }}</strong>
-        @else
-          <i class="fas fa-mobile-alt me-2"></i>
-          Code sent to <strong>{{ $identifier }}</strong>
-        @endif
-      </div>
-
       <form method="POST" action="{{ route('auth.verifyOtp') }}" id="verifyForm">
         @csrf
         <input type="hidden" name="identifier" value="{{ $identifier ?? '' }}">

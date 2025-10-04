@@ -62,7 +62,13 @@ class OTPController extends Controller
         if (!$user) {
             return response()->json(['message' => 'Invalid or expired OTP'], 401);
         }
-
+    // Set email as verified if contact is email and not already verified
+        if ($field === 'email' && !$user->email_verified) {
+            $user->update([
+                'email_verified' => 1,
+                'email_verified_at' => now()
+            ]);
+        }
     // Clear OTP
         $user->update(['otp_code' => null, 'otp_expires_at' => null]);
 
@@ -132,146 +138,146 @@ class OTPController extends Controller
     }
 
 
-public function verifyEmail(Request $request)
-{
-    $request->validate([
-        'email' => 'required|email',
-        'verification_code' => 'required|string'
-    ]);
-
-    $user = User::where('email', $request->email)
-    ->where('otp_code', $request->verification_code)
-    ->where('otp_expires_at', '>', now())
-    ->first();
-
-    if (!$user) {
-        return response()->json(['message' => 'Invalid or expired verification code'], 401);
-    }
-
-    $user->update([
-        'email_verified_at' => now(),
-        'otp_code' => null,
-        'otp_expires_at' => null
-    ]);
-
-    return response()->json(['message' => 'Email verified successfully']);
-}
-
-    // Private helper methods
-private function createTelcoUser($contact)
-{
-    $telcoData = $this->checkTelcoSubscriber($contact);
-
-    return $telcoData ? User::create([
-        'phone_number' => $telcoData['phone'],
-        'telco_provider' => $telcoData['provider'],
-        'telco_subscriber_id' => $telcoData['subscriber_id'],
-        'status' => 'potential',
-        'email_verified_at' => null,
-        'name' => 'Telco Subscriber',
-        'signup_channel' => 'telco_otp_login'
-    ]) : null;
-}
-
-private function handleTelcoOtp($user)
-{
-    $otp = $this->generateAndSaveOtp($user);
-    $this->sendSMS($user->phone_number, "Your All Gifted verification code: {$otp}");
-
-    return response()->json([
-        'message' => "Activating All Gifted Math Premium on your " . ucfirst($user->telco_provider ?? 'telco') . " bill. Enter the verification code sent to your phone.",
-        'is_telco_activation' => true,
-        'telco_provider' => $user->telco_provider,
-        'phone' => $user->phone_number
-    ]);
-}
-
-private function sendOtpToEmail($user)
-{
-    $otp = $this->generateAndSaveOtp($user);
-
-    try {
-        Mail::to($user->email)->send(new SendOtpMail($otp));
-
-        return response()->json([
-            'message' => 'OTP sent to your email',
-            'email_hint' => substr($user->email, 0, 2) . '***@' . explode('@', $user->email)[1]
+    public function verifyEmail(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'verification_code' => 'required|string'
         ]);
-    } catch (\Exception $e) {
-        return response()->json(['message' => 'Failed to send OTP'], 500);
-    }
-}
 
-private function generateAndSaveOtp($user)
-{
-    $otp = rand(100000, 999999);
-    $user->update([
-        'otp_code' => $otp,
-        'otp_expires_at' => now()->addMinutes(5)
-    ]);
-    return $otp;
-}
+        $user = User::where('email', $request->email)
+        ->where('otp_code', $request->verification_code)
+        ->where('otp_expires_at', '>', now())
+        ->first();
 
-private function activateTelcoUser($user)
-{
-    try {
-        $this->activateTelcoService($user);
+        if (!$user) {
+            return response()->json(['message' => 'Invalid or expired verification code'], 401);
+        }
 
         $user->update([
-            'status' => 'active',
-            'payment_method' => 'telco_billing',
-            'activated_at' => now(),
             'email_verified_at' => now(),
-            'lives' => 5
+            'otp_code' => null,
+            'otp_expires_at' => null
         ]);
 
-        $enrollmentId = $this->createMathEnrollment($user);
-        $token = $user->createToken('login')->plainTextToken;
+        return response()->json(['message' => 'Email verified successfully']);
+    }
+
+    // Private helper methods
+    private function createTelcoUser($contact)
+    {
+        $telcoData = $this->checkTelcoSubscriber($contact);
+
+        return $telcoData ? User::create([
+            'phone_number' => $telcoData['phone'],
+            'telco_provider' => $telcoData['provider'],
+            'telco_subscriber_id' => $telcoData['subscriber_id'],
+            'status' => 'potential',
+            'email_verified_at' => null,
+            'name' => 'Telco Subscriber',
+            'signup_channel' => 'telco_otp_login'
+        ]) : null;
+    }
+
+    private function handleTelcoOtp($user)
+    {
+        $otp = $this->generateAndSaveOtp($user);
+        $this->sendSMS($user->phone_number, "Your All Gifted verification code: {$otp}");
 
         return response()->json([
-            'message' => 'All Gifted Math Premium activated! Welcome!',
-            'token' => $token,
-            'user_id' => $user->id,
-            'first_name' => $user->name,
-            'is_subscriber' => true,
-            'maxile_level' => (int) $user->maxile_level,
-            'game_level' => (int) $user->game_level,
-            'lives' => (int) $user->lives,
-            'has_math_access' => true,
+            'message' => "Activating All Gifted Math Premium on your " . ucfirst($user->telco_provider ?? 'telco') . " bill. Enter the verification code sent to your phone.",
+            'is_telco_activation' => true,
             'telco_provider' => $user->telco_provider,
-            'enrollment' => [
-                'program' => 'K-6 Singapore Math',
-                'billing' => '$3/month via ' . ucfirst($user->telco_provider),
-                'enrollment_id' => $enrollmentId
-            ],
-            'is_new_activation' => true
+            'phone' => $user->phone_number
         ]);
-
-    } catch (\Exception $e) {
-        \Log::error('Telco activation failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
-        return response()->json(['message' => 'Activation failed. Please try again.'], 500);
     }
-}
 
-private function loginResponse(User $user)
-{
-    $mathEnrollment = $this->checkMathEnrollment($user);
-    $hasAccess = $mathEnrollment && $mathEnrollment->expiry_date >= now()->toDateString();
-    $token = $user->createToken('login')->plainTextToken;
+    private function sendOtpToEmail($user)
+    {
+        $otp = $this->generateAndSaveOtp($user);
+
+        try {
+            Mail::to($user->email)->send(new SendOtpMail($otp));
+
+            return response()->json([
+                'message' => 'OTP sent to your email',
+                'email_hint' => substr($user->email, 0, 2) . '***@' . explode('@', $user->email)[1]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to send OTP'], 500);
+        }
+    }
+
+    private function generateAndSaveOtp($user)
+    {
+        $otp = rand(100000, 999999);
+        $user->update([
+            'otp_code' => $otp,
+            'otp_expires_at' => now()->addMinutes(5)
+        ]);
+        return $otp;
+    }
+
+    private function activateTelcoUser($user)
+    {
+        try {
+            $this->activateTelcoService($user);
+
+            $user->update([
+                'status' => 'active',
+                'payment_method' => 'telco_billing',
+                'activated_at' => now(),
+                'email_verified_at' => now(),
+                'lives' => 5
+            ]);
+
+            $enrollmentId = $this->createMathEnrollment($user);
+            $token = $user->createToken('login')->plainTextToken;
+
+            return response()->json([
+                'message' => 'All Gifted Math Premium activated! Welcome!',
+                'token' => $token,
+                'user_id' => $user->id,
+                'first_name' => $user->name,
+                'is_subscriber' => true,
+                'maxile_level' => (int) $user->maxile_level,
+                'game_level' => (int) $user->game_level,
+                'lives' => (int) $user->lives,
+                'has_math_access' => true,
+                'telco_provider' => $user->telco_provider,
+                'enrollment' => [
+                    'program' => 'K-6 Singapore Math',
+                    'billing' => '$3/month via ' . ucfirst($user->telco_provider),
+                    'enrollment_id' => $enrollmentId
+                ],
+                'is_new_activation' => true
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Telco activation failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Activation failed. Please try again.'], 500);
+        }
+    }
+
+    private function loginResponse(User $user)
+    {
+        $mathEnrollment = $this->checkMathEnrollment($user);
+        $hasAccess = $mathEnrollment && $mathEnrollment->expiry_date >= now()->toDateString();
+        $token = $user->createToken('login')->plainTextToken;
 
     // Format DOB safely to YYYY-MM-DD, allow null
-    $dob = $user->date_of_birth
-    ? \Illuminate\Support\Carbon::parse($user->date_of_birth)->toDateString()
-    : null;
+        $dob = $user->date_of_birth
+        ? \Illuminate\Support\Carbon::parse($user->date_of_birth)->toDateString()
+        : null;
 
     // The FE wants 'first_name' (not 'firstname')
-    $firstName = $user->firstname ?? null;
+        $firstName = $user->firstname ?? null;
 
-    $response = [
-        'message'        => 'OTP verified. Login successful.',
-        'token'          => $token,
-        'user_id'        => $user->id,
-        'first_name'     => $firstName,
+        $response = [
+            'message'        => 'OTP verified. Login successful.',
+            'token'          => $token,
+            'user_id'        => $user->id,
+            'first_name'     => $firstName,
         'dob'            => $dob,                                // <- string or null
         'contact'        => $user->email ?? $user->phone_number, // <- handy for FE
         'is_subscriber'  => !is_null($dob) && !is_null($firstName),

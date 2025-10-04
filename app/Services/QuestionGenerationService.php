@@ -234,97 +234,137 @@ class QuestionGenerationService
       return $prompt;
   }
 
-  protected function buildVariationPrompt(Question $original, int $n, string $ageBand, string $readingLvl, string $focusAreas): string
-  {
-    $skill     = $original->skill;
-    $diffLabel = optional($original->difficulty)->difficulty ?? 'Medium';
-    $typeLabel = optional($original->type)->type ?? 'MCQ';
-    $diffId    = (int) ($original->difficulty_id ?? 2);
-    $typeId    = (int) ($original->type_id ?? 1);
+protected function buildVariationPrompt(
+    Question $original,
+    int $n,
+    string $ageBand,
+    string $readingLvl,
+    string $focusAreas
+): string {
+    $skill       = $original->skill;
+    $skillId     = (int) $original->skill_id;
+    $diffLabel   = optional($original->difficulty)->difficulty ?? 'Medium';
+    $typeLabel   = optional($original->type)->type ?? 'MCQ';
+    $diffId      = (int) ($original->difficulty_id ?? 2);
+    $typeId      = (int) ($original->type_id ?? 1);
 
-    $prompt = "Create EXACTLY {$n} VARIATIONS of the question below.\n";
-    $prompt .= "Keep SAME type_id={$typeId} ({$typeLabel}) and SAME difficulty_id={$diffId} ({$diffLabel}). Change surface details, numbers, or contexts only. Audience {$ageBand}, reading level {$readingLvl}.";
-    if ($focusAreas) {
-        $prompt .= " Focus areas: {$focusAreas}.";
-    }
-    $prompt .= "\n\n";
+    // Safely serialize any text we embed into the prompt
+    $skillName   = json_encode((string) ($skill->skill ?? ''), JSON_UNESCAPED_UNICODE);
+    $skillDesc   = json_encode((string) ($skill->description ?? ''), JSON_UNESCAPED_UNICODE);
+    $origQ       = json_encode((string) $original->question, JSON_UNESCAPED_UNICODE);
 
-    $prompt .= "Skill: {$skill->skill}\n";
-    $prompt .= "Skill Description: {$skill->description}\n";
-    $prompt .= "Original Question: {$original->question}\n";
+    $focusLine   = $focusAreas ? "Focus areas: {$focusAreas}." : "";
+
+    // Original MCQ bits (used only when type_id === 1)
+    $answersArr  = [$original->answer0, $original->answer1, $original->answer2, $original->answer3];
+    $answersJson = json_encode($answersArr, JSON_UNESCAPED_UNICODE);
+    $correctIdx  = is_numeric($original->correct_answer) ? (int) $original->correct_answer : null;
+
+    // ------- Header (no heredocs) -------
+    $headerLines = [
+        "Create EXACTLY {$n} VARIATIONS of the question below.",
+        "",
+        "Hard rules",
+        "- Keep SAME skill_id={$skillId}.",
+        "- Keep SAME type_id={$typeId} ({$typeLabel}).",
+        "- Keep SAME difficulty_id={$diffId} ({$diffLabel}).",
+        "- Stay strictly within the skill description. Only change surface details such as numbers, names, or light contexts.",
+        "- Audience: {$ageBand}. Reading level: {$readingLvl}.",
+    ];
+    if ($focusLine) $headerLines[] = $focusLine;
+
+    $headerLines[] = "";
+    $headerLines[] = "Context";
+    $headerLines[] = "- Skill Name: {$skillName}";
+    $headerLines[] = "- Skill Description (authoritative scope): {$skillDesc}";
+    $headerLines[] = "- Original Question: {$origQ}";
     if ($typeId === 1) {
-        $prompt .= "Original Answers: [\"{$original->answer0}\", \"{$original->answer1}\", \"{$original->answer2}\", \"{$original->answer3}\"]\n";
-        if (is_numeric($original->correct_answer)) {
-            $prompt .= "Original Correct Index: {$original->correct_answer}\n";
-        }
+        $headerLines[] = "- Original Answers: {$answersJson}";
+        $headerLines[] = "- Original Correct Index: " . ($correctIdx ?? 'unknown');
     }
-    $prompt .= "\n**REQUIRED FIELDS FOR EVERY VARIATION**\n";
-    $prompt .= "- 'explanation' (age appropriate)\n- exactly 3 'hints' with hint_level 1..3\n- 'solutions' with at least one method, steps, and final_answer\n";
-    $prompt .= "- MCQ: answers length 4, correct_answer index 0..3\n- FIB numbers: answers array includes numeric strings for blanks, correct_answer is numeric\n\n";
-    $prompt .= "\n**REQUIRED FIELDS FOR EVERY VARIATION**\n";
-    $prompt .= "- 'explanation': Age-appropriate explanation of why the answer is correct\n";
-    $prompt .= "- 'hints': Exactly 3 hints following progressive scaffolding:\n";
-    $prompt .= "  * Level 1: Strategic nudge (activates knowledge, suggests approach)\n";
-    $prompt .= "  * Level 2: Guided steps (shows first major step or partial work)\n";
-    $prompt .= "  * Level 3: Nearly complete (shows most steps, student finishes)\n";
-    $prompt .= "- 'solutions': At least 1 method with clear steps array and final_answer\n";
-    $prompt .= "- Use age-appropriate language for {$ageBand}\n";
-    $prompt .= "- Encourage student to 'be in' the problem when relevant\n";
-    $prompt .= "- MCQ: 4 answers, correct_answer index 0..3\n";
-    $prompt .= "- FIB: numeric answers array, numeric correct_answer\n\n";
-    $prompt .= "**STRICT OUTPUT JSON**\n";
+    $header = implode("\n", $headerLines);
+
+    // ------- Requirements -------
+    $reqLines = [
+        "",
+        "REQUIRED FIELDS for every variation",
+        "- 'skill_id', 'type_id', 'difficulty_id'  - must match the original values above",
+        "- 'question'                               - reworded prompt that assesses the same skill",
+        "- 'explanation'                            - age appropriate explanation of why the answer is correct",
+        "- 'hints'                                  - exactly 3 hints with hint_level 1, 2, 3 and hint_text",
+        "- 'solutions'                              - at least 1 method with steps array and final_answer",
+        "",
+        "Type specific shape",
+        "- For MCQ (type_id = 1)",
+        "  - 'answers' is an array of exactly 4 strings",
+        "  - 'correct_answer' is an integer index 0..3",
+        "- For FIB numeric (type_id != 1)",
+        "  - 'question' uses [?] where numeric answers go",
+        "  - 'answers' is an array of numeric strings, one per blank",
+        "  - 'correct_answer' is a numeric string for a single blank, or an array of numeric strings for multiple blanks",
+        "",
+        "Quality and scope constraints",
+        "- Use {$ageBand} appropriate language at reading level {$readingLvl}",
+        "- If unsure whether a concept is in scope of the skill description, treat it as out of scope and avoid it",
+        "",
+        "STRICT OUTPUT JSON",
+        "- Return a single top level object with key \"variations\"",
+        "- The \"variations\" value is an array with exactly {$n} items",
+        "- Output JSON only. No prose before or after",
+    ];
+    $requirements = implode("\n", $reqLines);
+
+    // ------- Example schema built via json_encode (no heredocs, valid JSON) -------
     if ($typeId === 1) {
-        $prompt .= <<<JSON
-        {
-          "variations": [
-            {
-              "type_id": 1,
-              "difficulty_id": {$diffId},
-              "question": "Reworded text",
-              "answers": ["opt1","opt2","opt3","opt4"],
-              "correct_answer": 0,
-              "explanation": "Student-friendly explanation.",
-              "hints": [
-                {"hint_level":1,"hint_text":"nudge"},
-                {"hint_level":2,"hint_text":"clue"},
-                {"hint_level":3,"hint_text":"almost there"}
-            ],
-              "solutions": [
-                {"method":"standard","steps":["s1","s2"],"final_answer":"opt1"}
-            ]
-          }
-      ]
-      }
-      JSON;
-      $prompt .= "\nReturn exactly {$n} items in \"variations\". JSON only.";
-  } else {
-    $prompt .= <<<JSON
-    {
-      "variations": [
-        {
-          "type_id": {$typeId},
-          "difficulty_id": {$diffId},
-          "question": "Text with [?] where numeric answers go",
-          "answers": ["12"],
-          "correct_answer": 12,
-          "explanation": "Student-friendly explanation.",
-          "hints": [
-            {"hint_level":1,"hint_text":"nudge"},
-            {"hint_level":2,"hint_text":"clue"},
-            {"hint_level":3,"hint_text":"almost there"}
-        ],
-          "solutions": [
-            {"method":"standard","steps":["s1","s2"],"final_answer":"12"}
-        ]
-      }
-  ]
-  }
-  JSON;
-  $prompt .= "\nReturn exactly {$n} items in \"variations\". JSON only.";
+        // MCQ skeleton
+        $example = [
+            'variations' => [[
+                'skill_id'       => $skillId,
+                'type_id'        => 1,
+                'difficulty_id'  => $diffId,
+                'question'       => 'Reworded MCQ that stays within the skill description',
+                'answers'        => ['opt1','opt2','opt3','opt4'],
+                'correct_answer' => 0,
+                'explanation'    => 'Student friendly explanation.',
+                'hints'          => [
+                    ['hint_level' => 1, 'hint_text' => 'strategic nudge'],
+                    ['hint_level' => 2, 'hint_text' => 'guided first step'],
+                    ['hint_level' => 3, 'hint_text' => 'nearly complete reasoning'],
+                ],
+                'solutions'      => [
+                    ['method' => 'standard', 'steps' => ['s1','s2'], 'final_answer' => 'opt1'],
+                ],
+            ]]
+        ];
+    } else {
+        // FIB numeric skeleton (single blank example)
+        $example = [
+            'variations' => [[
+                'skill_id'       => $skillId,
+                'type_id'        => $typeId,
+                'difficulty_id'  => $diffId,
+                'question'       => 'Prompt with [?] where numeric answers go, still within the described skill',
+                'answers'        => ['12'],
+                'correct_answer' => '12',
+                'explanation'    => 'Student friendly explanation.',
+                'hints'          => [
+                    ['hint_level' => 1, 'hint_text' => 'strategic nudge'],
+                    ['hint_level' => 2, 'hint_text' => 'guided first step'],
+                    ['hint_level' => 3, 'hint_text' => 'nearly complete reasoning'],
+                ],
+                'solutions'      => [
+                    ['method' => 'standard', 'steps' => ['s1','s2'], 'final_answer' => '12'],
+                ],
+            ]]
+        ];
+    }
+    $schema = json_encode($example, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    // ------- Final prompt -------
+    return $header . "\n\n" . $requirements . "\n\nExample JSON schema (structure only):\n" . $schema;
 }
 
-return $prompt;
-}
+
 
 /* ----------------- Parsing + Strong Validation ----------------- */
 

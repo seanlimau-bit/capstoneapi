@@ -5,6 +5,7 @@ use App\Http\Controllers\VisitorController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Api\TrackController;
+use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,19 +15,19 @@ use App\Http\Controllers\Api\TrackController;
 
 // === User Info Route (Protected) ===
 Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
-    $user = $request->user();
+    // Prefer guard('sanctum') explicitly, then fallback:
+    $user = Auth::guard('sanctum')->user() ?? $request->user();
 
     if (!$user) {
         return response()->json(['message' => 'Unauthenticated.'], 401);
     }
 
-    return response()->json([
-        'id' => $user->id,
-        'email' => $user->email,
-        'name' => $user->firstname,
-    ]);
+    return response()->json($user->only([
+        'id', 'name', 'firstname', 'lastname', 'email', 'contact',
+        'image', 'maxile_level', 'game_level', 'date_of_birth', 'is_admin',
+        'created_at', 'updated_at',
+    ]));
 });
-
 /*
 |--------------------------------------------------------------------------
 | Public Routes (No Authentication Required)
@@ -54,11 +55,13 @@ Route::get('/tracks', [App\Http\Controllers\API\TrackController::class, 'index']
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-
+    Route::post('/questions/{question}/report', [App\Http\Controllers\API\QuestionReportController::class, 'store']);
     // === Dashboard & QA ===
     Route::get('/protected', [App\Http\Controllers\DashboardController::class, 'index']);
-    Route::post('/qa', [App\Http\Controllers\CheckAnswerController::class, 'index']);
-    Route::post('/qa/answer', [App\Http\Controllers\CheckAnswerController::class, 'answer']);
+    Route::post('/test/answers', [App\Http\Controllers\AnswerController::class, 'answer']);
+    Route::get('/test/trackquestions/{track}', [App\Http\Controllers\TrackTestController::class, 'index']);
+
+    
 
     // === User Management ===
     Route::apiResource('users', App\Http\Controllers\UserController::class);
@@ -107,35 +110,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // === Testing & Assessment ===
     Route::apiResource('tests', App\Http\Controllers\TestController::class);
     Route::post('/test/protected/{type}', [App\Http\Controllers\DiagnosticController::class, 'index']);
-    Route::post('/test/answers', [App\Http\Controllers\AnswerController::class, 'answer']);
-    Route::get('/test/trackquestions/{track}', [App\Http\Controllers\TrackTestController::class, 'index']);
     Route::post('/loginInfo', [App\Http\Controllers\DiagnosticController::class, 'login']);
-
-    // === System Resources ===
-//    Route::apiResources([
-//        'difficulties'   => App\Http\Controllers\DifficultyController::class,
-//        'fields'         => App\Http\Controllers\FieldController::class,
- //       'levels'         => App\Http\Controllers\LevelController::class,
-  //      'permissions'    => App\Http\Controllers\PermissionController::class,
-   //     'roles'          => App\Http\Controllers\RoleController::class,
-//        'units'          => App\Http\Controllers\UnitController::class,
-  //      'types'          => App\Http\Controllers\TypeController::class,
-  //      'questions'      => App\Http\Controllers\QuestionController::class,
-    //    'enrolments'     => App\Http\Controllers\EnrolmentController::class,
-    //]);
-
-    // == Partners Management ==
-  /*  Route::prefix('partners')->middleware('auth:sanctum')->group(function () {
-        Route::get('/', [PartnerController::class, 'index']);
-        Route::post('/', [PartnerController::class, 'store']);
-        Route::('/{code}', [PartnerController::class, 'show']);
-        Route::put('/{partner}', [PartnerController::class, 'update']);
-        Route::delete('/{partner}', [PartnerController::class, 'destroy']);
-    });
-
-    Route::post('partner/{partnerCode}/webhook', [PartnerWebhookController::class, 'handleStatusUpdate']);
-*/
-    // === Logs ===
- //   Route::get('logs', [App\Http\Controllers\LogController::class, 'index']);
-
 });

@@ -708,52 +708,53 @@
     }
 
     static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? null), questionText = null) {
-  // sensible defaults
-  if (!questionText) questionText = `Question #${questionId}`;
+      if (!questionText) questionText = `Question #${questionId}`;
 
-  // 1) Preferred: use the reusable partial’s helper
-  const modalId = 'questionGenerationModal';
-  if (window.QuestionGeneration && window.QuestionGeneration[modalId]) {
-    window.QuestionGeneration[modalId].open({ questionId, questionText, skillId });
-    return;
-}
+      const modalId = 'questionGenerationModal';
 
-  // 2) Fallback A: use the reusable partial directly (without helper),
-  // populating its prefixed inputs, then show it.
-  const partialEl = document.getElementById(modalId);
-  if (partialEl) {
-    const byId = (suffix) => document.getElementById(`${modalId}_${suffix}`);
+      // 1) Preferred helper (if your reusable partial exposes it)
+      if (window.QuestionGeneration && window.QuestionGeneration[modalId]) {
+        window.QuestionGeneration[modalId].open({ questionId, questionText, skillId });
+        return;
+    }
 
-    const qIdEl     = byId('questionId');
-    const skillEl   = byId('skillId');
-    const textEl    = byId('originalText');
+      // 2) Directly target your current modal DOM
+      const partialEl = document.getElementById(modalId);
+      if (partialEl) {
+        // Write the question id into YOUR field id
+        const qIdEl = document.getElementById('selectedQuestionId');
+        if (qIdEl) qIdEl.value = questionId;
 
-    if (qIdEl)   qIdEl.value = questionId;
-    if (skillEl && skillId != null) skillEl.value = skillId;
-    if (textEl)  textEl.textContent = questionText;
+        // Flip radios to "Question"
+        const srcQn = partialEl.querySelector('input[name="source"][value="question"]');
+        if (srcQn) srcQn.checked = true;
 
-    new bootstrap.Modal(partialEl).show();
-    return;
-}
+        // If you want to also prefill skillId when present (optional)
+        const skillHidden = partialEl.querySelector('input[name="skill_id"]');
+        if (skillHidden && skillId != null) skillHidden.value = skillId;
 
-  // 3) Fallback B: legacy inline modal (old ids)
-  const legacyEl = document.getElementById('questionVariationModal');
-  if (legacyEl) {
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        new bootstrap.Modal(partialEl).show();
+        return;
+    }
 
-    setVal('originalQuestionId', questionId);
-    if (skillId != null) setVal('originalSkillId', skillId);
-    setTxt('originalQuestionText', questionText);
+      // 3) Legacy fallback (keep if you still support the old modal)
+      const legacyEl = document.getElementById('questionVariationModal');
+      if (legacyEl) {
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+        const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-    new bootstrap.Modal(legacyEl).show();
-    return;
-}
+        setVal('originalQuestionId', questionId);
+        if (skillId != null) setVal('originalSkillId', skillId);
+        setTxt('originalQuestionText', questionText);
 
-  // 4) Nothing found -> friendly error
-  console.error('Question generation modal not found (partial helper, partial DOM, or legacy DOM).');
-  this.showToast('Question generation modal is not available on this page.', 'error');
-}
+        new bootstrap.Modal(legacyEl).show();
+        return;
+    }
+
+    console.error('Question generation modal not found.');
+    this.showToast('Question generation modal is not available on this page.', 'error');
+    }
+
 
 static async generateVariations() {
     const questionId = document.getElementById('originalQuestionId').value;
@@ -791,16 +792,16 @@ static async generateVariations() {
         generateBtn.disabled = false;
 
         if (response.success) {
-         const generationModal = bootstrap.Modal.getInstance(document.getElementById('questionGenerationModal'));
+           const generationModal = bootstrap.Modal.getInstance(document.getElementById('questionGenerationModal'));
 
-         generationModal.hide();
+           generationModal.hide();
 
-         this.showToast(`Successfully generated ${response.questions_created || questionCount} question variations!`, 'success');
+           this.showToast(`Successfully generated ${response.questions_created || questionCount} question variations!`, 'success');
 
-         setTimeout(() => {
+           setTimeout(() => {
             window.location.reload();
         }, 1500);
-     } else {
+       } else {
         this.showToast(response.message || 'Error generating variations', 'error');
     }
 } catch (error) {
