@@ -1,0 +1,1 @@
+<?php /**PATH C:\allgifted\mathapi11v2\resources\views\admin\difficulties\index.blade.php ENDPATH**/ ?>

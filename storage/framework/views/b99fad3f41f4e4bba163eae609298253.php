@@ -1,0 +1,920 @@
+
+
+<?php $__env->startSection('title', 'Track Management'); ?>
+
+<?php $__env->startPush('styles'); ?>
+<style>
+    .img-picker{position:relative;display:inline-block}
+    .img-picker img{cursor:pointer;border:2px solid #dee2e6;border-radius:6px;transition:border-color .15s;object-fit:cover}
+    .img-picker img:hover{border-color:var(--primary-color,#0d6efd)}
+    .img-picker .btn-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;padding:0;border-radius:50%;background:#dc3545;color:#fff;border:2px solid #fff;display:none}
+    .img-picker:hover .btn-remove{display:block}
+    .img-upload-zone{border:2px dashed #dee2e6;border-radius:8px;padding:1rem;text-align:center;cursor:pointer;transition:all .2s}
+    .img-upload-zone:hover{border-color:var(--primary-color,#0d6efd);background:#f8f9fa}
+    .img-upload-zone.dragging{border-color:var(--primary-color,#0d6efd);background:#e7f1ff}
+    .pick-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1055;overflow:auto}
+    .pick-modal .content{background:#fff;margin:5% auto;padding:20px;width:92%;max-width:600px;border-radius:10px}
+</style>
+<?php $__env->stopPush(); ?>
+<?php $__env->startSection('content'); ?>
+<div class="container-fluid">
+    
+    <?php echo $__env->make('admin.components.page-header', [
+    'title' => 'Track Management',
+    'subtitle' => 'Manage educational tracks, levels, and skills',
+    'icon' => 'route',
+    'breadcrumbs' => [
+    ['title' => 'Tracks', 'url' => '']
+    ],
+    'actions' => [
+    [
+    'text' => 'Add Track',
+    'url' => route('admin.tracks.create'),
+    'icon' => 'plus',
+    'class' => 'success'
+    ],
+    [
+    'text' => 'Actions',
+    'type' => 'dropdown',
+    'icon' => 'ellipsis-v',
+    'class' => 'outline-secondary',
+    'items' => [
+    ['text' => 'Import Tracks', 'icon' => 'upload', 'onclick' => 'showImportModal()'],
+    ['text' => 'Export All', 'icon' => 'download', 'onclick' => 'exportTracks()'],
+    'divider',
+    ['text' => 'Bulk Operations', 'icon' => 'cogs', 'onclick' => 'showBulkOperations()']
+    ]
+    ]
+    ]
+    ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+    
+    <?php echo $__env->make('admin.components.stats-row', [
+    'stats' => [
+    [
+    'value' => $tracks->count(),
+    'label' => 'Total Tracks',
+    'color' => 'primary',
+    'icon' => 'route',
+    'id' => 'totalTracksCount'
+    ],
+    [
+    'value' => $tracks->where('status_id', 3)->count(),
+    'label' => 'Active Tracks',
+    'color' => 'success',
+    'icon' => 'check-circle',
+    'id' => 'activeTracksCount'
+    ],
+    [
+    'value' => $tracks->sum(function($track) { return $track->skills ? $track->skills->count() : 0; }),
+    'label' => 'Total Skills',
+    'color' => 'info',
+    'icon' => 'brain',
+    'id' => 'totalSkillsCount'
+    ],
+    [
+    'value' => $tracks->where('status_id', 4)->count(),
+    'label' => 'Draft Tracks',
+    'color' => 'warning',
+    'icon' => 'edit',
+    'id' => 'draftTracksCount'
+    ]
+    ]
+    ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+    
+    <?php $__env->startComponent('admin.components.filters-card', ['items' => $tracks]); ?>
+    <div class="col-md-3">
+        <label class="form-label fw-bold">Status</label>
+        <select class="form-select" id="statusFilter">
+            <option value="">All Statuses</option>
+            <?php $__currentLoopData = $tracks->pluck('status')->filter()->unique('id')->sortBy('status'); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $status): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <option value="<?php echo e(strtolower($status->status)); ?>"><?php echo e(ucfirst($status->status)); ?></option>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold">Level</label>
+        <select class="form-select" id="levelFilter">
+            <option value="">All Levels</option>
+            <?php $__currentLoopData = $levels; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $level): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <option value="<?php echo e($level->description); ?>"><?php echo e($level->description); ?></option>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">Search</label>
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Search tracks or descriptions..." id="searchInput">
+            <span class="input-group-text">
+                <i class="fas fa-search"></i>
+            </span>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">&nbsp;</label>
+        <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+            <i class="fas fa-times me-1"></i>Clear
+        </button>
+    </div>
+    <?php echo $__env->renderComponent(); ?>
+
+    
+    <?php if($tracks->isEmpty()): ?>
+    <?php echo $__env->make('admin.components.empty-state', [
+    'icon' => 'route',
+    'title' => 'No Tracks Found',
+    'message' => 'Create your first track to get started'
+    ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    <?php else: ?>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Tracks Overview</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="tracksTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th data-sort="id" class="sortable">Id</th>
+                            <th width="80">Image</th> 
+                            <th data-sort="track" class="sortable">Track</th>
+                            <th data-sort="description" class="sortable" width="320">Description</th>
+                            <th data-sort="level" class="sortable" width="150">Level</th>
+                            <th data-sort="skills" class="sortable" width="80">Skills</th>
+                            <th data-sort="status" class="sortable" width="120">Status</th>
+                            <th data-sort="created" class="sortable" width="140">Created</th>
+                            <th width="120">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $statusConfig = [
+                        'Public' => ['class' => 'success', 'icon' => 'globe'],
+                        'Draft' => ['class' => 'warning', 'icon' => 'edit'],
+                        'Only Me' => ['class' => 'info', 'icon' => 'lock'],
+                        'Restricted' => ['class' => 'secondary', 'icon' => 'ban']
+                        ];
+                        $allStatusLabels = array_keys($statusConfig);
+                        ?>
+                        <?php $__currentLoopData = $tracks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $track): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <?php
+                        $statusText = $track->status->status ?? 'Unknown';
+                        $statusMeta = $statusConfig[$statusText] ?? ['class' => 'secondary', 'icon' => 'question'];
+                        ?>
+                        <tr class="item-row"
+                        data-id="<?php echo e($track->id); ?>"
+                        data-status="<?php echo e($track->status ? strtolower($statusText) : 'unknown'); ?>"
+                        data-level="<?php echo e($track->level->description ?? ''); ?>"
+                        data-name="<?php echo e(strtolower($track->track)); ?>"
+                        data-description="<?php echo e(strtolower($track->description ?? '')); ?>"
+                        data-skills="<?php echo e($track->skills ? $track->skills->count() : 0); ?>"
+                        data-created="<?php echo e($track->created_at->timestamp); ?>">
+                        
+                        <td class="text-muted fw-semibold"><?php echo e($track->id); ?></td>
+                        
+                        <td>
+                            <div class="img-picker" title="Click to upload image" data-action="upload-image" data-track-id="<?php echo e($track->id); ?>">
+                                <img src="<?php echo e($track->image ? asset('storage/' . $track->image) : asset('images/site-logo.svg')); ?>" 
+                                width="60" height="46" alt="" 
+                                onerror="this.src='/images/site-logo.svg'">
+                                <button class="btn-remove" title="Upload/Change image">↑</button>
+                            </div>
+                        </td>
+
+                        
+                        <td data-editable="true" data-field="track" data-edit="text">
+                            <h6 class="mb-0 track-name searchable"><?php echo e($track->track); ?></h6>
+                        </td>
+
+                        
+                        <td data-editable="true" data-field="description" data-edit="text">
+                            <small class="text-muted track-desc searchable">
+                                <?php if(strlen($track->description ?? '') > 160): ?>
+                                <?php echo e(substr($track->description, 0, 160)); ?>...
+                                <?php else: ?>
+                                <?php echo e($track->description ?? 'No description'); ?>
+
+                                <?php endif; ?>
+                            </small>
+                        </td>
+
+                        
+                        <td data-editable="true" data-field="level_description" data-edit="select"
+                        data-options='<?php echo json_encode($levels->pluck("description"), 15, 512) ?>'>
+                        <?php if($track->level): ?>
+                        <span class="badge bg-info"><?php echo e($track->level->description); ?></span>
+                        <?php else: ?>
+                        <span class="text-muted">No level assigned</span>
+                        <?php endif; ?>
+                    </td>
+
+                    
+                    <td>
+                        <?php if($track->skills && $track->skills->count() > 0): ?>
+                        <span class="badge bg-primary"><?php echo e($track->skills->count()); ?></span>
+                        <?php else: ?>
+                        <span class="text-muted">0</span>
+                        <?php endif; ?>
+                    </td>
+
+                    
+                    <td data-editable="true" data-field="status" data-edit="select" data-options='<?php echo json_encode($allStatusLabels, 15, 512) ?>'>
+                        <span class="badge bg-<?php echo e($statusMeta['class']); ?>">
+                            <i class="fas fa-<?php echo e($statusMeta['icon']); ?> me-1"></i><?php echo e($statusText); ?>
+
+                        </span>
+                    </td>
+
+                    
+                    <div class="pick-modal" id="imgUploadModal" aria-modal="true" role="dialog">
+                        <div class="content" style="max-width:600px">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0">Upload Track Image</h5>
+                                <button class="btn-close" type="button" id="imgUploadClose"></button>
+                            </div>
+
+                            <div class="img-upload-zone" id="uploadZone">
+                                <input type="file" id="imgFileInput" accept="image/*" style="display:none">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-2"></i>
+                                <p class="mb-1">Click to browse or drag & drop</p>
+                                <small class="text-muted">PNG, JPG, WebP • Max 500KB • Recommended 600x400px</small>
+                            </div>
+
+                            <div id="uploadPreview" class="mt-3 d-none">
+                                <img id="previewImg" src="" alt="Preview" class="img-fluid rounded" style="max-height:200px">
+                                <div class="mt-2">
+                                    <small class="text-muted" id="fileInfo"></small>
+                                </div>
+                            </div>
+
+                            <div class="progress mt-3 d-none" id="uploadProgress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%" id="uploadProgressBar"></div>
+                            </div>
+
+                            <div class="mt-3 d-flex justify-content-between gap-2">
+                                <button class="btn btn-outline-danger" id="imgRemoveBtn">Remove Current Image</button>
+                                <div>
+                                    <button class="btn btn-secondary" id="imgUploadCancel">Cancel</button>
+                                    <button class="btn btn-primary" id="imgUploadBtn" disabled>Upload</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <td><small class="text-muted"><?php echo e($track->created_at->format('M j, Y')); ?></small></td>
+
+                    
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="<?php echo e(route('admin.tracks.show', $track)); ?>" class="btn btn-outline-info" title="View Track">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <button class="btn btn-outline-secondary" onclick="copyTrack(<?php echo e($track->id); ?>)" title="Duplicate Track">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteTrack(<?php echo e($track->id); ?>)" title="Delete Track">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </tbody>
+        </table>
+    </div>
+
+    
+    <div id="noResults" class="d-none text-center py-5">
+        <?php echo $__env->make('admin.components.empty-state', [
+        'icon' => 'search',
+        'title' => 'No matching results',
+        'message' => 'Try adjusting your search filters'
+        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    </div>
+</div>
+</div>
+<?php endif; ?>
+</div>
+
+
+<div class="modal fade" id="copyTrackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Copy Track</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="copyTrackId">
+                <p class="mb-3">You are about to create a copy of "<strong id="copyTrackName"></strong>".</p>
+                <p>Choose what to copy with the track:</p>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="copySkillsOption" checked>
+                    <label class="form-check-label" for="copySkillsOption">
+                        <strong>Copy all assigned skills (<span id="copySkillCount">0</span> skills)</strong>
+                    </label>
+                    <small class="form-text text-muted d-block mt-1">
+                        If unchecked, only track details will be copied (no skills attached)
+                    </small>
+                </div>
+                <div class="alert alert-info small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    The new track will be named "<span id="copyTrackNewName"></span>" and you'll be taken to it after creation.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeCopyTrack()">
+                    <i class="fas fa-copy me-1"></i> Copy Track
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startPush('scripts'); ?>
+<script src="<?php echo e(asset('js/admin/admin.js')); ?>"></script>
+<script>
+// ===== SHARED CSRF TOKEN =====
+const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+// ===== TRACKS TABLE: FILTERS, SORTING, INLINE EDITING =====
+(function() {
+  const table = document.getElementById('tracksTable');
+  if (!table) return;
+
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr.item-row'));
+  const noResults = document.getElementById('noResults');
+
+  const statusFilter = document.getElementById('statusFilter');
+  const levelFilter  = document.getElementById('levelFilter');
+  const searchInput  = document.getElementById('searchInput');
+
+  let sortState = { key: 'id', dir: 'asc' };
+
+  // debounce
+  const debounce = (fn, ms = 200) => {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  };
+
+  // Build cache for performance
+  const modelCache = new Map();
+  rows.forEach(r => {
+    modelCache.set(r, {
+      id: Number(r.dataset.id),
+      track: (r.querySelector('.track-name')?.textContent || '').toLowerCase(),
+      description: (r.dataset.description || '').toLowerCase(),
+      level: (r.dataset.level || '').toLowerCase(),
+      status: (r.dataset.status || '').toLowerCase(),
+      skills: Number(r.dataset.skills || 0),
+      created: Number(r.dataset.created || 0),
+      textBlob: ((r.dataset.name || '') + ' ' + (r.dataset.description || '')).toLowerCase()
+    });
+  });
+
+  // FILTERING
+  function applyFilters() {
+    const sStatus = (statusFilter?.value || '').toLowerCase();
+    const sLevel  = (levelFilter?.value || '').toLowerCase();
+    const sQuery  = (searchInput?.value || '').trim().toLowerCase();
+
+    let visible = 0;
+    for (const r of rows) {
+      const m = modelCache.get(r);
+      const okStatus = !sStatus || m.status === sStatus;
+      const okLevel  = !sLevel  || m.level === sLevel;
+      const okQuery  = !sQuery  || m.textBlob.includes(sQuery);
+      const show = okStatus && okLevel && okQuery;
+      r.classList.toggle('d-none', !show);
+      if (show) visible++;
+    }
+    noResults?.classList.toggle('d-none', visible !== 0);
+    updateStats();
+  }
+  const debouncedFilter = debounce(applyFilters, 120);
+
+  statusFilter?.addEventListener('change', debouncedFilter);
+  levelFilter?.addEventListener('change', debouncedFilter);
+  searchInput?.addEventListener('input', debouncedFilter);
+
+  window.clearFilters = function() {
+    if (statusFilter) statusFilter.value = '';
+    if (levelFilter) levelFilter.value = '';
+    if (searchInput) searchInput.value = '';
+    applyFilters();
+  };
+
+  // SORTING
+  function applySort(key, dir) {
+    const liveRows = rows.filter(r => !r.classList.contains('d-none'));
+    const withIdx = liveRows.map((r, i) => ({ r, i, m: modelCache.get(r) }));
+
+    const cmp = (a, b) => {
+      let va = a.m[key], vb = b.m[key];
+      if (typeof va === 'string' && typeof vb === 'string') {
+        const res = va.localeCompare(vb);
+        return dir === 'asc' ? res : -res;
+      }
+      if (va < vb) return dir === 'asc' ? -1 : 1;
+      if (va > vb) return dir === 'asc' ? 1 : -1;
+      return a.i - b.i;
+    };
+
+    withIdx.sort(cmp);
+
+    const frag = document.createDocumentFragment();
+    const hiddenRows = rows.filter(r => r.classList.contains('d-none'));
+    withIdx.forEach(({ r }) => frag.appendChild(r));
+    hiddenRows.forEach(r => frag.appendChild(r));
+    tbody.appendChild(frag);
+  }
+
+  function setSortIndicator(th, active, dir) {
+    th.querySelectorAll('.sort-caret')?.forEach(el => el.remove());
+    if (!active) return;
+    const caret = document.createElement('span');
+    caret.className = 'sort-caret ms-1';
+    caret.innerHTML = dir === 'asc' ? '&uarr;' : '&darr;';
+    th.appendChild(caret);
+  }
+
+  table.querySelectorAll('th.sortable').forEach(th => {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      sortState.dir = (sortState.key === key && sortState.dir === 'asc') ? 'desc' : 'asc';
+      sortState.key = key;
+
+      table.querySelectorAll('th.sortable').forEach(other => setSortIndicator(other, false));
+      setSortIndicator(th, true, sortState.dir);
+
+      applySort(sortState.key, sortState.dir);
+    });
+  });
+  // default sort
+  const defaultTh = table.querySelector('th[data-sort="id"]');
+  if (defaultTh) setSortIndicator(defaultTh, true, 'asc');
+
+  // DYNAMIC STATS
+  function updateStats() {
+    const items = rows.filter(r => !r.classList.contains('d-none')).map(r => ({
+      status: (r.dataset.status || '').toLowerCase(),
+      skills: Number(r.dataset.skills || 0)
+    }));
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+    setTxt('totalTracksCount', items.length);
+    setTxt('activeTracksCount', items.filter(i => i.status === 'public' || i.status === 'active').length);
+    setTxt('draftTracksCount', items.filter(i => i.status === 'draft').length);
+    setTxt('totalSkillsCount', items.reduce((s, i) => s + (i.skills || 0), 0));
+  }
+
+  // INITIAL RENDER
+  applyFilters();
+  applySort(sortState.key, sortState.dir);
+
+  // INLINE EDITING
+  async function patchTrack(trackId, payload) {
+    const res = await fetch(`/admin/tracks/${trackId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrf,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Update failed');
+    return await res.json();
+  }
+
+  function makeInput(initial, type, options) {
+    if (type === 'select') {
+      const sel = document.createElement('select');
+      sel.className = 'form-select form-select-sm';
+      (options || []).forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if ((initial || '').toLowerCase() === String(opt).toLowerCase()) o.selected = true;
+        sel.appendChild(o);
+      });
+      return sel;
+    }
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'form-control form-control-sm';
+    inp.value = initial || '';
+    return inp;
+  }
+
+  function startEdit(td) {
+    const tr = td.closest('tr');
+    const trackId = tr.dataset.id;
+    const field   = td.dataset.field;
+    const edit    = td.dataset.edit || 'text';
+    const opts    = td.dataset.options ? JSON.parse(td.dataset.options) : null;
+
+    if (!trackId || !field) return;
+
+    const currentText = td.innerText.trim();
+    td.dataset.originalHtml = td.innerHTML;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'd-flex align-items-center gap-2';
+    const input = makeInput(currentText, edit, opts);
+
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn btn-sm btn-primary';
+    okBtn.innerHTML = '<i class="fas fa-check"></i>';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-sm btn-outline-secondary';
+    cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(okBtn);
+    wrapper.appendChild(cancelBtn);
+
+    td.innerHTML = '';
+    td.appendChild(wrapper);
+    input.focus();
+    if (input.select) input.select();
+
+    const restore = () => {
+      td.innerHTML = td.dataset.originalHtml;
+      delete td.dataset.originalHtml;
+    };
+
+    cancelBtn.addEventListener('click', restore);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') restore();
+      if (e.key === 'Enter' && edit === 'text') okBtn.click();
+    });
+
+    okBtn.addEventListener('click', async () => {
+      const newValue = edit === 'select' ? input.value : input.value.trim();
+      const payload = { field, value: newValue };
+
+      okBtn.disabled = true;
+      okBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+      try {
+        const data = await patchTrack(trackId, payload);
+
+        if (field === 'track') {
+          td.innerHTML = `<h6 class="mb-0 track-name searchable">${newValue}</h6>`;
+          const m = modelCache.get(tr);
+          m.track = newValue.toLowerCase();
+          m.textBlob = (m.track + ' ' + (tr.dataset.description || '')).toLowerCase();
+        } else if (field === 'description') {
+          const display = newValue.length > 160 ? newValue.slice(0,160) + '...' : (newValue || 'No description');
+          td.innerHTML = `<small class="text-muted track-desc searchable">${display}</small>`;
+          tr.dataset.description = (newValue || '').toLowerCase();
+          const m = modelCache.get(tr);
+          m.description = tr.dataset.description;
+          m.textBlob = (m.track + ' ' + m.description).toLowerCase();
+        } else if (field === 'level_description') {
+          td.innerHTML = newValue ? `<span class="badge bg-info">${newValue}</span>` : '<span class="text-muted">No level assigned</span>';
+          tr.dataset.level = (newValue || '').toLowerCase();
+          modelCache.get(tr).level = tr.dataset.level;
+        } else if (field === 'status') {
+          const s = (newValue || 'Unknown');
+          const sLower = s.toLowerCase();
+          const map = {
+            'public': { cls: 'success', icon: 'globe' },
+            'draft': { cls: 'warning', icon: 'edit' },
+            'only me': { cls: 'info', icon: 'lock' },
+            'restricted': { cls: 'secondary', icon: 'ban' },
+            'unknown': { cls: 'secondary', icon: 'question' }
+          };
+          const meta = map[sLower] || map['unknown'];
+          td.innerHTML = `<span class="badge bg-${meta.cls}"><i class="fas fa-${meta.icon} me-1"></i>${s}</span>`;
+          tr.dataset.status = sLower;
+          modelCache.get(tr).status = sLower;
+          updateStats();
+        } else {
+          td.textContent = newValue;
+        }
+
+        AdminToast?.show?.(data.message || 'Saved', 'success');
+        applyFilters();
+        applySort(sortState.key, sortState.dir);
+      } catch (e) {
+        AdminToast?.show?.('Save failed. Please try again.', 'error');
+        restore();
+      }
+    });
+  }
+
+  // Activate editing on double-click
+  tbody.addEventListener('dblclick', (e) => {
+    const td = e.target.closest('td[data-editable="true"]');
+    if (td) startEdit(td);
+  });
+
+})();
+
+// ===== IMAGE UPLOAD MODULE =====
+(function() {
+    let currentTrackId = null;
+    let selectedFile = null;
+
+    const uploadModal = document.getElementById('imgUploadModal');
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('imgFileInput');
+    const uploadPreview = document.getElementById('uploadPreview');
+    const previewImg = document.getElementById('previewImg');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
+    const uploadBtn = document.getElementById('imgUploadBtn');
+    const uploadClose = document.getElementById('imgUploadClose');
+    const uploadCancel = document.getElementById('imgUploadCancel');
+    const imgRemoveBtn = document.getElementById('imgRemoveBtn');
+
+    // Open upload modal
+    document.addEventListener('click', (e) => {
+        const picker = e.target.closest('[data-action="upload-image"]');
+        if (picker) {
+            currentTrackId = picker.dataset.trackId;
+            selectedFile = null;
+            fileInput.value = '';
+            uploadPreview.classList.add('d-none');
+            uploadProgress.classList.add('d-none');
+            uploadBtn.disabled = true;
+            uploadModal.style.display = 'block';
+        }
+    });
+
+    // Upload zone click
+    uploadZone?.addEventListener('click', () => fileInput.click());
+
+    // Drag and drop
+    uploadZone?.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragging');
+    });
+    uploadZone?.addEventListener('dragleave', () => uploadZone.classList.remove('dragging'));
+    uploadZone?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragging');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            handleFileSelect();
+        }
+    });
+
+    // File selection
+    fileInput?.addEventListener('change', handleFileSelect);
+
+    function handleFileSelect() {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            AdminToast?.show?.('Please select an image file', 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        const maxSize = 500 * 1024;
+        if (file.size > maxSize) {
+            AdminToast?.show?.(`File too large. Maximum size: 500KB`, 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        selectedFile = file;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewImg.src = e.target.result;
+            uploadPreview.classList.remove('d-none');
+            fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)}KB)`;
+            uploadBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Upload
+    uploadBtn?.addEventListener('click', async () => {
+        if (!selectedFile || !currentTrackId) return;
+
+        uploadBtn.disabled = true;
+        uploadProgress.classList.remove('d-none');
+        
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress = Math.min(90, progress + 10);
+            uploadProgressBar.style.width = progress + '%';
+        }, 200);
+
+        const fd = new FormData();
+        fd.append('image', selectedFile);
+        fd.append('type', 'track_image');
+        fd.append('track_id', currentTrackId);
+
+        try {
+            const response = await fetch('/admin/upload/image', {
+                method: 'POST',
+                body: fd,
+                headers: {
+                    'X-CSRF-TOKEN': csrf,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+            
+            const result = await response.json();
+            clearInterval(interval);
+            uploadProgressBar.style.width = '100%';
+            
+            // Update image in table
+            const img = document.querySelector(`[data-track-id="${currentTrackId}"] img`);
+            if (img) img.src = `/storage/${result.path}?v=${Date.now()}`;
+            
+            AdminToast?.show?.('Image uploaded successfully', 'success');
+            setTimeout(() => {
+                uploadModal.style.display = 'none';
+                currentTrackId = null;
+                selectedFile = null;
+            }, 500);
+        } catch (err) {
+            clearInterval(interval);
+            AdminToast?.show?.(err.message || 'Upload failed', 'error');
+            uploadBtn.disabled = false;
+        }
+    });
+
+    // Remove image
+    imgRemoveBtn?.addEventListener('click', async () => {
+        if (!currentTrackId) return;
+        if (!confirm('Remove the current image?')) return;
+
+        try {
+            const response = await fetch(`/admin/tracks/${currentTrackId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ field: 'image', value: null })
+            });
+
+            if (!response.ok) throw new Error('Failed to remove image');
+            
+            const img = document.querySelector(`[data-track-id="${currentTrackId}"] img`);
+            if (img) img.src = '/images/site-logo.svg';
+            
+            AdminToast?.show?.('Image removed', 'success');
+            uploadModal.style.display = 'none';
+        } catch (err) {
+            AdminToast?.show?.(err.message || 'Failed to remove image', 'error');
+        }
+    });
+
+    // Close modal
+    const closeModal = () => {
+        uploadModal.style.display = 'none';
+        currentTrackId = null;
+        selectedFile = null;
+    };
+    uploadClose?.addEventListener('click', closeModal);
+    uploadCancel?.addEventListener('click', closeModal);
+})();
+
+// ===== GLOBAL HELPER FUNCTIONS =====
+window.adminConfig = {
+  filters: [
+    {id: 'statusFilter', key: 'status', type: 'select'},
+    {id: 'levelFilter',  key: 'level',  type: 'select'},
+    {id: 'searchInput',  key: 'search', type: 'search'}
+  ],
+  searchFields: ['name', 'description'],
+  highlightSelectors: ['.track-name', '.track-desc'],
+  dynamicStats: true,
+  stats: [
+    { id: 'totalTracksCount',  calculator: items => items.length },
+    { id: 'activeTracksCount', calculator: items => items.filter(item => item.status === 'active').length },
+    { id: 'draftTracksCount',  calculator: items => items.filter(item => item.status === 'draft').length },
+    { id: 'totalSkillsCount',  calculator: items => items.reduce((sum, item) => sum + parseInt(item.skills || 0), 0) }
+  ]
+};
+
+function copyTrack(trackId) {
+  const row = document.querySelector(`tr[data-id="${trackId}"]`);
+  const trackName = row?.querySelector('.track-name')?.textContent || '';
+  const skillCount = row?.dataset.skills || 0;
+
+  AdminModals.show('copyTrackModal', {
+    copyTrackId: trackId,
+    copyTrackName: trackName,
+    copySkillCount: skillCount,
+    copyTrackNewName: trackName + ' (Copy)'
+  });
+}
+
+function executeCopyTrack() {
+  const trackId = document.getElementById('copyTrackId').value;
+  const copySkills = document.getElementById('copySkillsOption').checked;
+  const btn = document.querySelector('.modal-footer .btn-primary');
+
+  adminAjax?.setLoadingState?.(btn, true);
+  fetch(`/admin/tracks/${trackId}/duplicate`, {
+    method: 'POST',
+    headers: {
+      'X-CSRF-TOKEN': csrf,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ copy_skills: copySkills })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data || data.success !== true) throw new Error(data?.message || 'Error copying track');
+    AdminToast.show(data.message || 'Track copied successfully', 'success');
+    AdminModals.hide('copyTrackModal');
+    if (data.redirect)      window.location.assign(data.redirect);
+    else if (data.track_id) window.location.assign(`/admin/tracks/${data.track_id}`);
+    else                    window.location.assign('/admin/tracks');
+  })
+  .catch(err => AdminToast.show(err.message || 'Network error occurred', 'error'))
+  .finally(() => adminAjax?.setLoadingState?.(btn, false));
+}
+
+function deleteTrack(trackId) {
+  const row = document.querySelector(`tr[data-id="${trackId}"]`);
+  const trackName = row?.querySelector('.track-name')?.textContent || '';
+  if (!confirm(`Delete "${trackName}"? This action cannot be undone.`)) return;
+
+  fetch(`/admin/tracks/${trackId}`, {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-TOKEN': csrf,
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => {
+    if (response.status === 409) {
+      return response.json().then(data => {
+        if (data.requires_confirmation) {
+          if (confirm(data.message + '\n\nClick OK to remove dependencies and delete the track.')) {
+            deleteTrackWithDependencies(trackId);
+          }
+        } else {
+          AdminToast.show(data.message || 'Cannot delete track, it has dependencies', 'error');
+        }
+      });
+    } else if (response.ok) {
+      return response.json().then(() => {
+        AdminToast.show('Track deleted successfully', 'success');
+        row?.remove();
+      });
+    } else {
+      throw new Error('Delete failed');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    AdminToast.show('Error deleting track', 'error');
+  });
+}
+
+function deleteTrackWithDependencies(trackId) {
+  fetch(`/admin/tracks/${trackId}`, {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-TOKEN': csrf,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ force: true, remove_dependencies: true })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      AdminToast.show('Track and dependencies deleted successfully', 'success');
+      document.querySelector(`tr[data-id="${trackId}"]`)?.remove();
+    } else {
+      AdminToast.show(data.message || 'Error deleting track', 'error');
+    }
+  })
+  .catch(e => {
+    console.error('Error:', e);
+    AdminToast.show('Error deleting track', 'error');
+  });
+}
+
+function showImportModal() { AdminToast.show('Import functionality coming soon', 'info'); }
+function exportTracks()    { window.location.href = '/admin/tracks/export'; }
+function showBulkOperations(){ AdminToast.show('Bulk operations functionality coming soon', 'info'); }
+</script>
+<?php $__env->stopPush(); ?>
+
+<?php echo $__env->make('layouts.admin', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\allgifted\mathapi11v2\resources\views\admin\tracks\index.blade.php ENDPATH**/ ?>

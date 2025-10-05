@@ -1,0 +1,2 @@
+Click here to reset your password: <a href="<?php echo e($link = url('password/reset', $token).'?email='.urlencode($user->getEmailForPasswordReset())); ?>"> <?php echo e($link); ?> </a>
+<?php /**PATH C:\allgifted\mathapi11v2\resources\views\auth\emails\password.blade.php ENDPATH**/ ?>
