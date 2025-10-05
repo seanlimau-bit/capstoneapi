@@ -47,18 +47,14 @@ return [
             'throw'      => false,
         ],
 
-        // Unified disk for your Asset Manager
         'assets' => [
-            'driver'     => 'local',
-            'root'       => env('ASSET_DISK', 'public') === 'webroot'
-                ? public_path('assets')
-                : storage_path('app/public/assets'),
-            'url'        => env('ASSET_DISK', 'public') === 'webroot'
-                ? env('APP_URL') . '/assets'
-                : env('APP_URL') . '/storage/assets',
+            'driver' => 'local',
+            'root' => storage_path('app/public'),
+            'url' => env('APP_URL').'/storage',   
             'visibility' => 'public',
-            'throw'      => false,
+            'throw' => false,
         ],
+
 
         // Example S3 (keep if you use it)
         's3' => [
