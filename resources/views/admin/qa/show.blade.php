@@ -425,8 +425,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (k === 'n') window.location.href = "{{ route('admin.qa.next', ['after' => $question->id, 'status' => 'unreviewed']) }}";
   });
 
-  
-  if (window.renderMathInElement) 
+  // Optional KaTeX auto-render in case raw TeX appears
+  if (window.renderMathInElement) {
     const targets = document.querySelectorAll('.question-field, .mcq-option');
     targets.forEach(el => {
       renderMathInElement(el, {
