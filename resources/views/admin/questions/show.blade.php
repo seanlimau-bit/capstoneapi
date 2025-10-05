@@ -74,7 +74,8 @@
             @if($question->question_image)
             <div class="image-container">
               <div class="image-wrapper">
-                <img src="{{ asset($question->question_image) }}" alt="Question Image" class="question-image">
+                <img src="{{ Storage::url($question->question_image) }}"
+                alt="Question Image" class="question-image">
                 <div class="image-overlay">
                   <button class="btn btn-light btn-sm" onclick="changeQuestionImage({{ $question->id }})" title="Change Image">
                     <i class="fas fa-edit"></i>
@@ -191,7 +192,7 @@
         @if($option['image'])
         <div class="answer-image-container">
           <div class="image-wrapper-small">
-            <img src="{{ asset($option['image']) }}" alt="Option {{ $letter }} Image" class="answer-image">
+            <img src="{{ Storage::url($option['image'])  }}" alt="Option {{ $letter }} Image" class="answer-image">
             <div class="image-overlay-small">
               <button class="btn btn-light btn-sm" onclick="changeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Change">
                 <i class="fas fa-edit"></i>
@@ -652,30 +653,30 @@
 </div>
 
 {{-- Hidden File Input --}}
-<input type="file" id="imageUpload" style="display: none;" accept="image/*">
+<input type="file" id="answerImageInput" style="display:none" accept="image/*">
 @endsection
 
 @push('scripts')
 <script>
-/** ====== CONSTANTS / ROUTES ====== **/
-const QUESTION_ID  = {{ $question->id }};
-const ROUTES = {
-  hints: {
-    store: @json(route('admin.hints.store')),
-    one: (id) => @json(url('admin/hints')) + '/' + id
-  },
-  solutions: {
-    store: @json(route('admin.solutions.store')),
-    one: (id) => @json(url('admin/solutions')) + '/' + id
-  }
-};
+  /** ====== CONSTANTS / ROUTES ====== **/
+  const QUESTION_ID  = {{ $question->id }};
+  const ROUTES = {
+    hints: {
+      store: @json(route('admin.hints.store')),
+      one: (id) => @json(url('admin/hints')) + '/' + id
+    },
+    solutions: {
+      store: @json(route('admin.solutions.store')),
+      one: (id) => @json(url('admin/solutions')) + '/' + id
+    }
+  };
 
-/** ====== ON LOAD ====== **/
-document.addEventListener('DOMContentLoaded', function() {
-  window.QUESTION_ID = QUESTION_ID;
-  renderKaTeX();
-  setupInlineEditing();
-  setupDropdownSelectors();
+  /** ====== ON LOAD ====== **/
+  document.addEventListener('DOMContentLoaded', function() {
+    window.QUESTION_ID = QUESTION_ID;
+    renderKaTeX();
+    setupInlineEditing();
+    setupDropdownSelectors();
   setupImageInputs(); // NEW: Setup image upload handlers
   
   // Hint toggles
@@ -711,10 +712,10 @@ document.addEventListener('DOMContentLoaded', function() {
   bindSolutionInlineEditing();
 });
 
-/** ====== IMAGE UPLOAD - NEW IMPLEMENTATION ====== **/
-let currentImageContext = null;
+  /** ====== IMAGE UPLOAD - NEW IMPLEMENTATION ====== **/
+  var currentImageContext = null;
 
-function setupImageInputs() {
+  function setupImageInputs() {
     const questionImageInput = document.createElement('input');
     questionImageInput.type = 'file';
     questionImageInput.id = 'questionImageInput';
@@ -722,36 +723,90 @@ function setupImageInputs() {
     questionImageInput.style.display = 'none';
     document.body.appendChild(questionImageInput);
 
-    questionImageInput.addEventListener('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+    questionImageInput.addEventListener('change', async function (e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-        const formData = new FormData();
-        formData.append('image', file);
-        const csrf = document.querySelector('meta[name="csrf-token"]').content;
-        
-        try {
-            const response = await fetch(`/admin/questions/${QUESTION_ID}/image`, {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
-            });
-            const data = await response.json();
-            if (data.success) {
-                showToast('Image uploaded!', 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showToast(data.message || 'Upload failed', 'error');
-            }
-        } catch (error) {
-            showToast('Upload failed', 'error');
+      const csrf = document.querySelector('meta[name="csrf-token"]').content;
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('type', 'question_image');
+      formData.append('question_id', String(QUESTION_ID));
+
+      try {
+        const response = await fetch('/admin/upload/image', {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          showToast('Image uploaded!', 'success');
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showToast(data.message || 'Upload failed', 'error');
         }
+      } catch (error) {
+        showToast('Upload failed', 'error');
+      } finally {
         e.target.value = '';
+      }
     });
+
+  // ✅ Handler for answer image input
+  const answerImageInput = document.getElementById('answerImageInput');
+  if (answerImageInput) {
+    answerImageInput.addEventListener('change', async function (e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // set by addAnswerImage/changeAnswerImage before opening the picker
+      if (!window.currentImageContext) {
+        console.warn('[answer upload] missing context');
+        e.target.value = '';
+        return;
+      }
+
+      const { questionId, optionIndex } = window.currentImageContext;
+      const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('type', 'answer_image');      // controller expects this
+      formData.append('question_id', String(questionId));
+      formData.append('option', String(optionIndex)); // 0..3
+
+      try {
+        const response = await fetch('/admin/upload/image', {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          showToast(`Option ${['A','B','C','D'][optionIndex]} image uploaded!`, 'success');
+          setTimeout(() => location.reload(), 800);
+        } else {
+          showToast(data.message || 'Upload failed', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Upload failed', 'error');
+      } finally {
+        window.currentImageContext = null;
+        e.target.value = ''; // allow re-selecting same file
+      }
+    });
+  } else {
+    console.error('#answerImageInput not found in DOM');
+  }
 }
 
-// Keep these simple
 function addQuestionImage() { document.getElementById('questionImageInput').click(); }
+
 function changeQuestionImage() { document.getElementById('questionImageInput').click(); }
 
 function addAnswerImage(questionId, optionIndex) {
@@ -781,8 +836,8 @@ function removeAnswerImage(questionId, optionIndex) {
 
 function removeImage(type, questionId, optionIndex = null) {
   const url = type === 'question' 
-    ? `/admin/questions/${questionId}/image`
-    : `/admin/questions/${questionId}/answers/${optionIndex}/image`;
+  ? `/admin/questions/${questionId}/image`
+  : `/admin/questions/${questionId}/answers/${optionIndex}/image`;
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
   
   fetch(url, {
@@ -952,8 +1007,8 @@ function startInlineEdit(containerEl, kind = 'text', onSave, opts = {}) {
   const originalText = containerEl.innerText.trim();
   const isTextarea = kind === 'textarea';
   const inputHTML = isTextarea
-    ? `<textarea class="form-control" rows="4" autofocus>${originalText}</textarea>`
-    : `<input class="form-control" type="${kind}" value="${originalText}" autofocus />`;
+  ? `<textarea class="form-control" rows="4" autofocus>${originalText}</textarea>`
+  : `<input class="form-control" type="${kind}" value="${originalText}" autofocus />`;
   
   containerEl.innerHTML = inputHTML;
   const inputEl = containerEl.querySelector(isTextarea ? 'textarea' : 'input');
@@ -965,8 +1020,8 @@ function startInlineEdit(containerEl, kind = 'text', onSave, opts = {}) {
       try {
         await onSave(newVal);
         containerEl.innerHTML = opts.htmlSafe === false
-          ? newVal.replace(/\n/g, '<br>')
-          : `${newVal}<i class="fas fa-edit text-muted ms-2 edit-icon"></i>`;
+        ? newVal.replace(/\n/g, '<br>')
+        : `${newVal}<i class="fas fa-edit text-muted ms-2 edit-icon"></i>`;
         showToast('Saved', 'success');
       } catch (err) {
         containerEl.innerHTML = originalHTML;
@@ -988,17 +1043,17 @@ function startInlineEdit(containerEl, kind = 'text', onSave, opts = {}) {
 function setupInlineEditing() {
   document.querySelectorAll('.editable-field').forEach(field => {
     if (field.classList.contains('editable-hint-level') ||
-        field.classList.contains('editable-hint-text') ||
-        field.classList.contains('editable-solution')) return;
-    
-    field.addEventListener('click', function() {
-      const fieldName = this.dataset.field;
-      const fieldType = this.dataset.type || 'text';
-      const currentVal = fieldType === 'html'
+      field.classList.contains('editable-hint-text') ||
+      field.classList.contains('editable-solution')) return;
+
+      field.addEventListener('click', function() {
+        const fieldName = this.dataset.field;
+        const fieldType = this.dataset.type || 'text';
+        const currentVal = fieldType === 'html'
         ? this.querySelector('.fib-content')?.innerHTML?.trim() ?? ''
         : this.textContent.trim();
-      showInlineEditor(this, fieldName, fieldType, currentVal);
-    });
+        showInlineEditor(this, fieldName, fieldType, currentVal);
+      });
   });
 }
 
@@ -1007,8 +1062,8 @@ function showInlineEditor(element, fieldName, fieldType, currentValue) {
   const isHtml = fieldType === 'html';
   const isTextarea = fieldType === 'textarea' || isHtml;
   const input = isTextarea
-    ? `<textarea class="form-control" rows="3" autofocus>${currentValue}</textarea>`
-    : `<input type="text" class="form-control" value="${currentValue}" autofocus>`;
+  ? `<textarea class="form-control" rows="3" autofocus>${currentValue}</textarea>`
+  : `<input type="text" class="form-control" value="${currentValue}" autofocus>`;
   
   element.innerHTML = input;
   const inputEl = element.querySelector(isTextarea ? 'textarea' : 'input');
@@ -1144,12 +1199,12 @@ function duplicateQuestion(questionId) {
 }
 
 function previewQuestion(questionId) {
-    window.open(`/admin/questions/${questionId}/preview`, '_blank', 'width=800,height=600');
+  window.open(`/admin/questions/${questionId}/preview`, '_blank', 'width=800,height=600');
 }
 
 function showToast(message, type = 'info') {
   const toastClass = type === 'success' ? 'alert-success' :
-                     type === 'error' ? 'alert-danger' : 'alert-info';
+  type === 'error' ? 'alert-danger' : 'alert-info';
   const toast = document.createElement('div');
   toast.className = `alert ${toastClass} alert-dismissible fade show position-fixed`;
   toast.style.cssText = 'top:20px;right:20px;z-index:9999;min-width:300px;';

@@ -83,7 +83,7 @@ class ImageOptimizationService
     {
         $config = $this->config[$type] ?? $this->config['default'];
         
-        $maxBytes = $config['max_size_kb'] * 1024 * 2;
+        $maxBytes = $config['max_size_kb'] * 1024;
         if ($file->getSize() > $maxBytes) {
             throw new \Exception("File too large. Maximum size: {$config['max_size_kb']}KB");
         }

@@ -7,6 +7,8 @@ use App\Services\ImageOptimizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Question;
+use Illuminate\Validation\Rule;
 
 class ImageUploadController extends Controller
 {
@@ -19,14 +21,20 @@ class ImageUploadController extends Controller
      */
     public function upload(Request $request)
     {
-        $request->validate([
-        'image' => 'required|image|mimes:jpeg,jpg,png,webp,svg|max:10240', // 10MB max
-        'type' => 'required|in:logo,favicon,login_background,question_image,profile_picture,skill_image,track_image',
-        'question_id' => 'nullable|integer',
-        'user_id' => 'nullable|integer',
-        'skill_id' => 'nullable|integer|exists:skills,id',
-        'track_id' => 'nullable|integer|exists:tracks,id',
-    ]);
+        $validated = $request->validate([
+            'image' => ['required','file','mimes:jpeg,jpg,png,webp,svg','max:10240'],
+            'type'  => ['required', Rule::in([
+                'logo','favicon','login_background','question_image','answer_image','profile_picture','skill_image','track_image'
+            ])],
+
+            'question_id' => ['required_if:type,question_image,answer_image','integer','exists:questions,id'],
+
+            'option' => ['required_if:type,answer_image','in:0,1,2,3'],
+
+            'user_id'  => ['nullable','integer'],
+            'skill_id' => ['nullable','integer','exists:skills,id'],
+            'track_id' => ['nullable','integer','exists:tracks,id'],
+        ]);
 
         try {
             $type = $request->input('type');
@@ -36,6 +44,14 @@ class ImageUploadController extends Controller
                 $request->file('image'),
                 $type
             );
+
+        // Extra guards for specific types
+            if (in_array($type, ['question_image', 'answer_image']) && !$request->filled('question_id')) {
+                throw new \Exception('question_id is required for question/answer image uploads');
+            }
+            if ($type === 'answer_image' && !$request->filled('option')) {
+                throw new \Exception('option is required for answer image uploads');
+            }
 
         // Handle different types
             switch ($type) {
@@ -49,84 +65,89 @@ class ImageUploadController extends Controller
                 $this->handleBackgroundUpload($result);
                 break;
                 case 'question_image':
-                $this->handleQuestionImageUpload($result, $request);
+                $this->handleQuestionImageUpload($result, Question::find($request->question_id));
+                break;
+
+                case 'answer_image':
+                $this->handleAnswerImageUpload($result, $request);
                 break;
                 case 'profile_picture':
                 $this->handleProfilePictureUpload($result, $request);
                 break;
-                case 'skill_image': // ADD THIS CASE
+                case 'skill_image':
                 $this->handleSkillImageUpload($result, $request);
                 break;
                 case 'track_image':
                 $this->handleTrackImageUpload($result, $request);
                 break;
-        }
-        
-        return response()->json([
-            'success' => true,
-            'url' => $result['url'] . '?v=' . time(),
-            'path' => $result['path'],
-            'message' => 'Image uploaded successfully!',
-            'stats' => [
-                'original_size' => $this->formatBytes($result['original_size']),
-                'optimized_size' => $this->formatBytes($result['size']),
-                'saved' => $this->formatBytes($result['saved_bytes']),
-                'dimensions' => $result['dimensions']['width'] . '×' . $result['dimensions']['height'],
-            ],
-            'css_version' => in_array($type, ['logo', 'favicon', 'login_background']) ? time() : null,
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => $e->getMessage()
-        ], 422);
-    }
-}
+            }
 
-protected function handleTrackImageUpload($result, $request)
-{
-    $trackId = $request->input('track_id');
-    
-    if (!$trackId) {
-        throw new \Exception('Track ID is required for track image upload');
-    }
-    
-    $track = \App\Models\Track::findOrFail($trackId);
-    
-    // Delete old image if exists
-    if ($track->image) {
-        $oldPath = storage_path('app/public/' . $track->image);
-        if (file_exists($oldPath)) {
-            @unlink($oldPath);
+            return response()->json([
+                'success' => true,
+                'url' => $result['url'] . '?v=' . time(),
+                'path' => $result['path'],
+                'message' => 'Image uploaded successfully!',
+                'stats' => [
+                    'original_size' => $this->formatBytes($result['original_size']),
+                    'optimized_size' => $this->formatBytes($result['size']),
+                    'saved' => $this->formatBytes($result['saved_bytes'] ?? 0),
+                    'dimensions' => $result['dimensions']['width'] . '×' . $result['dimensions']['height'],
+                ],
+                'css_version' => in_array($type, ['logo', 'favicon', 'login_background']) ? time() : null,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
         }
     }
-    
-    $track->image = $result['path'];
-    $track->save();
-}
 
-protected function handleSkillImageUpload($result, $request)
-{
-    $skillId = $request->input('skill_id');
-    
-    if (!$skillId) {
-        throw new \Exception('Skill ID is required for skill image upload');
-    }
-    
-    $skill = \App\Models\Skill::findOrFail($skillId);
-    
-    // Delete old image if exists
-    if ($skill->image) {
-        $oldPath = storage_path('app/public/' . $skill->image);
-        if (file_exists($oldPath)) {
-            @unlink($oldPath);
+
+    protected function handleTrackImageUpload($result, $request)
+    {
+        $trackId = $request->input('track_id');
+
+        if (!$trackId) {
+            throw new \Exception('Track ID is required for track image upload');
         }
+
+        $track = \App\Models\Track::findOrFail($trackId);
+
+    // Delete old image if exists
+        if ($track->image) {
+            $oldPath = storage_path('app/public/' . $track->image);
+            if (file_exists($oldPath)) {
+                @unlink($oldPath);
+            }
+        }
+
+        $track->image = $result['path'];
+        $track->save();
     }
-    
+
+    protected function handleSkillImageUpload($result, $request)
+    {
+        $skillId = $request->input('skill_id');
+
+        if (!$skillId) {
+            throw new \Exception('Skill ID is required for skill image upload');
+        }
+
+        $skill = \App\Models\Skill::findOrFail($skillId);
+
+    // Delete old image if exists
+        if ($skill->image) {
+            $oldPath = storage_path('app/public/' . $skill->image);
+            if (file_exists($oldPath)) {
+                @unlink($oldPath);
+            }
+        }
+
     // Update skill with new image path
-    $skill->image = $result['path'];
-    $skill->save();
-}
+        $skill->image = $result['path'];
+        $skill->save();
+    }
     /**
      * Handle logo upload
      */
@@ -187,19 +208,37 @@ protected function handleSkillImageUpload($result, $request)
     /**
      * Handle question image upload
      */
-    protected function handleQuestionImageUpload(array $result, Request $request): void
+    protected function handleQuestionImageUpload(array $result, Question $question): void
     {
-        // If you have a question_images table, save there
-        // Otherwise, just return the URL for the question form to use
-        if ($request->has('question_id')) {
-            DB::table('question_images')->insert([
-                'question_id' => $request->input('question_id'),
-                'path' => $result['path'],
-                'url' => $result['url'],
-                'created_at' => now(),
-            ]);
+    // delete old file if exists
+        if (!empty($question->question_image) && Storage::disk('public')->exists($question->question_image)) {
+            Storage::disk('public')->delete($question->question_image);
         }
+
+        $question->question_image = $result['path'];
+        $question->save();
     }
+
+    protected function handleAnswerImageUpload(array $result, Request $request): void
+    {
+        $questionId = (int) $request->input('question_id');
+    $option = (string) $request->input('option'); // '0' | '1' | '2' | '3'
+
+    $question = \App\Models\Question::findOrFail($questionId);
+
+    $fieldName = "answer{$option}_image";
+
+    // Delete old image if exists
+    $old = $question->$fieldName;
+    if (!empty($old) && Storage::disk('public')->exists($old)) {
+        Storage::disk('public')->delete($old);
+    }
+
+    // Save the new storage path
+    $question->$fieldName = $result['path'];  // storage-relative path
+    $question->save();
+}
+
 
     /**
      * Handle profile picture upload

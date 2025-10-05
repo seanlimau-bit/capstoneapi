@@ -41,23 +41,35 @@ Route::get('/awaiting-access', function () {
 })->middleware('auth')->name('auth.awaiting-access');
 
 Route::get('/media/{path}', function (Request $request, $path) {
-    abort_unless(Storage::disk('public')->exists($path), 404);
+    // Normalise path: drop leading slashes and optional "storage/"
+    $path = ltrim($path, '/');
+    $path = preg_replace('#^storage/#', '', $path);
 
-    $mime = Storage::disk('public')->mimeType($path);
-    $stream = Storage::disk('public')->readStream($path);
+    $disk = Storage::disk('public');
+    abort_unless($disk->exists($path), 404);
+
+    $mime = $disk->mimeType($path) ?? 'application/octet-stream';
+    $stream = $disk->readStream($path);
 
     return response()->stream(function () use ($stream) {
         fpassthru($stream);
+        if (is_resource($stream)) fclose($stream);
     }, 200, [
         'Content-Type' => $mime,
         'Access-Control-Allow-Origin' => '*',
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-        'Access-Control-Allow-Headers' => '*',
-        'Cache-Control' => 'public, max-age=31536000',
+        'Access-Control-Allow-Headers' => 'Origin, Content-Type, Accept, Authorization',
+        'Cache-Control' => 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options' => 'nosniff',
     ]);
 })->where('path', '.*');
-Route::get('/storage/{path}', fn($path) => redirect("/media/{$path}", 302))
-    ->where('path', '.*');
+
+// Optional: handle preflight cleanly
+Route::options('/media/{any}', fn() => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Origin, Content-Type, Accept, Authorization',
+]))->where('any', '.*');
 
 /*
 |--------------------------------------------------------------------------
@@ -224,12 +236,9 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
             Route::get('/preview', [QuestionController::class, 'preview'])->name('preview');
             Route::post('/duplicate', [QuestionController::class, 'duplicate'])->name('duplicate');
             Route::patch('/update-field', [QuestionController::class, 'updateField'])->name('update-field');
-
-            Route::post('/image', [QuestionController::class, 'uploadQuestionImage'])->name('upload-image');
             Route::delete('/image', [QuestionController::class, 'deleteQuestionImage'])->name('delete-image');
 
             Route::prefix('answers/{option}')->name('answers.')->group(function () {
-                Route::post('/image', [QuestionController::class, 'uploadAnswerImage'])->name('upload-image');
                 Route::delete('/image', [QuestionController::class, 'deleteAnswerImage'])->name('delete-image');
             });
         });

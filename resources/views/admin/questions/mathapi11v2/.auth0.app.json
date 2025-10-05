@@ -1,0 +1,93 @@
+{
+    "name": "All Gifted Math Quiz",
+    "description": "This is the new MathAPI",
+    "client_id": "x0AAlKqaQ8Zw6YF4kdMzTE08oAXjIhGJ",
+    "client_secret": "0ypbEEyAjhBYCjT0_DjO0c_fsTzcsU2zvObRLojrn2Ebq4r0M_dGl9e8vfe0Fay5",
+    "app_type": "non_interactive",
+    "logo_uri": "https://sp-ao.shortpixel.ai/client/to_webp,q_glossy,ret_img/https://www.allgifted.com/wp-content/uploads/2020/06/ags-trans.png",
+    "is_first_party": true,
+    "is_token_endpoint_ip_header_trusted": false,
+    "oidc_conformant": false,
+    "callbacks": [
+        "http://localhost:3000",
+        "https://mathapi.pamelalim.me",
+        "http://188.166.210.90/callback",
+        "https://mathquiz.allgifted.com",
+        "exp://192.168.1.114:8081",
+        "https://math.allgifted.com/home",
+        "http://localhost:4200/home",
+        "exp://192.168.10.3:8081",
+        "exp://192.168.10.5:8081",
+        "http://localhost:8000/callback"
+    ],
+    "allowed_origins": [
+        "https://mathapi.pamelalim.me"
+    ],
+    "web_origins": [
+        "http://localhost:3000",
+        "https://mathapi.pamelalim.me",
+        "http://188.166.210.90",
+        "https://mathquiz.allgifted.com",
+        "exp://192.168.1.114:8081",
+        "https://math.allgifted.com",
+        "http://localhost:4200",
+        "exp://192.168.10.3:8081",
+        "exp://192.168.10.5:8081",
+        "http://localhost:8000"
+    ],
+    "client_aliases": [],
+    "allowed_clients": [],
+    "allowed_logout_urls": [
+        "http://localhost:3000",
+        "https://mathapi.pamelalim.me",
+        "http://188.166.210.90/logout",
+        "https://mathquiz.allgifted.com/logout",
+        "exp://192.168.1.114:8081",
+        "https://math.allgifted.com/callback",
+        "http://localhost:4200/logout",
+        "exp://192.168.10.3:8081",
+        "exp://192.168.10.5:8081",
+        "http://localhost:8000"
+    ],
+    "jwt_configuration": {
+        "secret_encoded": false,
+        "alg": "RS256"
+    },
+    "signing_keys": [
+        {
+            "cert": "-----BEGIN CERTIFICATE-----\r\nMIIC7jCCAdagAwIBAgIJewN6CY/vLYH2MA0GCSqGSIb3DQEBBQUAMB4xHDAaBgNV\r\nBAMTE3BhbWVsYWxpbS5hdXRoMC5jb20wHhcNMTYwNTI4MjE0NzU4WhcNMzAwMjA0\r\nMjE0NzU4WjAeMRwwGgYDVQQDExNwYW1lbGFsaW0uYXV0aDAuY29tMIIBIjANBgkq\r\nhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+cxFSfFPYByIVCb5zEOEm+UVSt/S8OY9\r\nRnoQ+gh7U07yMSRC5TUhK3UXvCNgfRQ3edvpEwfUtEl7BhkWvzvNI1tJmQ2er/IX\r\nww/VG0UifoYdnqV/HKPI9TN5f5P9oeGakqWX6xKgMlA5PdvdA/fFac+aaKwoB3k0\r\n1ZnkIaE4y5nvmALPU6n/WZVO+fcksMIKtvvr906i2VTWSqI4Uj9iZN+JaSMzdwcy\r\nFMptDZpbsRvAjNydpSb3T6ecomij3YyaouyafOUBPG6zQYvj+OfBerK/OBX5KE0B\r\nDplmVIJ7+AismRo1iLxCYk582XpfgnhaoB++v0aPRFHK/ZF/nSkwNQIDAQABoy8w\r\nLTAMBgNVHRMEBTADAQH/MB0GA1UdDgQWBBSUcdnkG2GGWt4C0RedqyHNm73yeTAN\r\nBgkqhkiG9w0BAQUFAAOCAQEAr57QtM7cmGSBK0ToQ48j6RpQ4Mc+1PmHuMruve39\r\nqZ6S7clbYWAgsNCzYb66oyGqcDfkY+Ox73ifiQkkd6qhESpLxZ/l0XqF/fuVjwCH\r\nhNivpUSOF+B27CQW5pOaYEGQRiiqV5U+lkbco1wYHZQ4xcK3ouIagoAQlYtLD+S3\r\ndExUt5Xl898jIDKqMtOm3pLL5Nv/ZRCDujCrL5HBhf2Thdb+52SfDbGu9hDW7Woc\r\n3SGfmmTy1Rd4uZVPwb/yfqAH6b7uUR8ElI2UdRTXTooGNIp0TgK54fBjsFDnGgK2\r\nm1cwQypl7EEEvGekq8Ip1FefMoxyhjU4HXmH52ChvZxwbg==\r\n-----END CERTIFICATE-----",
+            "pkcs7": "-----BEGIN PKCS7-----\r\nMIIDHwYJKoZIhvcNAQcCoIIDEDCCAwwCAQExADALBgkqhkiG9w0BBwGgggLyMIIC\r\n7jCCAdagAwIBAgIJewN6CY/vLYH2MA0GCSqGSIb3DQEBBQUAMB4xHDAaBgNVBAMT\r\nE3BhbWVsYWxpbS5hdXRoMC5jb20wHhcNMTYwNTI4MjE0NzU4WhcNMzAwMjA0MjE0\r\nNzU4WjAeMRwwGgYDVQQDExNwYW1lbGFsaW0uYXV0aDAuY29tMIIBIjANBgkqhkiG\r\n9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+cxFSfFPYByIVCb5zEOEm+UVSt/S8OY9RnoQ\r\n+gh7U07yMSRC5TUhK3UXvCNgfRQ3edvpEwfUtEl7BhkWvzvNI1tJmQ2er/IXww/V\r\nG0UifoYdnqV/HKPI9TN5f5P9oeGakqWX6xKgMlA5PdvdA/fFac+aaKwoB3k01Znk\r\nIaE4y5nvmALPU6n/WZVO+fcksMIKtvvr906i2VTWSqI4Uj9iZN+JaSMzdwcyFMpt\r\nDZpbsRvAjNydpSb3T6ecomij3YyaouyafOUBPG6zQYvj+OfBerK/OBX5KE0BDplm\r\nVIJ7+AismRo1iLxCYk582XpfgnhaoB++v0aPRFHK/ZF/nSkwNQIDAQABoy8wLTAM\r\nBgNVHRMEBTADAQH/MB0GA1UdDgQWBBSUcdnkG2GGWt4C0RedqyHNm73yeTANBgkq\r\nhkiG9w0BAQUFAAOCAQEAr57QtM7cmGSBK0ToQ48j6RpQ4Mc+1PmHuMruve39qZ6S\r\n7clbYWAgsNCzYb66oyGqcDfkY+Ox73ifiQkkd6qhESpLxZ/l0XqF/fuVjwCHhNiv\r\npUSOF+B27CQW5pOaYEGQRiiqV5U+lkbco1wYHZQ4xcK3ouIagoAQlYtLD+S3dExU\r\nt5Xl898jIDKqMtOm3pLL5Nv/ZRCDujCrL5HBhf2Thdb+52SfDbGu9hDW7Woc3SGf\r\nmmTy1Rd4uZVPwb/yfqAH6b7uUR8ElI2UdRTXTooGNIp0TgK54fBjsFDnGgK2m1cw\r\nQypl7EEEvGekq8Ip1FefMoxyhjU4HXmH52ChvZxwbqEAMQA=\r\n-----END PKCS7-----\r\n",
+            "subject": "deprecated"
+        }
+    ],
+    "sso_disabled": false,
+    "grant_types": [
+        "client_credentials",
+        "authorization_code",
+        "implicit",
+        "refresh_token",
+        "password",
+        "http://auth0.com/oauth/grant-type/password-realm"
+    ],
+    "custom_login_page_on": true,
+    "token_endpoint_auth_method": "client_secret_post",
+    "native_social_login": {
+        "apple": {
+            "enabled": false
+        },
+        "facebook": {
+            "enabled": false
+        }
+    },
+    "refresh_token": {
+        "rotation_type": "non-rotating",
+        "expiration_type": "non-expiring",
+        "leeway": 0,
+        "token_lifetime": 31557600,
+        "infinite_token_lifetime": true,
+        "infinite_idle_token_lifetime": true,
+        "idle_token_lifetime": 2592000
+    },
+    "organization_usage": "deny",
+    "organization_require_behavior": "no_prompt"
+}
