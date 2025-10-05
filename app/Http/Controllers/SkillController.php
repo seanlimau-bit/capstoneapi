@@ -27,10 +27,10 @@ class SkillController extends Controller
     public function index()
     {
         $skills = Skill::with([
-                'status',
-                'tracks.level',
-                'videos',  // if you have a videos() relation
-            ])
+            'status',
+            'tracks' => fn($q) => $q->public()->with('level'),
+            'videos', 
+        ])
             ->withCount('questions')              // -> questions_count
             ->get([
                 'id',
@@ -43,7 +43,7 @@ class SkillController extends Controller
                 'updated_at'
             ]);
 
-        $maps = [
+            $maps = [
             'tracks' => Track::orderBy('track')->pluck('track', 'id'),   // { id: "Track name" }
             'levels' => Level::orderBy('id')->pluck('description','level', 'id'),      // { id: "Level name" }
             'statuses' => Status::orderBy('status')->pluck('status', 'id') // { id: "Active" }
@@ -120,8 +120,8 @@ class SkillController extends Controller
             DB::rollBack();
             $msg = 'Error creating skill: ' . $e->getMessage();
             return $request->expectsJson()
-                ? response()->json(['message' => $msg, 'code' => 500], 500)
-                : redirect()->back()->with('error', $msg)->withInput();
+            ? response()->json(['message' => $msg, 'code' => 500], 500)
+            : redirect()->back()->with('error', $msg)->withInput();
         }
     }
 
@@ -233,8 +233,8 @@ class SkillController extends Controller
             DB::rollBack();
             $msg = 'Error updating skill: ' . $e->getMessage();
             return $request->expectsJson()
-                ? response()->json(['message' => $msg, 'code' => 500], 500)
-                : redirect()->back()->with('error', $msg)->withInput();
+            ? response()->json(['message' => $msg, 'code' => 500], 500)
+            : redirect()->back()->with('error', $msg)->withInput();
         }
     }
 
@@ -265,8 +265,8 @@ class SkillController extends Controller
             if ($skill->questions()->count() > 0) {
                 $msg = 'There are questions in this skill. Delete all questions first.';
                 return $request->expectsJson()
-                    ? response()->json(['success' => false, 'message' => $msg, 'code' => 409], 409)
-                    : redirect()->back()->with('error', $msg);
+                ? response()->json(['success' => false, 'message' => $msg, 'code' => 409], 409)
+                : redirect()->back()->with('error', $msg);
             }
 
             if ($request->boolean('delink_tracks')) {
@@ -276,8 +276,8 @@ class SkillController extends Controller
             if ($skill->tracks()->count() > 0) {
                 $msg = 'There are tracks that use this skill. Do you want to delink all the tracks first?';
                 return $request->expectsJson()
-                    ? response()->json(['success' => false, 'message' => $msg, 'code' => 409, 'requires_confirmation' => true], 409)
-                    : redirect()->back()->with('error', $msg);
+                ? response()->json(['success' => false, 'message' => $msg, 'code' => 409, 'requires_confirmation' => true], 409)
+                : redirect()->back()->with('error', $msg);
             }
 
             if ($skill->image && file_exists(public_path($skill->image))) {
@@ -303,8 +303,8 @@ class SkillController extends Controller
             DB::rollBack();
             $msg = 'Error deleting skill: ' . $e->getMessage();
             return $request->expectsJson()
-                ? response()->json(['success' => false, 'message' => $msg, 'code' => 500], 500)
-                : redirect()->back()->with('error', $msg);
+            ? response()->json(['success' => false, 'message' => $msg, 'code' => 500], 500)
+            : redirect()->back()->with('error', $msg);
         }
     }
 
@@ -317,15 +317,15 @@ class SkillController extends Controller
 
             if ($new->save()) {
                 return request()->expectsJson()
-                    ? response()->json(['success' => true, 'message' => 'Skill duplicated successfully', 'skill_id' => $new->id, 'redirect' => route('admin.skills.show', $new->id)])
-                    : redirect()->route('admin.skills.show', $new->id)->with('success', 'Skill duplicated successfully');
+                ? response()->json(['success' => true, 'message' => 'Skill duplicated successfully', 'skill_id' => $new->id, 'redirect' => route('admin.skills.show', $new->id)])
+                : redirect()->route('admin.skills.show', $new->id)->with('success', 'Skill duplicated successfully');
             }
             throw new \Exception('Failed to save skill');
         } catch (\Exception $e) {
             $msg = 'Error duplicating skill: ' . $e->getMessage();
             return request()->expectsJson()
-                ? response()->json(['success' => false, 'message' => $msg], 500)
-                : redirect()->back()->with('error', $msg);
+            ? response()->json(['success' => false, 'message' => $msg], 500)
+            : redirect()->back()->with('error', $msg);
         }
     }
 
@@ -416,13 +416,13 @@ class SkillController extends Controller
             }
 
             $similar = Skill::whereHas('tracks', fn($q) => $q->whereIn('id', $trackIds))
-                ->where('id', '!=', $skill->id)
-                ->withCount('questions')
-                ->having('questions_count', '>', 0)
-                ->orderByDesc('questions_count')
-                ->limit(15)
-                ->get(['id', 'skill', 'description'])
-                ->map(fn($s) => ['id' => $s->id, 'skill' => $s->skill, 'description' => $s->description, 'questions_count' => $s->questions_count]);
+            ->where('id', '!=', $skill->id)
+            ->withCount('questions')
+            ->having('questions_count', '>', 0)
+            ->orderByDesc('questions_count')
+            ->limit(15)
+            ->get(['id', 'skill', 'description'])
+            ->map(fn($s) => ['id' => $s->id, 'skill' => $s->skill, 'description' => $s->description, 'questions_count' => $s->questions_count]);
 
             return response()->json(['success' => true, 'skills' => $similar]);
         } catch (\Exception $e) {
@@ -434,11 +434,11 @@ class SkillController extends Controller
     {
         $skill = Skill::findOrFail($id);
         $skills = Skill::where('id', '!=', $skill->id)
-            ->whereHas('questions')
-            ->with(['questions' => fn($q) => $q->select('id', 'skill_id', 'question')])
-            ->withCount('questions')
-            ->orderBy('skill')
-            ->get();
+        ->whereHas('questions')
+        ->with(['questions' => fn($q) => $q->select('id', 'skill_id', 'question')])
+        ->withCount('questions')
+        ->orderBy('skill')
+        ->get();
 
         return response()->json(['success' => true, 'skills' => $skills, 'code' => 200]);
     }
@@ -509,7 +509,7 @@ class SkillController extends Controller
         if ($q !== '') {
             $query->where(function ($s) use ($q) {
                 $s->where('video_title', 'like', "%{$q}%")
-                    ->orWhere('video_link', 'like', "%{$q}%");
+                ->orWhere('video_link', 'like', "%{$q}%");
             });
         }
         if ($request->filled('field_id')) {
@@ -517,17 +517,17 @@ class SkillController extends Controller
         }
 
         $videos = $query->orderByRaw("COALESCE(NULLIF(video_title,''), video_link)")
-            ->limit($per)
-            ->get()
-            ->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->video_title ?: basename($v->video_link),
-                    'path' => $v->video_link,
-                    'field_id' => $v->field_id,
-                    'url' => Storage::disk('webroot')->url($v->video_link),
-                ];
-            });
+        ->limit($per)
+        ->get()
+        ->map(function ($v) {
+            return [
+                'id' => $v->id,
+                'title' => $v->video_title ?: basename($v->video_link),
+                'path' => $v->video_link,
+                'field_id' => $v->field_id,
+                'url' => Storage::disk('webroot')->url($v->video_link),
+            ];
+        });
 
         return response()->json(['videos' => $videos]);
     }
