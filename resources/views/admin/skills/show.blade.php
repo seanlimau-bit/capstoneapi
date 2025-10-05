@@ -336,26 +336,33 @@
                         <select name="track_id" class="form-select" required>
                             <option value="">Choose a track...</option>
                             @php
-                            $availableTracks = \App\Models\Track::with('level')->orderBy('track')->get()->filter(function($track) use ($skill) {
-                            return !$skill->tracks->contains($track->id);
-                        });
-                        @endphp
-                        @foreach($availableTracks as $track)
-                        <option value="{{ $track->id }}">
-                            {{ $track->track }}
-                            @if($track->level) (Level {{ $track->level->level }}) @endif
-                        </option>
-                        @endforeach
-                    </select>
-                </div>
-            </form>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary" onclick="SkillManager.addTrack()">Add Track</button>
+                            $availableTracks = \App\Models\Track::public()
+                            ->with(['level' => fn($q) => $q->public()])
+                            ->whereNotIn('tracks.id', $skill->tracks->pluck('id'))
+                            ->orderBy(
+                            \App\Models\Level::select('level')
+                            ->whereColumn('levels.id', 'tracks.level_id')
+                            ->limit(1)
+                            )
+                            ->orderBy('tracks.track')
+                            ->get();
+                            @endphp
+                            @foreach($availableTracks as $track)
+                            <option value="{{ $track->id }}">
+                                {{ $track->track }}
+                                @if($track->level) ({{ $track->level->description }}) @endif
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="SkillManager.addTrack()">Add Track</button>
+            </div>
         </div>
     </div>
-</div>
 </div>
 
 {{-- Add Video Modal --}}
@@ -707,14 +714,14 @@
         }
     }
 
-static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? null), questionText = null) {
-  const modalEl = document.getElementById('questionGenerationModal');
-  
-  if (!modalEl) {
-    console.error('Question generation modal not found.');
-    this.showToast('Question generation modal is not available on this page.', 'error');
-    return;
-  }
+    static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? null), questionText = null) {
+      const modalEl = document.getElementById('questionGenerationModal');
+
+      if (!modalEl) {
+        console.error('Question generation modal not found.');
+        this.showToast('Question generation modal is not available on this page.', 'error');
+        return;
+    }
 
   // Set the question ID
   const qIdEl = document.getElementById('selectedQuestionId');
@@ -733,25 +740,25 @@ static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? nu
 }
 
 
-    static async generateVariations(e) {
-      e?.preventDefault?.(); 
+static async generateVariations(e) {
+  e?.preventDefault?.(); 
 
-      const form        = document.getElementById('questionGenerationForm');
-      const spinner     = document.getElementById('loadingSpinner');
-      const generateBtn = document.getElementById('generateBtn');
-      const originalBtnHTML = generateBtn ? generateBtn.innerHTML : '';
+  const form        = document.getElementById('questionGenerationForm');
+  const spinner     = document.getElementById('loadingSpinner');
+  const generateBtn = document.getElementById('generateBtn');
+  const originalBtnHTML = generateBtn ? generateBtn.innerHTML : '';
 
       // 1) UI -> Generating…
       spinner?.classList.remove('d-none');
       if (generateBtn) {
         generateBtn.disabled = true;
         generateBtn.innerHTML = `
-          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-          Generating…
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        Generating…
         `;
-      }
+    }
 
-      try {
+    try {
         // 2) Send to backend
         const fd = new FormData(form); // includes @csrf and all inputs
         const res = await fetch(form.action, {
@@ -759,9 +766,9 @@ static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? nu
           headers: {
             'Accept': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-          },
+        },
           body: fd // important: no manual Content-Type for FormData
-        });
+      });
 
         // 3) Handle response
         const ct = res.headers.get('content-type') || '';
@@ -773,22 +780,22 @@ static generateSimilar(questionId, skillId = (SkillManager.config?.skillId ?? nu
           this.showToast(`Created ${made} questions${ids}`, 'success');
           bootstrap.Modal.getInstance(document.getElementById('questionGenerationModal'))?.hide();
           setTimeout(() => window.location.reload(), 1000);
-        } else {
+      } else {
           this.showToast(data.message || 'Error generating questions', 'error');
-        }
-      } catch (err) {
-        this.showToast(err?.message || 'Unknown error', 'error');
-      } finally {
+      }
+  } catch (err) {
+    this.showToast(err?.message || 'Unknown error', 'error');
+} finally {
         // 4) UI -> restore
         spinner?.classList.add('d-none');
         if (generateBtn) {
           generateBtn.disabled = false;
           generateBtn.innerHTML = originalBtnHTML;
-        }
       }
+  }
 
       return false; // keep the browser on the page
-    }
+  }
 
 
     // === TRACK MANAGEMENT ===
