@@ -336,101 +336,103 @@ class AssetController extends Controller
        Helpers
        ========================= */
 
-private function scanRoots(string $type, array $contexts): array
-{
-    $disk = Storage::disk('public');
+       /** Decide which roots to scan based on requested type/context */
+       private function scanRoots(string $type, array $contexts): array
+       {
+        $wantVideos = $type === 'video' || in_array('field_video', $contexts, true) || in_array('skill_video', $contexts, true);
+        $wantImages = $type === 'image' || array_intersect($contexts, ['question_image','answer_image','course_image','profile_image','house_image','logo','background']);
+        $wantAnim   = $type === 'animation';
 
-    $roots = [['disk' => 'public', 'path' => '']]; // always include the root
-
-    // Optionally also add each top-level subdirectory as a root
-    foreach ($disk->directories('') as $dir) {
-        $roots[] = ['disk' => 'public', 'path' => $dir];
-    }
-
-    // If you still want your type/context filtering, apply it here,
-    // otherwise just return $roots.
-    return $roots;
-}
-
-
-private function processUpload($file, string $toPath): array
-{
-    try {
-        $orig = $file->getClientOriginalName();
-        $ext  = strtolower($file->getClientOriginalExtension());
-        if (!$this->isAllowedExt($ext)) {
-            return ['success'=>false,'error'=>"File type '{$ext}' is not allowed"];
+        $roots = [];
+        foreach (self::ROOTS as $r) {
+            if ($r['path'] === 'videos'     && !$wantVideos && $type !== 'all') continue;
+            if ($r['path'] === 'images'     && !$wantImages && $type !== 'all') continue;
+            if ($r['path'] === 'animations' && !$wantAnim   && $type !== 'all') continue;
+            $roots[] = $r;
         }
-        $base   = Str::slug(pathinfo($orig, PATHINFO_FILENAME));
-        $final  = $base.'_'.time().'.'.$ext;
-        $stored = $file->storeAs($toPath, $final, 'public');
 
-        return [
-            'success' => true,
-            'file'    => [
-                'id'            => 'public|'.ltrim($stored, '/'),
-                'name'          => $final,
-                'original_name' => $orig,
-                'path'          => $stored,
-                'size'          => $file->getSize(),
-                'type'          => $this->inferType($ext, $stored),
-                'url'           => Storage::disk('public')->url($stored),
-                'extension'     => $ext,
-            ],
-        ];
-    } catch (\Throwable $e) {
-        return ['success'=>false,'error'=>'Failed to upload file: '.$e->getMessage()];
+        // if type==all and no context, keep all roots
+        return $roots ?: self::ROOTS;
     }
-}
 
-private function inferType(string $ext, string $lowerPath): string
-{
-    foreach (self::ALLOWED as $t => $exts) {
-        if (in_array($ext, $exts, true)) return $t;
+    private function processUpload($file, string $toPath): array
+    {
+        try {
+            $orig = $file->getClientOriginalName();
+            $ext  = strtolower($file->getClientOriginalExtension());
+            if (!$this->isAllowedExt($ext)) {
+                return ['success'=>false,'error'=>"File type '{$ext}' is not allowed"];
+            }
+            $base   = Str::slug(pathinfo($orig, PATHINFO_FILENAME));
+            $final  = $base.'_'.time().'.'.$ext;
+            $stored = $file->storeAs($toPath, $final, 'public');
+
+            return [
+                'success' => true,
+                'file'    => [
+                    'id'            => 'public|'.ltrim($stored, '/'),
+                    'name'          => $final,
+                    'original_name' => $orig,
+                    'path'          => $stored,
+                    'size'          => $file->getSize(),
+                    'type'          => $this->inferType($ext, $stored),
+                    'url'           => Storage::disk('public')->url($stored),
+                    'extension'     => $ext,
+                ],
+            ];
+        } catch (\Throwable $e) {
+            return ['success'=>false,'error'=>'Failed to upload file: '.$e->getMessage()];
+        }
     }
+
+    private function inferType(string $ext, string $lowerPath): string
+    {
+        foreach (self::ALLOWED as $t => $exts) {
+            if (in_array($ext, $exts, true)) return $t;
+        }
         // Treat lottie/animations JSON as animation
-    if ($ext === 'json' && str_contains($lowerPath, '/animations/')) return 'animation';
+        if ($ext === 'json' && str_contains($lowerPath, '/animations/')) return 'animation';
         // Heuristics by folder if still unknown
-    if (preg_match('~/videos?/~i', $lowerPath)) return 'video';
-    if (preg_match('~/images?|img/|/pictures?/~i', $lowerPath)) return 'image';
-    if (preg_match('~/audio|music/~i', $lowerPath)) return 'audio';
-    if (preg_match('~/docs?|documents?/~i', $lowerPath)) return 'document';
-    return 'other';
-}
+        if (preg_match('~/videos?/~i', $lowerPath)) return 'video';
+        if (preg_match('~/images?|img/|/pictures?/~i', $lowerPath)) return 'image';
+        if (preg_match('~/audio|music/~i', $lowerPath)) return 'audio';
+        if (preg_match('~/docs?|documents?/~i', $lowerPath)) return 'document';
+        return 'other';
+    }
 
-private function deriveTags(string $lowerPath, string $name, string $ext, string $type): array
-{
-    $tags = [$type];
+    private function deriveTags(string $lowerPath, string $name, string $ext, string $type): array
+    {
+        $tags = [$type];
 
-    if (preg_match('#/images/questions/.*/answers/#', $lowerPath) || str_contains($lowerPath, '/images/questions/answers/')) $tags[] = 'answer_image';
-    if (preg_match('#/images/questions/.*/question_?image/#', $lowerPath) || str_contains($lowerPath, '/images/questions/question_image/')) $tags[] = 'question_image';
+        if (preg_match('#/images/questions/.*/answers/#', $lowerPath) || str_contains($lowerPath, '/images/questions/answers/')) $tags[] = 'answer_image';
+        if (preg_match('#/images/questions/.*/question_?image/#', $lowerPath) || str_contains($lowerPath, '/images/questions/question_image/')) $tags[] = 'question_image';
 
-    if (str_contains($lowerPath, '/images/courses/'))  $tags[] = 'course_image';
-    if (str_contains($lowerPath, '/images/profiles/')) $tags[] = 'profile_image';
-    if (str_contains($lowerPath, '/images/houses/'))   $tags[] = 'house_image';
+        if (str_contains($lowerPath, '/images/courses/'))  $tags[] = 'course_image';
+        if (str_contains($lowerPath, '/images/profiles/')) $tags[] = 'profile_image';
+        if (str_contains($lowerPath, '/images/houses/'))   $tags[] = 'house_image';
 
-    if (str_contains($lowerPath, '/videos/fields/'))   $tags[] = 'field_video';
-    if (str_contains($lowerPath, '/videos/skills/'))   $tags[] = 'skill_video';
+        if (str_contains($lowerPath, '/videos/fields/'))   $tags[] = 'field_video';
+        if (str_contains($lowerPath, '/videos/skills/'))   $tags[] = 'skill_video';
 
-    if (str_contains($lowerPath, '/animations/') || $ext === 'json') $tags[] = 'animation';
+        if (str_contains($lowerPath, '/animations/') || $ext === 'json') $tags[] = 'animation';
 
-    $lname = strtolower($name);
-    if (str_contains($lname, 'logo') || str_contains($lname, 'favicon')) $tags[] = 'logo';
-    if (str_contains($lname, 'background') || str_contains($lname, 'login_bg') || str_contains($lname, 'login-background')) $tags[] = 'background';
+        $lname = strtolower($name);
+        if (str_contains($lname, 'logo') || str_contains($lname, 'favicon')) $tags[] = 'logo';
+        if (str_contains($lname, 'background') || str_contains($lname, 'login_bg') || str_contains($lname, 'login-background')) $tags[] = 'background';
 
-    return array_values(array_unique($tags));
-}
+        return array_values(array_unique($tags));
+    }
 
-private function matchesAnyContext(array $tags, array $contexts): bool
-{
-    foreach ($contexts as $c) if (in_array($c, $tags, true)) return true;
-    return false;
-}
+    private function matchesAnyContext(array $tags, array $contexts): bool
+    {
+        foreach ($contexts as $c) if (in_array($c, $tags, true)) return true;
+        return false;
+    }
 
-private function publicUrl(string $disk, string $path): ?string
-{
-    $path = ltrim($path, '/');
-    return $disk === 'public'
+    private function publicUrl(string $disk, string $path): ?string
+    {
+        $path = ltrim($path, '/');
+        return $disk === 'public'
             ? Storage::disk('public')->url($path)   // -> /storage/...
             : url('/'.$path);                       // webroot: /images/.. /videos/..
         }
@@ -484,66 +486,66 @@ private function publicUrl(string $disk, string $path): ?string
     /**
  * GET /admin/assets/videos - Get only video files for skill linking
  */
-    public function getVideos(Request $request)
-    {
-        try {
-            $videos = [];
-            $finfo = \finfo_open(FILEINFO_MIME_TYPE);
-
+public function getVideos(Request $request)
+{
+    try {
+        $videos = [];
+        $finfo = \finfo_open(FILEINFO_MIME_TYPE);
+        
         // Only scan video-relevant roots
-            $videoRoots = [
-                ['disk' => 'webroot', 'path' => 'videos'],
-                ['disk' => 'public', 'path' => 'assets']
-            ];
-
-            foreach ($videoRoots as $root) {
-                $disk = Storage::disk($root['disk']);
-
-                if (!$disk->exists($root['path'])) {
-                    continue;
-                }
-
-                foreach ($disk->allFiles($root['path']) as $rel) {
-                    $abs = $this->absolutePath($root['disk'], $rel);
-                    if (!is_file($abs)) continue;
-
-                    $name = basename($rel);
-                    $ext = strtolower(pathinfo($rel, PATHINFO_EXTENSION));
-                    $type = $this->inferType($ext, strtolower($rel));
-
-                // Only include video files
-                    if ($type !== 'video') continue;
-
-                    $videos[] = [
-                        'name' => $name,
-                        'path' => str_replace('\\', '/', $rel),
-                        'url' => $this->publicUrl($root['disk'], $rel),
-                        'size' => @filesize($abs) ?: 0,
-                        'modified' => @filemtime($abs) ?: null,
-                        'extension' => $ext,
-                        'type' => 'video'
-                    ];
-                }
+        $videoRoots = [
+            ['disk' => 'webroot', 'path' => 'videos'],
+            ['disk' => 'public', 'path' => 'assets']
+        ];
+        
+        foreach ($videoRoots as $root) {
+            $disk = Storage::disk($root['disk']);
+            
+            if (!$disk->exists($root['path'])) {
+                continue;
             }
-
-            if ($finfo) \finfo_close($finfo);
-
-        // Sort by modification date (newest first)
-            usort($videos, function ($a, $b) {
-                return ($b['modified'] ?? 0) <=> ($a['modified'] ?? 0);
-            });
-
-            return response()->json([
-                'success' => true,
-                'videos' => $videos
-            ]);
-
-        } catch (\Throwable $e) {
-            Log::error('Get videos failed: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to load videos'
-            ], 500);
+            
+            foreach ($disk->allFiles($root['path']) as $rel) {
+                $abs = $this->absolutePath($root['disk'], $rel);
+                if (!is_file($abs)) continue;
+                
+                $name = basename($rel);
+                $ext = strtolower(pathinfo($rel, PATHINFO_EXTENSION));
+                $type = $this->inferType($ext, strtolower($rel));
+                
+                // Only include video files
+                if ($type !== 'video') continue;
+                
+                $videos[] = [
+                    'name' => $name,
+                    'path' => str_replace('\\', '/', $rel),
+                    'url' => $this->publicUrl($root['disk'], $rel),
+                    'size' => @filesize($abs) ?: 0,
+                    'modified' => @filemtime($abs) ?: null,
+                    'extension' => $ext,
+                    'type' => 'video'
+                ];
+            }
         }
+        
+        if ($finfo) \finfo_close($finfo);
+        
+        // Sort by modification date (newest first)
+        usort($videos, function ($a, $b) {
+            return ($b['modified'] ?? 0) <=> ($a['modified'] ?? 0);
+        });
+        
+        return response()->json([
+            'success' => true,
+            'videos' => $videos
+        ]);
+        
+    } catch (\Throwable $e) {
+        Log::error('Get videos failed: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to load videos'
+        ], 500);
     }
+}
 }

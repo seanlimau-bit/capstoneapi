@@ -101,148 +101,159 @@
 
             @if($question->type_id == 2)
             {{-- ===== FIB (Type 2) ===== --}}
-            <div class="editable-field question-field html-content"
+            <div id="fib-question-field"
+            class="editable-field question-field html-content no-auto-inline"
             data-field="question"
             data-id="{{ $question->id }}"
             data-type="html"
-            title="Click to edit HTML content">
+            title="Click the code icon to edit HTML/KaTeX">
             <div class="fib-content large">
               {!! $question->question !!}
             </div>
-            <i class="fas fa-code text-muted ms-2 edit-icon"></i>
+            <i class="fas fa-code text-muted ms-2 edit-icon"
+            onclick="startFibQuestionEdit(event)"></i>
           </div>
           <small class="text-muted">This question supports HTML and KaTeX mathematical notation</small>
 
+          {{-- Count blanks and show appropriate number of answer fields --}}
           @php
-          // Count blanks in the plain text (support [?], ___, ____, [blank])
-          $plain = strip_tags($question->question ?? '');
-          $blankCount = preg_match_all('/\[\?\]|_{3,}|\[blank\]/', $plain) ?: 1;
+          $plain = html_entity_decode(strip_tags($question->question ?? ''), ENT_QUOTES | ENT_HTML5);
+          preg_match_all('/(\[\?\])|(_{3,})|(\[blank\])/u', $plain, $m);
+          $blankCount = max(1, count($m[0]));
 
-          // Build answers array from answer0..answer3
-          $answers = [];
-          if (!empty($question->answer0)) $answers[] = $question->answer0;
-          if (!empty($question->answer1)) $answers[] = $question->answer1;
-          if (!empty($question->answer2)) $answers[] = $question->answer2;
-          if (!empty($question->answer3)) $answers[] = $question->answer3;
+          // keep answers aligned to indices 0..3
+          $answers = [
+          (string) ($question->answer0 ?? ''),
+          (string) ($question->answer1 ?? ''),
+          (string) ($question->answer2 ?? ''),
+          (string) ($question->answer3 ?? ''),
+          ];
           @endphp
 
           <div class="mt-3">
             <label class="form-label text-muted small">EXPECTED ANSWERS (for each blank):</label>
             @for($i = 0; $i < min($blankCount, 4); $i++)
-            <div class="mb-2">
-              <span class="text-muted me-2">Blank {{ $i + 1 }}:</span>
-              <div class="editable-field answer-field d-inline-block"
+            <div class="mb-2 d-flex align-items-center gap-2">
+              <span class="text-muted">Blank {{ $i + 1 }}:</span>
+              <div class="editable-field answer-field d-inline-block flex-grow-1"
               data-field="answer{{ $i }}"
               data-id="{{ $question->id }}"
               data-type="text"
+              data-sanitize="plain"
               style="min-width: 200px; border-bottom: 1px solid #dee2e6; padding: 2px 5px;">
-              {{ $answers[$i] ?? 'Not set' }}
+              {{ $answers[$i] !== '' ? $answers[$i] : 'Not set' }}
               <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
             </div>
           </div>
           @endfor
-          <div class="mt-2 d-flex gap-2 flex-wrap">
-            <button class="btn btn-sm btn-outline-primary" id="fib-add-blank">
-              <i class="fas fa-plus me-1"></i>Add Blank
-            </button>
-            <button class="btn btn-sm btn-outline-danger" id="fib-remove-blank">
-              <i class="fas fa-minus me-1"></i>Remove Last Blank
-            </button>
-            <small class="text-muted ms-2">
-              Blanks detected: <span id="fib-blank-count">{{ $blankCount }}</span> / 4
-            </small>
-          </div>
           @if($blankCount > 4)
           <small class="text-danger">Only 4 blanks are supported in the UI. Extra blanks won’t show here.</small>
           @endif
         </div>
+        <div class="mt-2 d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-primary" id="fib-add-blank">
+            <i class="fas fa-plus me-1"></i>Add Blank
+          </button>
+          <button class="btn btn-sm btn-outline-danger" id="fib-remove-blank">
+            <i class="fas fa-minus me-1"></i>Remove Last Blank
+          </button>
+          <small class="text-muted ms-2">
+            Blanks detected: <span id="fib-blank-count">{{ $blankCount }}</span> / 4
+          </small>
+        </div>
+        @if($blankCount > 4)
+        <small class="text-danger">Only 4 blanks are supported in the UI. Extra blanks won’t show here.</small>
+        @endif
+      </div>
 
-        @elseif($question->type_id == 1)
-        {{-- ===== MCQ (Type 1) ===== --}}
-        <div class="editable-field question-field"
-        data-field="question"
+      @elseif($question->type_id == 1)
+      {{-- ===== MCQ (Type 1) ===== --}}
+      <div class="editable-field question-field no-auto-inline html-content"
+      data-field="question"
+      data-id="{{ $question->id }}"
+      data-type="textarea"
+      title="Click to edit">
+      {{ $question->question }}
+      <i class="fas fa-code text-muted ms-2 edit-icon"
+      onclick="startFibQuestionEdit(event)"></i>
+    </div>
+
+    @php
+    $mcqOptions = [
+    'A' => ['text' => $question->answer0, 'image' => $question->answer0_image, 'index' => 0],
+    'B' => ['text' => $question->answer1, 'image' => $question->answer1_image, 'index' => 1],
+    'C' => ['text' => $question->answer2, 'image' => $question->answer2_image, 'index' => 2],
+    'D' => ['text' => $question->answer3, 'image' => $question->answer3_image, 'index' => 3],
+    ];
+    $validOptions = array_filter($mcqOptions, fn($o) => !empty($o['text']) || !empty($o['image']));
+    @endphp
+
+    @if(count($validOptions) > 0)
+    <div class="mb-4">
+      <label class="form-label text-muted small">MULTIPLE CHOICE OPTIONS</label>
+      @foreach($validOptions as $letter => $option)
+      <div class="mcq-option {{ $question->correct_answer == $option['index'] ? 'border-success' : '' }}"
+       data-option-index="{{ $option['index'] }}">
+       <div class="mcq-option-label {{ $question->correct_answer == $option['index'] ? 'bg-success text-white' : '' }}">
+        {{ $letter }}
+        @if($question->correct_answer == $option['index'])
+        <i class="fas fa-check position-absolute" style="font-size: 10px; top: 2px; right: 2px;"></i>
+        @endif
+      </div>
+      <div class="flex-grow-1">
+        @if($option['text'])
+        <div class="editable-field mb-2"
+        data-field="answer{{ $option['index'] }}"
         data-id="{{ $question->id }}"
-        data-type="textarea"
-        title="Click to edit">
-        {{ $question->question }}
+        data-type="text"
+        data-sanitize="plain"
+        title="Click to edit option {{ $letter }}">
+        {{ $option['text'] }}
         <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
       </div>
+      @endif
 
-      @php
-      $mcqOptions = [
-      'A' => ['text' => $question->answer0, 'image' => $question->answer0_image, 'index' => 0],
-      'B' => ['text' => $question->answer1, 'image' => $question->answer1_image, 'index' => 1],
-      'C' => ['text' => $question->answer2, 'image' => $question->answer2_image, 'index' => 2],
-      'D' => ['text' => $question->answer3, 'image' => $question->answer3_image, 'index' => 3],
-      ];
-      $validOptions = array_filter($mcqOptions, fn($o) => !empty($o['text']) || !empty($o['image']));
-      @endphp
-
-      @if(count($validOptions) > 0)
-      <div class="mb-4">
-        <label class="form-label text-muted small">MULTIPLE CHOICE OPTIONS</label>
-        @foreach($validOptions as $letter => $option)
-        <div class="mcq-option {{ $question->correct_answer == $option['index'] ? 'border-success' : '' }}"
-         data-option-index="{{ $option['index'] }}">
-         <div class="mcq-option-label {{ $question->correct_answer == $option['index'] ? 'bg-success text-white' : '' }}">
-          {{ $letter }}
-          @if($question->correct_answer == $option['index'])
-          <i class="fas fa-check position-absolute" style="font-size: 10px; top: 2px; right: 2px;"></i>
-          @endif
-        </div>
-        <div class="flex-grow-1">
-          @if($option['text'])
-          <div class="editable-field mb-2"
-          data-field="answer{{ $option['index'] }}"
-          data-id="{{ $question->id }}"
-          data-type="text"
-          title="Click to edit option {{ $letter }}">
-          {{ $option['text'] }}
-          <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
-        </div>
-        @endif
-
-        {{-- Answer Image Section --}}
-        @if($option['image'])
-        <div class="answer-image-container">
-          <div class="image-wrapper-small">
-            <img src="{{ Storage::url($option['image'])  }}" alt="Option {{ $letter }} Image" class="answer-image">
-            <div class="image-overlay-small">
-              <button class="btn btn-light btn-sm" onclick="changeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Change">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-danger btn-sm" onclick="removeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Remove">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
+      {{-- Answer Image Section --}}
+      @if($option['image'])
+      <div class="answer-image-container">
+        <div class="image-wrapper-small">
+          <img src="{{ Storage::url($option['image'])  }}" alt="Option {{ $letter }} Image" class="answer-image">
+          <div class="image-overlay-small">
+            <button class="btn btn-light btn-sm" onclick="changeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Change">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="removeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Remove">
+              <i class="fas fa-trash"></i>
+            </button>
           </div>
         </div>
-        @else
-        <div class="upload-area-small" onclick="addAnswerImage({{ $question->id }}, {{ $option['index'] }})">
-          <i class="fas fa-plus me-2"></i>Add Image for Option {{ $letter }}
-        </div>
-        @endif
       </div>
+      @else
+      <div class="upload-area-small" onclick="addAnswerImage({{ $question->id }}, {{ $option['index'] }})">
+        <i class="fas fa-plus me-2"></i>Add Image for Option {{ $letter }}
+      </div>
+      @endif
     </div>
-    @endforeach
   </div>
+  @endforeach
+</div>
 
-  {{-- Correct Answer for MCQ --}}
-  <div class="mb-4">
-    <label class="form-label text-muted small">CORRECT ANSWER</label>
-    <div class="correct-answer-selector-wrapper">
-      <select class="form-select form-select-sm correct-answer-selector"
-      data-field="correct_answer"
-      data-id="{{ $question->id }}"
-      data-current="{{ $question->correct_answer }}">
-      <option value="">Select correct answer...</option>
-      @foreach($validOptions as $letter => $option)
-      <option value="{{ $option['index'] }}" {{ $question->correct_answer == $option['index'] ? 'selected' : '' }}>
-        Option {{ $letter }}
-      </option>
-      @endforeach
-    </select>
-  </div>
+{{-- Correct Answer for MCQ --}}
+<div class="mb-4">
+  <label class="form-label text-muted small">CORRECT ANSWER</label>
+  <div class="correct-answer-selector-wrapper">
+    <select class="form-select form-select-sm correct-answer-selector"
+    data-field="correct_answer"
+    data-id="{{ $question->id }}"
+    data-current="{{ $question->correct_answer }}">
+    <option value="">Select correct answer...</option>
+    @foreach($validOptions as $letter => $option)
+    <option value="{{ $option['index'] }}" {{ $question->correct_answer == $option['index'] ? 'selected' : '' }}>
+      Option {{ $letter }}
+    </option>
+    @endforeach
+  </select>
+</div>
 </div>
 @else
 <div class="mb-4">
@@ -320,7 +331,6 @@
     </option>
     @endforeach
   </select>
-</div>
 </div>
 </div>
 </div>
@@ -879,6 +889,15 @@ function closeImagePreview() {
   uploadBtn.disabled = false;
 }
 
+function startFibQuestionEdit(e) {
+  e.stopPropagation();
+  const el = document.getElementById('fib-question-field');
+  if (!el) return;
+  const currentVal = el.querySelector('.fib-content')?.innerHTML?.trim() ?? '';
+  showInlineEditor(el, 'question', 'html', currentVal, { htmlSafe: false });
+}
+
+
 /** ====== HINTS ====== **/
 async function saveNewHint() {
   const hintText = document.getElementById('new-hint-text').value.trim();
@@ -1055,20 +1074,51 @@ function startInlineEdit(containerEl, kind = 'text', onSave, opts = {}) {
 /** ====== QUESTION FIELD UPDATES ====== **/
 function setupInlineEditing() {
   document.querySelectorAll('.editable-field').forEach(field => {
+    // skip special cases
     if (field.classList.contains('editable-hint-level') ||
-      field.classList.contains('editable-hint-text') ||
-      field.classList.contains('editable-solution')) return;
+      field.classList.contains('editable-hint-text')  ||
+      field.classList.contains('editable-solution')   ||
+      field.classList.contains('no-auto-inline')) {
+      return;
+  }
 
-      field.addEventListener('click', function() {
-        const fieldName = this.dataset.field;
-        const fieldType = this.dataset.type || 'text';
-        const currentVal = fieldType === 'html'
-        ? this.querySelector('.fib-content')?.innerHTML?.trim() ?? ''
-        : this.textContent.trim();
-        showInlineEditor(this, fieldName, fieldType, currentVal);
+  field.addEventListener('click', function () {
+    const fieldName = this.dataset.field;
+    const fieldType = this.dataset.type || 'text';
+
+    let currentVal;
+    if (fieldType === 'html') {
+      currentVal = this.querySelector('.fib-content')?.innerHTML?.trim() ?? '';
+    } else {
+        // plain text path (answers, titles, etc.)
+        currentVal = this.textContent.trim();
+        if (this.dataset.sanitize === 'plain') {
+          currentVal = stripTagsAndDecode(currentVal);
+        }
+      }
+
+      showInlineEditor(this, fieldName, fieldType, currentVal, {
+        htmlSafe: fieldType !== 'html'
       });
-  });
+    });
+});
 }
+
+function stripTagsAndDecode(input) {
+  // decode entities
+  const d = document.createElement('textarea');
+  d.innerHTML = input;
+  let s = d.value;
+
+  // strip tags (including KaTeX-rendered spans)
+  const tmp = document.createElement('div');
+  tmp.innerHTML = s;
+  s = (tmp.textContent || tmp.innerText || '').trim();
+
+  // collapse whitespace
+  return s.replace(/\s{2,}/g, ' ');
+}
+
 
 function showInlineEditor(element, fieldName, fieldType, currentValue) {
   const csrf = document.querySelector('meta[name="csrf-token"]').content;

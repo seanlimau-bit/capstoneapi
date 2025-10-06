@@ -508,14 +508,17 @@ class QAController extends Controller
 
     // -------- helpers --------
 
-    private function getReviewHistory($questionId)
+    private function getReviewHistory(int $questionId)
     {
         try {
-            return DB::table('review_history')
-            ->where('question_id', $questionId)
-            ->orderBy('created_at', 'desc')
-            ->get();
+            // You can later swap this for a true qa_history table if you add one
+            return \App\Models\QaIssue::with('reviewer')
+                ->where('question_id', $questionId)
+                ->latest()
+                ->take(50)
+                ->get();
         } catch (\Throwable $e) {
+            \Log::warning('getReviewHistory fallback: '.$e->getMessage());
             return collect();
         }
     }

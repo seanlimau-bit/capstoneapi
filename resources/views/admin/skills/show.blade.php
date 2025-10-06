@@ -183,7 +183,7 @@
                                     </td>
                                     <td>
                                         <span class="badge bg-info">
-                                            {{ $question->question_type ?? 'MCQ' }}
+                                            {{ $question->type->type ?? 'MCQ' }}
                                         </span>
                                     </td>
                                     <td>

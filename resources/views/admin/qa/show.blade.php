@@ -344,11 +344,79 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
           @if($question->qa_reviewed_at)
             <div class="text-muted small mt-3"><i class="fas fa-clock me-1"></i> Reviewed {{ $human($question->qa_reviewed_at) }}</div>
           @endif
-        </div>
+        <h6 class="mb-2">
+          <i class="fas fa-flag me-1 text-warning"></i> Issues
+          <span class="badge bg-secondary">{{ $qaIssues->count() }}</span>
+        </h6>
+
+        @if($qaIssues->count())
+          <div class="list-group small">
+            @foreach($qaIssues as $issue)
+              @php
+                $typeColors = [
+                  'grammar'    => 'primary',
+                  'math_error' => 'danger',
+                  'unclear'    => 'warning',
+                  'image_issue'=> 'info',
+                  'other'      => 'secondary',
+                ];
+                $statusColors = [
+                  'open'      => 'warning',
+                  'resolved'  => 'success',
+                  'dismissed' => 'secondary',
+                ];
+                $tColor = $typeColors[$issue->issue_type] ?? 'secondary';
+                $sColor = $statusColors[$issue->status] ?? 'secondary';
+              @endphp
+              <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div class="me-2">
+                    <div class="mb-1">
+                      <span class="badge bg-{{ $tColor }} me-1 text-uppercase">{{ $issue->issue_type }}</span>
+                      <span class="badge bg-{{ $sColor }}">{{ $issue->status }}</span>
+                    </div>
+                    <div class="text-body">{!! nl2br(e($issue->description)) !!}</div>
+                    <div class="text-muted mt-1">
+                      <i class="fas fa-user me-1"></i>{{ optional($issue->reviewer)->name ?? 'Unknown' }}
+                      &middot;
+                      <i class="fas fa-clock ms-1 me-1"></i>{{ \Illuminate\Support\Carbon::parse($issue->created_at)->diffForHumans() }}
+                      @if($issue->updated_at && $issue->updated_at != $issue->created_at)
+                        <span class="ms-2">(updated {{ \Illuminate\Support\Carbon::parse($issue->updated_at)->diffForHumans() }})</span>
+                      @endif
+                    </div>
+                  </div>
+                  @if($canQA)
+                    <div class="btn-group btn-group-sm">
+                      @if($issue->status !== 'open')
+                        <button class="btn btn-outline-warning" onclick="Issue.updateStatus({{ $issue->id }}, 'open')">
+                          <i class="fas fa-folder-open"></i>
+                        </button>
+                      @endif
+                      @if($issue->status !== 'resolved')
+                        <button class="btn btn-outline-success" onclick="Issue.updateStatus({{ $issue->id }}, 'resolved')">
+                          <i class="fas fa-check"></i>
+                        </button>
+                      @endif
+                      @if($issue->status !== 'dismissed')
+                        <button class="btn btn-outline-secondary" onclick="Issue.updateStatus({{ $issue->id }}, 'dismissed')">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      @endif
+                    </div>
+                  @endif
+                </div>
+              </div>
+            @endforeach
+          </div>
+        @else
+          <div class="alert alert-light border small mb-0">
+            No issues have been filed for this question yet. Use <em>Report Issue…</em> to add one.
+          </div>
+        @endif
+
       </div>
     </div>
   </div>
-
 </div>
 @endsection
 
