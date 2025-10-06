@@ -196,7 +196,7 @@
         <div class="question-container">
             <div class="w-100">
                 @if($question->question_image)
-                    <img src="{{ asset($question->question_image) }}" alt="Question" class="question-image">
+                    <img src="{{ Storage::url($question->question_image) }}" alt="Question" class="question-image">
                 @endif
                 
                 <div class="question-text" id="questionText">
@@ -222,7 +222,7 @@
                 @foreach($validOptions as $option)
                     <div class="mcq-option" onclick="selectOption({{ $option['index'] }})">
                         @if($option['image'])
-                            <img src="{{ asset($option['image']) }}" alt="Option" style="max-width: 100%; height: auto; margin-bottom: 8px; border-radius: 8px;">
+                            <img src="{{Storage::url($option['image']) }}" alt="Option" style="max-width: 100%; height: auto; margin-bottom: 8px; border-radius: 8px;">
                         @endif
                         <div>{!! $option['text'] !!}</div>
                     </div>
