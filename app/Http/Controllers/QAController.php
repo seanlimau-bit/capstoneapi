@@ -333,34 +333,20 @@ class QAController extends Controller
     /**
      * Resolve an issue
      */
-    public function resolveIssue(Request $request, QaIssue $issue)
+    public function issueStatus(\App\Models\QaIssue $issue, \Illuminate\Http\Request $request)
     {
-        try {
-            DB::beginTransaction();
+        $request->validate(['status' => 'required|in:open,resolved,dismissed']);
 
-            $issue->update([
-                'status'      => 'resolved',
-                'resolved_by' => Auth::id(),
-                'resolved_at' => now(),
-            ]);
+        $issue->status = $request->string('status');
+        $issue->save();
 
-            $question   = $issue->question;
-            $openIssues = $question->qaIssues()->where('status', 'open')->count();
-
-            if ($openIssues === 0) {
-                $question->update(['qa_status' => 'needs_revision']);
-            }
-
-            $this->logReviewAction($question->id, 'resolve', 'Issue resolved: '.$issue->issue_type);
-
-            DB::commit();
-            return back()->with('success', 'Issue marked as resolved.');
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            Log::error('QA Resolve Issue Error: '.$e->getMessage());
-            return back()->with('error', 'Failed to resolve issue. Please try again.');
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Issue status updated.',
+            'status'  => $issue->status,
+        ]);
     }
+
 
     /**
      * Bulk approve => Public

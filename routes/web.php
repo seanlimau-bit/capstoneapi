@@ -99,9 +99,9 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
             ->middleware('qa:qa_request_changes')
             ->name('bulk-flag');
 
-        Route::post('/issues/{issue}/resolve', [QAController::class, 'resolveIssue'])
+        Route::post('/issues/{issue}/status', [QAController::class, 'issueStatus'])
             ->middleware('qa:qa_checklist_update')
-            ->name('resolve-issue');
+            ->name('issue.status');
 
         Route::prefix('questions/{question}')->name('questions.')->group(function () {
             Route::get('/', [QAController::class, 'show'])->name('show');

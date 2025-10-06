@@ -477,6 +477,45 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
       credentials: 'same-origin'
     }).then(handleJson),
   };
+  
+  window.Issue = {
+    updateStatus: (issueId, status) => fetch(`/admin/qa/issues/${issueId}/status`, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({ status }),
+      credentials: 'same-origin'
+    })
+    .then(async (res) => {
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        const html = await res.text();
+        return { success:false, message:`HTTP ${res.status}`, html };
+      }
+      return res.json();
+    })
+    .then(d => {
+      if (!d.success) {
+        console.error('Issue.updateStatus failed:', d);
+        if (d.html && d.html.includes('419')) {
+          (window.showToast||alert)('CSRF/session error (419). Check SESSION_DOMAIN/SSL.', 'error');
+        } else {
+          (window.showToast||alert)(d.message || 'Failed to update issue', 'error');
+        }
+        return;
+      }
+      (window.showToast||alert)(d.message || 'Issue updated', 'success');
+      setTimeout(()=>location.reload(), 250);
+    })
+    .catch(err => {
+      console.error(err);
+      (window.showToast||alert)('Network error updating issue');
+    })
+  };
 
   window.setStatus = (id, status) => {
     QA.status(id, status).then(d => {
