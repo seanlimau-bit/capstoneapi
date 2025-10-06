@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Question;
-use App\Models\QaIssue;
 use App\Models\Skill;
 use App\Models\Level;
+use App\Models\QAIssue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
