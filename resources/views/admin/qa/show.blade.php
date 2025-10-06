@@ -6,16 +6,16 @@
 use Illuminate\Support\Carbon;
 
 $human = function ($d, $fallback = null) {
-  if (empty($d)) return $fallback;
-  if ($d instanceof \DateTimeInterface) return $d->diffForHumans();
-  try { return Carbon::parse($d)->diffForHumans(); } catch (\Throwable $e) { return $fallback; }
+if (empty($d)) return $fallback;
+if ($d instanceof \DateTimeInterface) return $d->diffForHumans();
+try { return Carbon::parse($d)->diffForHumans(); } catch (\Throwable $e) { return $fallback; }
 };
 
 $u = auth()->user();
 
 $canQA = $u && (
-  (method_exists($u,'canAccessQA') && $u->canAccessQA())
-  || (method_exists($u,'canAccessAdmin') && $u->canAccessAdmin())
+(method_exists($u,'canAccessQA') && $u->canAccessQA())
+|| (method_exists($u,'canAccessAdmin') && $u->canAccessAdmin())
 );
 
 // Force read-only on this page
@@ -23,11 +23,11 @@ $editMode = false;
 
 $qaStatus = $question->qa_status ?? 'unreviewed';
 $statusConfig = [
-  'unreviewed'     => ['color'=>'warning','icon'=>'clock','text'=>'Unreviewed'],
-  'approved'       => ['color'=>'success','icon'=>'check-circle','text'=>'Approved'],
-  'flagged'        => ['color'=>'danger','icon'=>'flag','text'=>'Flagged'],
-  'needs_revision' => ['color'=>'info','icon'=>'edit','text'=>'Needs Revision'],
-  'ai_generated'   => ['color'=>'secondary','icon'=>'robot','text'=>'AI-Generated'],
+'unreviewed'     => ['color'=>'warning','icon'=>'clock','text'=>'Unreviewed'],
+'approved'       => ['color'=>'success','icon'=>'check-circle','text'=>'Approved'],
+'flagged'        => ['color'=>'danger','icon'=>'flag','text'=>'Flagged'],
+'needs_revision' => ['color'=>'info','icon'=>'edit','text'=>'Needs Revision'],
+'ai_generated'   => ['color'=>'secondary','icon'=>'robot','text'=>'AI-Generated'],
 ];
 $config = $statusConfig[$qaStatus] ?? $statusConfig['unreviewed'];
 
@@ -66,7 +66,7 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
         <div class="small text-muted">
           Created: {{ $question->created_at ? $question->created_at->format('M d, Y') : 'Unknown' }}
           @if(!empty($question->published_at))
-            &nbsp;•&nbsp; Published {{ $human($question->published_at, 'recently') }}
+          &nbsp;•&nbsp; Published {{ $human($question->published_at, 'recently') }}
           @endif
         </div>
       </div>
@@ -117,7 +117,7 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
             </div>
             <div class="text-muted small">
               @if($question->skill)
-                <i class="fas fa-brain me-1"></i>Skill: {{ $question->skill->skill }} &nbsp;&nbsp;
+              <i class="fas fa-brain me-1"></i>Skill: {{ $question->skill->skill }} &nbsp;&nbsp;
               @endif
               <i class="fas fa-signal me-1"></i>Difficulty: {{ $difficulty }}
             </div>
@@ -149,7 +149,7 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
             @php $qImg = $question->question_image; @endphp
             <div class="text-center mb-2">
               <img id="qImagePreview" class="thumb" style="{{ $qImg ? '' : 'display:none' }}"
-                   src="{{ $qImg ? asset($qImg) : '' }}" alt="Question image">
+              src="{{ $qImg ? asset($qImg) : '' }}" alt="Question image">
               <div id="qImageEmpty" class="img-empty" style="{{ $qImg ? 'display:none' : '' }}">
                 No image uploaded
               </div>
@@ -164,259 +164,282 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
 
           {{-- Answers read only --}}
           @if($question->type_id == 1)
-            @php
-              $answers = [
-                ['text' => $question->answer0 ?? '', 'image' => $question->answer0_image ?? '', 'i' => 0],
-                ['text' => $question->answer1 ?? '', 'image' => $question->answer1_image ?? '', 'i' => 1],
-                ['text' => $question->answer2 ?? '', 'image' => $question->answer2_image ?? '', 'i' => 2],
-                ['text' => $question->answer3 ?? '', 'image' => $question->answer3_image ?? '', 'i' => 3],
-              ];
-              $correctIndex = (int)($question->correct_answer ?? 0);
-            @endphp
-            <h6 class="text-muted small mb-3">ANSWER OPTIONS</h6>
-            @foreach($answers as $ans)
-              @php
-                $i = $ans['i'];
-                $img = $ans['image'];
-                $isCorrect = $i === $correctIndex;
-                $letter = chr(65 + $i);
-              @endphp
-              <div class="border rounded p-3 mb-3 {{ $isCorrect ? 'bg-success bg-opacity-10 border-success' : '' }}">
-                <div class="row align-items-start">
-                  <div class="col-auto">
-                    <div class="rounded-circle d-flex align-items-center justify-content-center position-relative
-                                {{ $isCorrect ? 'bg-success text-white' : 'bg-secondary text-white' }} ans-letter">
-                      {{ $letter }}
-                      @if($isCorrect)
-                        <i class="fas fa-check position-absolute" style="font-size:0.7em;top:2px;right:2px;"></i>
-                      @endif
-                    </div>
-                  </div>
-                  <div class="col">
-                    @if($ans['text'])
-                      <div class="mb-2 mcq-option">{!! $ans['text'] !!}</div>
-                    @endif
-                    <div class="d-flex align-items-center gap-3">
-                      <div style="min-width:120px">
-                        <img class="thumb ans-preview" style="{{ $img ? '' : 'display:none' }}" src="{{ $img ? asset($img) : '' }}" alt="Answer {{ $letter }} image">
-                        <div class="img-empty ans-empty" style="{{ $img ? 'display:none' : '' }}">No image</div>
-                      </div>
-                    </div>
-                    @if($isCorrect)
-                      <small class="text-success fw-bold d-block mt-2">
-                        <i class="fas fa-check-circle me-1"></i>Correct Answer
-                      </small>
-                    @endif
-                  </div>
-                </div>
-              </div>
-            @endforeach
-          @else
-            <div class="mb-4">
-              <h6 class="text-muted small mb-2">CORRECT ANSWER</h6>
-              <div class="border rounded p-3 bg-success bg-opacity-10 border-success">
-                <div class="d-flex align-items-center">
-                  <i class="fas fa-check-circle text-success me-2"></i>
-                  <strong>{{ $question->correct_answer ?: '[No answer provided]' }}</strong>
-                </div>
+          @php
+          $answers = [
+          ['text' => $question->answer0 ?? '', 'image' => $question->answer0_image ?? '', 'i' => 0],
+          ['text' => $question->answer1 ?? '', 'image' => $question->answer1_image ?? '', 'i' => 1],
+          ['text' => $question->answer2 ?? '', 'image' => $question->answer2_image ?? '', 'i' => 2],
+          ['text' => $question->answer3 ?? '', 'image' => $question->answer3_image ?? '', 'i' => 3],
+          ];
+          $correctIndex = (int)($question->correct_answer ?? 0);
+          @endphp
+          <h6 class="text-muted small mb-3">ANSWER OPTIONS</h6>
+          @foreach($answers as $ans)
+          @php
+          $i = $ans['i'];
+          $img = $ans['image'];
+          $isCorrect = $i === $correctIndex;
+          $letter = chr(65 + $i);
+          @endphp
+          <div class="border rounded p-3 mb-3 {{ $isCorrect ? 'bg-success bg-opacity-10 border-success' : '' }}">
+            <div class="row align-items-start">
+              <div class="col-auto">
+                <div class="rounded-circle d-flex align-items-center justify-content-center position-relative
+                {{ $isCorrect ? 'bg-success text-white' : 'bg-secondary text-white' }} ans-letter">
+                {{ $letter }}
+                @if($isCorrect)
+                <i class="fas fa-check position-absolute" style="font-size:0.7em;top:2px;right:2px;"></i>
+                @endif
               </div>
             </div>
-          @endif
-
-          {{-- Meta row --}}
-          <div class="row mt-4">
-            <div class="col-md-4">
-              <h6 class="text-muted small mb-2">DIFFICULTY</h6>
-              <span class="badge bg-{{ $difficultyColor }}">{{ $question->difficulty->short_description }}</span>
-            </div>
-            <div class="col-md-6">
-              <h6 class="text-muted small mb-2">SKILL</h6>
-              @if($question->skill)
-                <span class="badge bg-primary">{{ $question->skill->skill }}</span>
-              @else
-                <span class="text-muted">No skill assigned</span>
+            <div class="col">
+              @if($ans['text'])
+              <div class="mb-2 mcq-option">{!! $ans['text'] !!}</div>
+              @endif
+              <div class="d-flex align-items-center gap-3">
+                <div style="min-width:120px">
+                  <img class="thumb ans-preview" style="{{ $img ? '' : 'display:none' }}" src="{{ $img ? asset($img) : '' }}" alt="Answer {{ $letter }} image">
+                  <div class="img-empty ans-empty" style="{{ $img ? 'display:none' : '' }}">No image</div>
+                </div>
+              </div>
+              @if($isCorrect)
+              <small class="text-success fw-bold d-block mt-2">
+                <i class="fas fa-check-circle me-1"></i>Correct Answer
+              </small>
               @endif
             </div>
-            <div class="col-md-1 text-center">
-              <h6 class="text-muted small mb-2"><i class="fas fa-calculator"></i></h6>
-              <span class="badge bg-secondary">{{ $question->calculator ? ucfirst($question->calculator) : 'None' }}</span>
-            </div>
           </div>
-
-          {{-- Hints (read-only) --}}
-          <div class="mt-4">
-            <label class="form-label text-muted small">HINTS</label>
-            @if($question->hints && $question->hints->count() > 0)
-              <div class="hints-container">
-                @foreach($question->hints->sortBy('hint_level') as $hint)
-                  <div class="hint-item mb-2 p-2 border-start border-3 border-info bg-light">
-                    <div class="d-flex justify-content-between align-items-start">
-                      <div class="flex-grow-1 d-flex align-items-center gap-2">
-                        <span class="badge bg-info me-2">Level</span>
-                        <span>{{ $hint->hint_level }}</span>
-                        <span class="ms-2">{{ $hint->hint_text }}</span>
-                      </div>
-                    </div>
-                    @if($hint->user)
-                      <small class="text-muted">Added by {{ $hint->user->name }}</small>
-                    @endif
-                  </div>
-                @endforeach
-              </div>
-            @else
-              <p class="text-muted">No hints available</p>
-            @endif
-          </div>
-
-          {{-- Solutions (read-only) --}}
-          <div class="mt-3">
-            <label class="form-label text-muted small">SOLUTIONS</label>
-            @if($question->solutions && $question->solutions->count() > 0)
-              <div class="solutions-container">
-                @foreach($question->solutions as $solution)
-                  <div class="solution-item mb-3 p-3 border rounded bg-light">
-                    <div class="solution-content">{!! nl2br(e($solution->solution)) !!}</div>
-                    <div class="mt-2 d-flex justify-content-between align-items-center">
-                      <small class="text-muted">
-                        <i class="fas fa-user me-1"></i>
-                        By {{ $solution->user->name ?? 'Unknown' }} on {{ optional($solution->created_at)->format('M d, Y') }}
-                      </small>
-                    </div>
-                  </div>
-                @endforeach
-              </div>
-            @else
-              <p class="text-muted">No solutions available</p>
-            @endif
-          </div>
-
         </div>
+        @endforeach
+        @else
+        @php
+        // Gather any FIB answers (answer0–answer3) that exist
+        $fibAnswers = [];
+        foreach ([0,1,2,3] as $i) {
+        $val = $question->{'answer'.$i} ?? null;
+        if (!is_null($val) && trim($val) !== '') {
+        $fibAnswers[] = ['idx' => $i, 'text' => $val];
+      }
+    }
+    @endphp
+
+    <div class="mb-4">
+      <h6 class="text-muted small mb-2">FILL-IN ANSWERS</h6>
+
+      @if(count($fibAnswers))
+      <div class="list-group">
+        @foreach($fibAnswers as $a)
+        <div class="list-group-item d-flex align-items-start">
+          <div class="badge bg-primary me-3">Blank {{ $a['idx'] + 1 }}</div>
+          <div class="flex-grow-1">
+            <div class="border rounded p-2 bg-light">{!! $a['text'] !!}</div>
+          </div>
+        </div>
+        @endforeach
+      </div>
+      @else
+      <div class="alert alert-light border mb-0 small">
+        No FIB answers found. Add values in <em>answer0…answer3</em> on the edit page.
+      </div>
+      @endif
+    </div>
+    @endif
+
+
+    {{-- Meta row --}}
+    <div class="row mt-4">
+      <div class="col-md-4">
+        <h6 class="text-muted small mb-2">DIFFICULTY</h6>
+        <span class="badge bg-{{ $difficultyColor }}">{{ $question->difficulty->short_description }}</span>
+      </div>
+      <div class="col-md-6">
+        <h6 class="text-muted small mb-2">SKILL</h6>
+        @if($question->skill)
+        <span class="badge bg-primary">{{ $question->skill->skill }}</span>
+        @else
+        <span class="text-muted">No skill assigned</span>
+        @endif
+      </div>
+      <div class="col-md-1 text-center">
+        <h6 class="text-muted small mb-2"><i class="fas fa-calculator"></i></h6>
+        <span class="badge bg-secondary">{{ $question->calculator ? ucfirst($question->calculator) : 'None' }}</span>
       </div>
     </div>
 
-    {{-- Right: QA actions (status only) --}}
-    <div class="col-lg-4">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">QA Actions</h5>
-          @if($question->qa_reviewer_id)
-            <small class="text-muted">
-              <i class="fas fa-user-check me-1"></i>
-              Assigned to: {{ optional(\App\Models\User::find($question->qa_reviewer_id))->name ?? 'Unknown' }}
-            </small>
+    {{-- Hints (read-only) --}}
+    <div class="mt-4">
+      <label class="form-label text-muted small">HINTS</label>
+      @if($question->hints && $question->hints->count() > 0)
+      <div class="hints-container">
+        @foreach($question->hints->sortBy('hint_level') as $hint)
+        <div class="hint-item mb-2 p-2 border-start border-3 border-info bg-light">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1 d-flex align-items-center gap-2">
+              <span class="badge bg-info me-2">Level</span>
+              <span>{{ $hint->hint_level }}</span>
+              <span class="ms-2">{{ $hint->hint_text }}</span>
+            </div>
+          </div>
+          @if($hint->user)
+          <small class="text-muted">Added by {{ $hint->user->name }}</small>
           @endif
         </div>
-
-        <div class="card-body">
-          @if($canQA)
-            <div class="d-grid gap-2 mb-3">
-              <button type="button" class="btn btn-success" onclick="setStatus({{ $question->id }}, 'approved')">
-                <i class="fas fa-check me-1"></i> Approve
-              </button>
-              <button type="button" class="btn btn-info" onclick="needsRevision({{ $question->id }})">
-                <i class="fas fa-edit me-1"></i> Needs Revision…
-              </button>
-              <button type="button" class="btn btn-warning" onclick="flagWithReason({{ $question->id }})">
-                <i class="fas fa-flag me-1"></i> Report Issue…
-              </button>
-              <button type="button" class="btn btn-outline-danger" onclick="setStatus({{ $question->id }}, 'ai_generated')">
-                <i class="fas fa-robot me-1"></i> Mark as AI-generated
-              </button>
-              <button type="button" class="btn btn-outline-secondary" onclick="setStatus({{ $question->id }}, 'unreviewed')">
-                <i class="fas fa-undo me-1"></i> Unreview
-              </button>
-            </div>
-
-            <div class="d-flex gap-2">
-              <a class="btn btn-outline-dark" href="{{ route('admin.qa.previous', ['before' => $question->id]) }}">
-                <i class="fas fa-backward me-1"></i> Prev
-              </a>
-              <a class="btn btn-outline-dark" href="{{ route('admin.qa.next', ['after' => $question->id, 'status' => 'unreviewed']) }}">
-                <i class="fas fa-forward me-1"></i> Next
-              </a>
-            </div>
-          @else
-            <div class="alert alert-info mb-0">You do not have QA privileges on this item.</div>
-          @endif
-
-          @include('admin.components.math-help')
-
-          @if($question->qa_reviewed_at)
-            <div class="text-muted small mt-3"><i class="fas fa-clock me-1"></i> Reviewed {{ $human($question->qa_reviewed_at) }}</div>
-          @endif
-        <h6 class="mb-2">
-          <i class="fas fa-flag me-1 text-warning"></i> Issues
-          <span class="badge bg-secondary">{{ $qaIssues->count() }}</span>
-        </h6>
-
-        @if($qaIssues->count())
-          <div class="list-group small">
-            @foreach($qaIssues as $issue)
-              @php
-                $typeColors = [
-                  'grammar'    => 'primary',
-                  'math_error' => 'danger',
-                  'unclear'    => 'warning',
-                  'image_issue'=> 'info',
-                  'other'      => 'secondary',
-                ];
-                $statusColors = [
-                  'open'      => 'warning',
-                  'resolved'  => 'success',
-                  'dismissed' => 'secondary',
-                ];
-                $tColor = $typeColors[$issue->issue_type] ?? 'secondary';
-                $sColor = $statusColors[$issue->status] ?? 'secondary';
-              @endphp
-              <div class="list-group-item">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div class="me-2">
-                    <div class="mb-1">
-                      <span class="badge bg-{{ $tColor }} me-1 text-uppercase">{{ $issue->issue_type }}</span>
-                      <span class="badge bg-{{ $sColor }}">{{ $issue->status }}</span>
-                    </div>
-                    <div class="text-body">{!! nl2br(e($issue->description)) !!}</div>
-                    <div class="text-muted mt-1">
-                      <i class="fas fa-user me-1"></i>{{ optional($issue->reviewer)->name ?? 'Unknown' }}
-                      &middot;
-                      <i class="fas fa-clock ms-1 me-1"></i>{{ \Illuminate\Support\Carbon::parse($issue->created_at)->diffForHumans() }}
-                      @if($issue->updated_at && $issue->updated_at != $issue->created_at)
-                        <span class="ms-2">(updated {{ \Illuminate\Support\Carbon::parse($issue->updated_at)->diffForHumans() }})</span>
-                      @endif
-                    </div>
-                  </div>
-                  @if($canQA)
-                    <div class="btn-group btn-group-sm">
-                      @if($issue->status !== 'open')
-                        <button class="btn btn-outline-warning" onclick="Issue.updateStatus({{ $issue->id }}, 'open')">
-                          <i class="fas fa-folder-open"></i>
-                        </button>
-                      @endif
-                      @if($issue->status !== 'resolved')
-                        <button class="btn btn-outline-success" onclick="Issue.updateStatus({{ $issue->id }}, 'resolved')">
-                          <i class="fas fa-check"></i>
-                        </button>
-                      @endif
-                      @if($issue->status !== 'dismissed')
-                        <button class="btn btn-outline-secondary" onclick="Issue.updateStatus({{ $issue->id }}, 'dismissed')">
-                          <i class="fas fa-times"></i>
-                        </button>
-                      @endif
-                    </div>
-                  @endif
-                </div>
-              </div>
-            @endforeach
-          </div>
-        @else
-          <div class="alert alert-light border small mb-0">
-            No issues have been filed for this question yet. Use <em>Report Issue…</em> to add one.
-          </div>
-        @endif
-
+        @endforeach
       </div>
+      @else
+      <p class="text-muted">No hints available</p>
+      @endif
+    </div>
+
+    {{-- Solutions (read-only) --}}
+    <div class="mt-3">
+      <label class="form-label text-muted small">SOLUTIONS</label>
+      @if($question->solutions && $question->solutions->count() > 0)
+      <div class="solutions-container">
+        @foreach($question->solutions as $solution)
+        <div class="solution-item mb-3 p-3 border rounded bg-light">
+          <div class="solution-content">{!! nl2br(e($solution->solution)) !!}</div>
+          <div class="mt-2 d-flex justify-content-between align-items-center">
+            <small class="text-muted">
+              <i class="fas fa-user me-1"></i>
+              By {{ $solution->user->name ?? 'Unknown' }} on {{ optional($solution->created_at)->format('M d, Y') }}
+            </small>
+          </div>
+        </div>
+        @endforeach
+      </div>
+      @else
+      <p class="text-muted">No solutions available</p>
+      @endif
+    </div>
+
+  </div>
+</div>
+</div>
+
+{{-- Right: QA actions (status only) --}}
+<div class="col-lg-4">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">QA Actions</h5>
+      @if($question->qa_reviewer_id)
+      <small class="text-muted">
+        <i class="fas fa-user-check me-1"></i>
+        Assigned to: {{ optional(\App\Models\User::find($question->qa_reviewer_id))->name ?? 'Unknown' }}
+      </small>
+      @endif
+    </div>
+
+    <div class="card-body">
+      @if($canQA)
+      <div class="d-grid gap-2 mb-3">
+        <button type="button" class="btn btn-success" onclick="setStatus({{ $question->id }}, 'approved')">
+          <i class="fas fa-check me-1"></i> Approve
+        </button>
+        <button type="button" class="btn btn-info" onclick="needsRevision({{ $question->id }})">
+          <i class="fas fa-edit me-1"></i> Needs Revision…
+        </button>
+        <button type="button" class="btn btn-warning" onclick="flagWithReason({{ $question->id }})">
+          <i class="fas fa-flag me-1"></i> Report Issue…
+        </button>
+        <button type="button" class="btn btn-outline-danger" onclick="setStatus({{ $question->id }}, 'ai_generated')">
+          <i class="fas fa-robot me-1"></i> Mark as AI-generated
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="setStatus({{ $question->id }}, 'unreviewed')">
+          <i class="fas fa-undo me-1"></i> Unreview
+        </button>
+      </div>
+
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-dark" href="{{ route('admin.qa.previous', ['before' => $question->id]) }}">
+          <i class="fas fa-backward me-1"></i> Prev
+        </a>
+        <a class="btn btn-outline-dark" href="{{ route('admin.qa.next', ['after' => $question->id, 'status' => 'unreviewed']) }}">
+          <i class="fas fa-forward me-1"></i> Next
+        </a>
+      </div>
+      @else
+      <div class="alert alert-info mb-0">You do not have QA privileges on this item.</div>
+      @endif
+
+      @include('admin.components.math-help')
+
+      @if($question->qa_reviewed_at)
+      <div class="text-muted small mt-3"><i class="fas fa-clock me-1"></i> Reviewed {{ $human($question->qa_reviewed_at) }}</div>
+      @endif
+      <h6 class="mb-2">
+        <i class="fas fa-flag me-1 text-warning"></i> Issues
+        <span class="badge bg-secondary">{{ $qaIssues->count() }}</span>
+      </h6>
+
+      @if($qaIssues->count())
+      <div class="list-group small">
+        @foreach($qaIssues as $issue)
+        @php
+        $typeColors = [
+        'grammar'    => 'primary',
+        'math_error' => 'danger',
+        'unclear'    => 'warning',
+        'image_issue'=> 'info',
+        'other'      => 'secondary',
+        ];
+        $statusColors = [
+        'open'      => 'warning',
+        'resolved'  => 'success',
+        'dismissed' => 'secondary',
+        ];
+        $tColor = $typeColors[$issue->issue_type] ?? 'secondary';
+        $sColor = $statusColors[$issue->status] ?? 'secondary';
+        @endphp
+        <div class="list-group-item">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="me-2">
+              <div class="mb-1">
+                <span class="badge bg-{{ $tColor }} me-1 text-uppercase">{{ $issue->issue_type }}</span>
+                <span class="badge bg-{{ $sColor }}">{{ $issue->status }}</span>
+              </div>
+              <div class="text-body">{!! nl2br(e($issue->description)) !!}</div>
+              <div class="text-muted mt-1">
+                <i class="fas fa-user me-1"></i>{{ optional($issue->reviewer)->name ?? 'Unknown' }}
+                &middot;
+                <i class="fas fa-clock ms-1 me-1"></i>{{ \Illuminate\Support\Carbon::parse($issue->created_at)->diffForHumans() }}
+                @if($issue->updated_at && $issue->updated_at != $issue->created_at)
+                <span class="ms-2">(updated {{ \Illuminate\Support\Carbon::parse($issue->updated_at)->diffForHumans() }})</span>
+                @endif
+              </div>
+            </div>
+            @if($canQA)
+            <div class="btn-group btn-group-sm">
+              @if($issue->status !== 'open')
+              <button class="btn btn-outline-warning" onclick="Issue.updateStatus({{ $issue->id }}, 'open')">
+                <i class="fas fa-folder-open"></i>
+              </button>
+              @endif
+              @if($issue->status !== 'resolved')
+              <button class="btn btn-outline-success" onclick="Issue.updateStatus({{ $issue->id }}, 'resolved')">
+                <i class="fas fa-check"></i>
+              </button>
+              @endif
+              @if($issue->status !== 'dismissed')
+              <button class="btn btn-outline-secondary" onclick="Issue.updateStatus({{ $issue->id }}, 'dismissed')">
+                <i class="fas fa-times"></i>
+              </button>
+              @endif
+            </div>
+            @endif
+          </div>
+        </div>
+        @endforeach
+      </div>
+      @else
+      <div class="alert alert-light border small mb-0">
+        No issues have been filed for this question yet. Use <em>Report Issue…</em> to add one.
+      </div>
+      @endif
+
     </div>
   </div>
+</div>
 </div>
 @endsection
 
@@ -425,8 +448,8 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+  document.addEventListener('DOMContentLoaded', () => {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 
   // Lightweight toast helper
   function toast(msg, type='info') { window.showToast ? showToast(msg, type) : alert(msg); }
@@ -499,10 +522,10 @@ document.addEventListener('DOMContentLoaded', () => {
     targets.forEach(el => {
       renderMathInElement(el, {
         delimiters: [
-          {left: '$$', right: '$$', display: true},
-          {left: '$', right: '$', display: false},
-          {left: '\\(', right: '\\)', display: false},
-          {left: '\\[', right: '\\]', display: true}
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false},
+        {left: '\\[', right: '\\]', display: true}
         ],
         throwOnError: false
       });
