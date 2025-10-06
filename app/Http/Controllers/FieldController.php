@@ -17,68 +17,10 @@ class FieldController extends Controller
     /**
      * API + Web index entrypoint.
      */
-public function index(Request $request)
-{
-    // If it's NOT an AJAX request expecting JSON, go to webIndex for Blade view
-    if (!$request->ajax()) {
-        return $this->webIndex($request);
+    public function index(Request $request)
+    {
+        return view('admin.fields.index-livewire');
     }
-
-    // Continue with JSON logic for AJAX requests
-    $query = Field::with(['tracks', 'status'])
-        ->orderBy('created_at', 'desc');
-
-    // Filter by status_id
-    if ($request->filled('status_id')) {
-        $query->where('status_id', $request->status_id);
-    }
-
-    // Add sorting support
-    if ($request->filled('sort')) {
-        $sortField = $request->sort;
-        $direction = $request->filled('direction') ? $request->direction : 'asc';
-        $query->orderBy($sortField, $direction);
-    }
-
-    if ($request->filled('has_tracks')) {
-        $request->has_tracks === '1'
-            ? $query->has('tracks')
-            : $query->doesntHave('tracks');
-    }
-
-    if ($request->filled('search')) {
-        $searchTerm = $request->search;
-        $query->where(function ($q) use ($searchTerm) {
-            $q->where('field', 'LIKE', "%{$searchTerm}%")
-              ->orWhere('description', 'LIKE', "%{$searchTerm}%");
-        });
-    }
-
-    $fields = $query->get();
-
-    // Calculate counts for each field
-    $fields->each(function (Field $field) {
-        $field->tracks_count = $field->tracks()->count();
-        $field->questions_count = 0;
-        $field->skills_count = 0;
-    });
-
-    // Get status counts dynamically by status name
-    $publicStatus = \DB::table('statuses')->where('status', 'Public')->first();
-    $draftStatus = \DB::table('statuses')->where('status', 'Draft')->first();
-    $privateStatus = \DB::table('statuses')->whereIn('status', ['Private', 'Restricted'])->first();
-
-    return response()->json([
-        'fields' => $fields,
-        'totals' => [
-            'total' => Field::count(),
-            'public' => $publicStatus ? Field::where('status_id', $publicStatus->id)->count() : 0,
-            'draft' => $draftStatus ? Field::where('status_id', $draftStatus->id)->count() : 0,
-            'private' => $privateStatus ? Field::where('status_id', $privateStatus->id)->count() : 0,
-        ],
-        'num_pages' => 1,
-    ]);
-}
     /**
      * Web admin index with filters and search.
      */

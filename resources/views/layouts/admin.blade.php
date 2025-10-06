@@ -110,7 +110,7 @@
 
 <!-- Custom Admin Styles -->
 <link rel="stylesheet" href="{{ asset('css/admin-styles.css') }}">
-
+@livewireStyles
 @stack('styles')
 </head>
 <body>
@@ -485,7 +485,18 @@
         bsModal.show();
     }
 </script>
-
+@livewireScripts
+<script>
+  // Re-render KaTeX after Livewire DOM updates
+  document.addEventListener('livewire:load', () => {
+    // Livewire v2 hook:
+    if (window.Livewire && Livewire.hook) {
+      Livewire.hook('message.processed', () => { if (typeof renderKaTeX === 'function') renderKaTeX(); });
+    }
+    // Fallback initial render (in case this page loaded via PJAX or similar)
+    if (typeof renderKaTeX === 'function') renderKaTeX();
+  });
+</script>
 @stack('scripts')
 </body>
 </html>
