@@ -95,153 +95,155 @@
             </div>
             @endif
           </div>
+{{-- Question Text --}}
+<div class="mb-4">
+  <label class="form-label text-muted small">QUESTION TEXT</label>
 
-          {{-- Question Text --}}
-          <div class="mb-4">
-            <label class="form-label text-muted small">QUESTION TEXT</label>
-            @if($question->type_id == 2)
-            <div class="editable-field question-field html-content"
-            data-field="question"
-            data-id="{{ $question->id }}"
-            data-type="html"
-            title="Click to edit HTML content">
-            <div class="fib-content large">
-              {!! $question->question !!}
-            </div>
-            <i class="fas fa-code text-muted ms-2 edit-icon"></i>
-          </div>
-          <small class="text-muted">This question supports HTML and KaTeX mathematical notation</small>
-
-          {{-- Count blanks and show appropriate number of answer fields --}}
-          @php
-          $blankCount = substr_count($question->question, '___') ?:
-          substr_count($question->question, '[blank]') ?:
-          substr_count($question->question, '____') ?: 1;
-
-          $answers = [];
-          if (!empty($question->answer0)) $answers[] = $question->answer0;
-          if (!empty($question->answer1)) $answers[] = $question->answer1;
-          if (!empty($question->answer2)) $answers[] = $question->answer2;
-          if (!empty($question->answer3)) $answers[] = $question->answer3;
-          @endphp
-
-          <div class="mt-3">
-            <label class="form-label text-muted small">EXPECTED ANSWERS (for each blank):</label>
-            @for($i = 0; $i < min($blankCount, 4); $i++)
-            <div class="mb-2">
-              <span class="text-muted me-2">Blank {{ $i + 1 }}:</span>
-              <div class="editable-field answer-field d-inline-block"
-              data-field="answer{{ $i }}"
-              data-id="{{ $question->id }}"
-              data-type="text"
-              style="min-width: 200px; border-bottom: 1px solid #dee2e6; padding: 2px 5px;">
-              {{ $answers[$i] ?? 'Not set' }}
-              <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
-            </div>
-          </div>
-          @endfor
-        </div>
-        @else
-        <div class="editable-field question-field"
-        data-field="question"
-        data-id="{{ $question->id }}"
-        data-type="textarea"
-        title="Click to edit">
-        {{ $question->question }}
-        <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
+  @if($question->type_id == 2)
+    {{-- ===== FIB (Type 2) ===== --}}
+    <div class="editable-field question-field html-content"
+         data-field="question"
+         data-id="{{ $question->id }}"
+         data-type="html"
+         title="Click to edit HTML content">
+      <div class="fib-content large">
+        {!! $question->question !!}
       </div>
+      <i class="fas fa-code text-muted ms-2 edit-icon"></i>
+    </div>
+    <small class="text-muted">This question supports HTML and KaTeX mathematical notation</small>
+
+    @php
+      // Count blanks in the plain text (support [?], ___, ____, [blank])
+      $plain = strip_tags($question->question ?? '');
+      $blankCount = preg_match_all('/\[\?\]|_{3,}|\[blank\]/', $plain) ?: 1;
+
+      // Build answers array from answer0..answer3
+      $answers = [];
+      if (!empty($question->answer0)) $answers[] = $question->answer0;
+      if (!empty($question->answer1)) $answers[] = $question->answer1;
+      if (!empty($question->answer2)) $answers[] = $question->answer2;
+      if (!empty($question->answer3)) $answers[] = $question->answer3;
+    @endphp
+
+    <div class="mt-3">
+      <label class="form-label text-muted small">EXPECTED ANSWERS (for each blank):</label>
+      @for($i = 0; $i < min($blankCount, 4); $i++)
+        <div class="mb-2">
+          <span class="text-muted me-2">Blank {{ $i + 1 }}:</span>
+          <div class="editable-field answer-field d-inline-block"
+               data-field="answer{{ $i }}"
+               data-id="{{ $question->id }}"
+               data-type="text"
+               style="min-width: 200px; border-bottom: 1px solid #dee2e6; padding: 2px 5px;">
+            {{ $answers[$i] ?? 'Not set' }}
+            <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
+          </div>
+        </div>
+      @endfor
+      @if($blankCount > 4)
+        <small class="text-danger">Only 4 blanks are supported in the UI. Extra blanks won’t show here.</small>
       @endif
     </div>
 
-    {{-- Multiple Choice Options (Type 1) --}}
-    @if($question->type_id == 1)
+  @elseif($question->type_id == 1)
+    {{-- ===== MCQ (Type 1) ===== --}}
+    <div class="editable-field question-field"
+         data-field="question"
+         data-id="{{ $question->id }}"
+         data-type="textarea"
+         title="Click to edit">
+      {{ $question->question }}
+      <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
+    </div>
+
     @php
-    $mcqOptions = [
-    'A' => ['text' => $question->answer0, 'image' => $question->answer0_image, 'index' => 0],
-    'B' => ['text' => $question->answer1, 'image' => $question->answer1_image, 'index' => 1],
-    'C' => ['text' => $question->answer2, 'image' => $question->answer2_image, 'index' => 2],
-    'D' => ['text' => $question->answer3, 'image' => $question->answer3_image, 'index' => 3]
-    ];
-    $validOptions = array_filter($mcqOptions, fn($o) => !empty($o['text']) || !empty($o['image']));
+      $mcqOptions = [
+        'A' => ['text' => $question->answer0, 'image' => $question->answer0_image, 'index' => 0],
+        'B' => ['text' => $question->answer1, 'image' => $question->answer1_image, 'index' => 1],
+        'C' => ['text' => $question->answer2, 'image' => $question->answer2_image, 'index' => 2],
+        'D' => ['text' => $question->answer3, 'image' => $question->answer3_image, 'index' => 3],
+      ];
+      $validOptions = array_filter($mcqOptions, fn($o) => !empty($o['text']) || !empty($o['image']));
     @endphp
 
     @if(count($validOptions) > 0)
-    <div class="mb-4">
-      <label class="form-label text-muted small">MULTIPLE CHOICE OPTIONS</label>
-      @foreach($validOptions as $letter => $option)
-      <div class="mcq-option {{ $question->correct_answer == $option['index'] ? 'border-success' : '' }}" data-option-index="{{ $option['index'] }}">
-        <div class="mcq-option-label {{ $question->correct_answer == $option['index'] ? 'bg-success text-white' : '' }}">
-          {{ $letter }}
-          @if($question->correct_answer == $option['index'])
-          <i class="fas fa-check position-absolute" style="font-size: 10px; top: 2px; right: 2px;"></i>
-          @endif
-        </div>
-        <div class="flex-grow-1">
-          @if($option['text'])
-          <div class="editable-field mb-2"
-          data-field="answer{{ $option['index'] }}"
-          data-id="{{ $question->id }}"
-          data-type="text"
-          title="Click to edit option {{ $letter }}">
-          {{ $option['text'] }}
-          <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
-        </div>
-        @endif
+      <div class="mb-4">
+        <label class="form-label text-muted small">MULTIPLE CHOICE OPTIONS</label>
+        @foreach($validOptions as $letter => $option)
+          <div class="mcq-option {{ $question->correct_answer == $option['index'] ? 'border-success' : '' }}"
+               data-option-index="{{ $option['index'] }}">
+            <div class="mcq-option-label {{ $question->correct_answer == $option['index'] ? 'bg-success text-white' : '' }}">
+              {{ $letter }}
+              @if($question->correct_answer == $option['index'])
+                <i class="fas fa-check position-absolute" style="font-size: 10px; top: 2px; right: 2px;"></i>
+              @endif
+            </div>
+            <div class="flex-grow-1">
+              @if($option['text'])
+                <div class="editable-field mb-2"
+                     data-field="answer{{ $option['index'] }}"
+                     data-id="{{ $question->id }}"
+                     data-type="text"
+                     title="Click to edit option {{ $letter }}">
+                  {{ $option['text'] }}
+                  <i class="fas fa-edit text-muted ms-2 edit-icon"></i>
+                </div>
+              @endif
 
-        {{-- Answer Image Section --}}
-        @if($option['image'])
-        <div class="answer-image-container">
-          <div class="image-wrapper-small">
-            <img src="{{ Storage::url($option['image'])  }}" alt="Option {{ $letter }} Image" class="answer-image">
-            <div class="image-overlay-small">
-              <button class="btn btn-light btn-sm" onclick="changeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Change">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-danger btn-sm" onclick="removeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Remove">
-                <i class="fas fa-trash"></i>
-              </button>
+              {{-- Answer Image Section --}}
+              @if($option['image'])
+                <div class="answer-image-container">
+                  <div class="image-wrapper-small">
+                    <img src="{{ Storage::url($option['image'])  }}" alt="Option {{ $letter }} Image" class="answer-image">
+                    <div class="image-overlay-small">
+                      <button class="btn btn-light btn-sm" onclick="changeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Change">
+                        <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn btn-danger btn-sm" onclick="removeAnswerImage({{ $question->id }}, {{ $option['index'] }})" title="Remove">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              @else
+                <div class="upload-area-small" onclick="addAnswerImage({{ $question->id }}, {{ $option['index'] }})">
+                  <i class="fas fa-plus me-2"></i>Add Image for Option {{ $letter }}
+                </div>
+              @endif
             </div>
           </div>
-        </div>
-        @else
-        <div class="upload-area-small" onclick="addAnswerImage({{ $question->id }}, {{ $option['index'] }})">
-          <i class="fas fa-plus me-2"></i>Add Image for Option {{ $letter }}
-        </div>
-        @endif
+        @endforeach
       </div>
-    </div>
-    @endforeach
-  </div>
 
-  {{-- Correct Answer for MCQ --}}
-  <div class="mb-4">
-    <label class="form-label text-muted small">CORRECT ANSWER</label>
-    <div class="correct-answer-selector-wrapper">
-      <select class="form-select form-select-sm correct-answer-selector"
-      data-field="correct_answer"
-      data-id="{{ $question->id }}"
-      data-current="{{ $question->correct_answer }}">
-      <option value="">Select correct answer...</option>
-      @foreach($validOptions as $letter => $option)
-      <option value="{{ $option['index'] }}" {{ $question->correct_answer == $option['index'] ? 'selected' : '' }}>
-        Option {{ $letter }}
-      </option>
-      @endforeach
-    </select>
-  </div>
-</div>
-@else
-<div class="mb-4">
-  <div class="alert alert-warning">
-    <i class="fas fa-exclamation-triangle me-2"></i>
-    This MCQ question has no options defined.
-  </div>
-</div>
-@endif
-@else
-{{-- Fill in the Blank Answer (Type 2) --}}
-@endif
+      {{-- Correct Answer for MCQ --}}
+      <div class="mb-4">
+        <label class="form-label text-muted small">CORRECT ANSWER</label>
+        <div class="correct-answer-selector-wrapper">
+          <select class="form-select form-select-sm correct-answer-selector"
+                  data-field="correct_answer"
+                  data-id="{{ $question->id }}"
+                  data-current="{{ $question->correct_answer }}">
+            <option value="">Select correct answer...</option>
+            @foreach($validOptions as $letter => $option)
+              <option value="{{ $option['index'] }}" {{ $question->correct_answer == $option['index'] ? 'selected' : '' }}>
+                Option {{ $letter }}
+              </option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+    @else
+      <div class="mb-4">
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          This MCQ question has no options defined.
+        </div>
+      </div>
+    @endif
 
+  @endif
+</div>
 {{-- Question Settings Row --}}
 <div class="row">
   <div class="col-md-6 mb-4">

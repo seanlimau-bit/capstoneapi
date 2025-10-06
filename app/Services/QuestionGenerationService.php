@@ -234,7 +234,7 @@ class QuestionGenerationService
       return $prompt;
   }
 
-protected function buildVariationPrompt(
+  protected function buildVariationPrompt(
     Question $original,
     int $n,
     string $ageBand,
@@ -248,19 +248,19 @@ protected function buildVariationPrompt(
     $diffId      = (int) ($original->difficulty_id ?? 2);
     $typeId      = (int) ($original->type_id ?? 1);
 
-    // Safely serialize any text we embed into the prompt
+        // Safely serialize any text we embed into the prompt
     $skillName   = json_encode((string) ($skill->skill ?? ''), JSON_UNESCAPED_UNICODE);
     $skillDesc   = json_encode((string) ($skill->description ?? ''), JSON_UNESCAPED_UNICODE);
     $origQ       = json_encode((string) $original->question, JSON_UNESCAPED_UNICODE);
 
     $focusLine   = $focusAreas ? "Focus areas: {$focusAreas}." : "";
 
-    // Original MCQ bits (used only when type_id === 1)
+        // Original MCQ bits (used only when type_id === 1)
     $answersArr  = [$original->answer0, $original->answer1, $original->answer2, $original->answer3];
     $answersJson = json_encode($answersArr, JSON_UNESCAPED_UNICODE);
     $correctIdx  = is_numeric($original->correct_answer) ? (int) $original->correct_answer : null;
 
-    // ------- Header (no heredocs) -------
+        // ------- Header (no heredocs) -------
     $headerLines = [
         "Create EXACTLY {$n} VARIATIONS of the question below.",
         "",
@@ -271,7 +271,7 @@ protected function buildVariationPrompt(
         "- Stay strictly within the skill description. Only change surface details such as numbers, names, or light contexts.",
         "- Audience: {$ageBand}. Reading level: {$readingLvl}.",
     ];
-    if ($focusLine) $headerLines[] = $focusLine;
+    if ($focusLine) { $headerLines[] = $focusLine; }
 
     $headerLines[] = "";
     $headerLines[] = "Context";
@@ -284,7 +284,7 @@ protected function buildVariationPrompt(
     }
     $header = implode("\n", $headerLines);
 
-    // ------- Requirements -------
+        // ------- Requirements -------
     $reqLines = [
         "",
         "REQUIRED FIELDS for every variation",
@@ -298,10 +298,19 @@ protected function buildVariationPrompt(
         "- For MCQ (type_id = 1)",
         "  - 'answers' is an array of exactly 4 strings",
         "  - 'correct_answer' is an integer index 0..3",
-        "- For FIB numeric (type_id != 1)",
-        "  - 'question' uses [?] where numeric answers go",
-        "  - 'answers' is an array of numeric strings, one per blank",
-        "  - 'correct_answer' is a numeric string for a single blank, or an array of numeric strings for multiple blanks",
+        "- For FIB numeric (type_id = 2)",
+        "  - The 'question' uses \"[?]\" once per blank, left-to-right.",
+        "  - The number of \"[?]\" blanks must equal the number of entries in 'answers'.",
+        "  - 'answers' is an array of numeric strings, one per blank, ordered left-to-right. ALL ANSWERS MUST BE NUMERIC.",
+        "    Example 1 blank: \"answers\": [\"12\"]",
+        "    Example 2 blanks: \"answers\": [\"4\",\"2\"]",
+        "  - for FIB 'correct_answer' is 0",
+        "  - Storage mapping when persisted:",
+        "    - Single blank -> answers[0]",
+        "    - Two blanks   -> answers[0], answers[1]",
+        "    - Three blanks -> answers[0], answers[1], answers[2]",
+        "    - Four blanks  -> answers[0], answers[1], answers[2], answers[3]",
+        "  - Do not include units inside numeric strings. Use simplified fractions or decimals.",
         "",
         "Quality and scope constraints",
         "- Use {$ageBand} appropriate language at reading level {$readingLvl}",
@@ -314,9 +323,9 @@ protected function buildVariationPrompt(
     ];
     $requirements = implode("\n", $reqLines);
 
-    // ------- Example schema built via json_encode (no heredocs, valid JSON) -------
+        // ------- Example schema built via json_encode (no heredocs, valid JSON) -------
     if ($typeId === 1) {
-        // MCQ skeleton
+            // MCQ skeleton
         $example = [
             'variations' => [[
                 'skill_id'       => $skillId,
@@ -337,15 +346,14 @@ protected function buildVariationPrompt(
             ]]
         ];
     } else {
-        // FIB numeric skeleton (single blank example)
+            // FIB numeric skeleton (no 'correct_answer', matching the saver)
         $example = [
             'variations' => [[
                 'skill_id'       => $skillId,
                 'type_id'        => $typeId,
                 'difficulty_id'  => $diffId,
-                'question'       => 'Prompt with [?] where numeric answers go, still within the described skill',
-                'answers'        => ['12'],
-                'correct_answer' => '12',
+                'question'       => 'Complete this sequence: 24, [?], 30, [?], [?], 39, [?]',
+                'answers'        => ['27','33','36','41'],
                 'explanation'    => 'Student friendly explanation.',
                 'hints'          => [
                     ['hint_level' => 1, 'hint_text' => 'strategic nudge'],
@@ -353,18 +361,16 @@ protected function buildVariationPrompt(
                     ['hint_level' => 3, 'hint_text' => 'nearly complete reasoning'],
                 ],
                 'solutions'      => [
-                    ['method' => 'standard', 'steps' => ['s1','s2'], 'final_answer' => '12'],
+                    ['method' => 'standard', 'steps' => ['s1','s2'], 'final_answer' => '41'],
                 ],
             ]]
         ];
     }
     $schema = json_encode($example, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    // ------- Final prompt -------
+        // ------- Final prompt -------
     return $header . "\n\n" . $requirements . "\n\nExample JSON schema (structure only):\n" . $schema;
 }
-
-
 
 /* ----------------- Parsing + Strong Validation ----------------- */
 
@@ -397,7 +403,7 @@ protected function parseVariationsOrFail(array $json): array
     ): array {
         $out = [];
         foreach ($items as $i => $q) {
-            $typeId = (int) ($q['type_id'] ?? ($base ? $base->type_id : 1));
+            $typeId       = (int) ($q['type_id'] ?? ($base ? $base->type_id : 1));
             $difficultyId = (int) ($q['difficulty_id'] ?? ($base ? $base->difficulty_id : 2));
             $questionText = trim((string) ($q['question'] ?? ''));
             $explanation  = trim((string) ($q['explanation'] ?? ''));
@@ -452,9 +458,9 @@ protected function parseVariationsOrFail(array $json): array
                         throw new \Exception("Item {$i} solution must include method, steps, and final_answer");
                     }
                     return [
-                        'method'        => $method,
-                        'steps'         => array_values(array_map(fn($st) => trim((string)$st), $steps)),
-                        'final_answer'  => is_array($final) ? json_encode($final) : (string)$final,
+                        'method'       => $method,
+                        'steps'        => array_values(array_map(fn($st) => trim((string)$st), $steps)),
+                        'final_answer' => is_array($final) ? json_encode($final) : (string)$final,
                     ];
                 }, $solutions));
             }
@@ -480,9 +486,8 @@ protected function parseVariationsOrFail(array $json): array
                         throw new \Exception("Item {$i} (FIB) answers[{$k}] must be numeric string");
                     }
                 }
-                if (!is_numeric($correct)) {
-                    throw new \Exception("Item {$i} (FIB) correct_answer must be numeric");
-                }
+                // FIB does not use correct_answer, ignore any provided value
+                $correct = null;
             }
 
             $out[] = [
@@ -494,7 +499,7 @@ protected function parseVariationsOrFail(array $json): array
                 'difficulty_id'  => $difficultyId,
                 'question'       => $questionText,
                 'answers'        => $answers,
-                'correct_answer' => $typeId === 1 ? (int) $correct : $correct,
+                'correct_answer' => $typeId === 1 ? (int) $correct : null,
                 'explanation'    => $explanation,
                 'hints'          => $hints,
                 'solutions'      => $solutions,
@@ -607,9 +612,22 @@ protected function parseVariationsOrFail(array $json): array
         DB::beginTransaction();
         try {
             foreach ($vars as $idx => $data) {
-                $answers = array_pad($data['answers'] ?? [], 4, '');
-                $typeId  = (int) ($data['type_id'] ?? $original->type_id);
-                $diffId  = (int) ($data['difficulty_id'] ?? $original->difficulty_id);
+                // Normalize answers to exactly 4 string slots
+                $answers = array_map(
+                    static fn($v) => is_null($v) ? '' : (string) $v,
+                    array_pad($data['answers'] ?? [], 4, '')
+                );
+
+                $typeId = (int) ($data['type_id'] ?? $original->type_id);
+                $diffId = (int) ($data['difficulty_id'] ?? $original->difficulty_id);
+
+                // Normalize correct_answer:
+                // - MCQ: integer index
+                // - FIB: numeric string or JSON-encoded array of numeric strings
+                $correct = ($typeId === 1 && isset($data['correct_answer']))
+                ? (int) $data['correct_answer']
+                : 0;
+
 
                 $q = Question::create([
                     'skill_id'       => $original->skill_id,
@@ -621,14 +639,15 @@ protected function parseVariationsOrFail(array $json): array
                     'answer1'        => $answers[1] ?? '',
                     'answer2'        => $answers[2] ?? '',
                     'answer3'        => $answers[3] ?? '',
-                    'correct_answer' => $typeId === 1 ? (int) $data['correct_answer'] : null,
+                    'correct_answer' => $correct, // now saved for both MCQ and FIB
                     'explanation'    => $data['explanation'] ?? null,
                     'status_id'      => 3,
                     'qa_status'      => 'ai_generated',
                     'source'         => "AI generated from question {$original->id}",
                 ]);
 
-                foreach ($data['hints'] as $h) {
+                // Hints
+                foreach (($data['hints'] ?? []) as $h) {
                     $hintsBulk[] = [
                         'question_id' => $q->id,
                         'hint_level'  => $h['hint_level'],
@@ -639,7 +658,8 @@ protected function parseVariationsOrFail(array $json): array
                     ];
                 }
 
-                foreach ($data['solutions'] as $sol) {
+                // Solutions
+                foreach (($data['solutions'] ?? []) as $sol) {
                     $txt = $this->formatSolutionText($sol);
                     $solBulk[] = [
                         'question_id' => $q->id,
@@ -669,6 +689,7 @@ protected function parseVariationsOrFail(array $json): array
             throw new \Exception('Failed to save variations: ' . $e->getMessage());
         }
     }
+
 
     /* ----------------- Helpers (all used) ----------------- */
 
