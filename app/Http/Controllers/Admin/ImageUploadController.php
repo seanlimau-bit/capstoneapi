@@ -22,87 +22,105 @@ class ImageUploadController extends Controller
     public function upload(Request $request)
     {
         $validated = $request->validate([
-            'image' => ['required','file','mimes:jpeg,jpg,png,webp,svg','max:10240'],
+            'image' => ['required','file','mimes:jpeg,jpg,png,webp,svg,ico','max:10240'],
             'type'  => ['required', Rule::in([
                 'logo','favicon','login_background','question_image','answer_image','profile_picture','skill_image','track_image'
             ])],
-
             'question_id' => ['required_if:type,question_image,answer_image','integer','exists:questions,id'],
-
-            'option' => ['required_if:type,answer_image','in:0,1,2,3'],
-
-            'user_id'  => ['nullable','integer'],
-            'skill_id' => ['nullable','integer','exists:skills,id'],
-            'track_id' => ['nullable','integer','exists:tracks,id'],
+            'option'      => ['required_if:type,answer_image','in:0,1,2,3'],
+            'user_id'     => ['nullable','integer'],
+            'skill_id'    => ['nullable','integer','exists:skills,id'],
+            'track_id'    => ['nullable','integer','exists:tracks,id'],
         ]);
 
         try {
             $type = $request->input('type');
+            $file = $request->file('image');
+            $ext  = strtolower($file->getClientOriginalExtension());
 
-        // Optimize the image
-            $result = $this->imageOptimizer->optimize(
-                $request->file('image'),
-                $type
-            );
+            // --- ICO bypass to avoid Intervention error ---
+            if ($type === 'favicon' && $ext === 'ico') {
+                // enforce your favicon cap (50 KB?) if you want
+                $maxBytes = 50 * 1024; // adjust or remove
+                if ($file->getSize() > $maxBytes) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'File too large. Maximum size: 50KB'
+                    ], 422);
+                }
 
-        // Extra guards for specific types
-            if (in_array($type, ['question_image', 'answer_image']) && !$request->filled('question_id')) {
-                throw new \Exception('question_id is required for question/answer image uploads');
+                // put into canonical public disk location
+                \Storage::disk('public')->makeDirectory('favicons');
+                $storedRel = 'favicons/favicon.ico';
+                \Storage::disk('public')->put($storedRel, file_get_contents($file->getRealPath()));
+
+                // update config.favicon to public path
+                $cfg = \App\Models\Config::current() ?? \App\Models\Config::create();
+                $cfg->update(['favicon' => "storage/{$storedRel}"]);
+
+                // optional: legacy root copy
+                @copy(public_path("storage/{$storedRel}"), public_path('favicon.ico'));
+
+                return response()->json([
+                    'success' => true,
+                    'url'     => asset("storage/{$storedRel}") . '?v=' . time(),
+                    'path'    => "storage/{$storedRel}",
+                    'message' => 'ICO favicon uploaded',
+                    'css_version' => time(),
+                ]);
             }
-            if ($type === 'answer_image' && !$request->filled('option')) {
-                throw new \Exception('option is required for answer image uploads');
-            }
+            // --- end ICO bypass ---
 
-        // Handle different types
+            // Everything else: go through your optimizer
+            $result = $this->imageOptimizer->optimize($file, $type);
+
             switch ($type) {
-                case 'logo':
-                $this->handleLogoUpload($result);
-                break;
                 case 'favicon':
-                $this->handleFaviconUpload($result);
-                break;
+                    $this->handleFaviconUpload($result); // stores configs.favicon etc.
+                    break;
+                case 'logo':
+                    $this->handleLogoUpload($result);
+                    break;
                 case 'login_background':
-                $this->handleBackgroundUpload($result);
-                break;
+                    $this->handleBackgroundUpload($result);
+                    break;
                 case 'question_image':
-                $this->handleQuestionImageUpload($result, Question::find($request->question_id));
-                break;
-
+                    $this->handleQuestionImageUpload($result, \App\Models\Question::find($request->question_id));
+                    break;
                 case 'answer_image':
-                $this->handleAnswerImageUpload($result, $request);
-                break;
+                    $this->handleAnswerImageUpload($result, $request);
+                    break;
                 case 'profile_picture':
-                $this->handleProfilePictureUpload($result, $request);
-                break;
+                    $this->handleProfilePictureUpload($result, $request);
+                    break;
                 case 'skill_image':
-                $this->handleSkillImageUpload($result, $request);
-                break;
+                    $this->handleSkillImageUpload($result, $request);
+                    break;
                 case 'track_image':
-                $this->handleTrackImageUpload($result, $request);
-                break;
+                    $this->handleTrackImageUpload($result, $request);
+                    break;
             }
 
             return response()->json([
                 'success' => true,
-                'url' => $result['url'] . '?v=' . time(),
-                'path' => $result['path'],
+                'url'     => $result['url'] . '?v=' . time(),
+                'path'    => $result['path'],
                 'message' => 'Image uploaded successfully!',
-                'stats' => [
-                    'original_size' => $this->formatBytes($result['original_size']),
-                    'optimized_size' => $this->formatBytes($result['size']),
-                    'saved' => $this->formatBytes($result['saved_bytes'] ?? 0),
-                    'dimensions' => $result['dimensions']['width'] . '×' . $result['dimensions']['height'],
+                'stats'   => [
+                    'original_size'   => $this->formatBytes($result['original_size']),
+                    'optimized_size'  => $this->formatBytes($result['size']),
+                    'saved'           => $this->formatBytes($result['saved_bytes'] ?? 0),
+                    'dimensions'      => $result['dimensions']['width'] . '×' . $result['dimensions']['height'],
                 ],
-                'css_version' => in_array($type, ['logo', 'favicon', 'login_background']) ? time() : null,
+                'css_version' => in_array($type, ['logo','favicon','login_background']) ? time() : null,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 422);
         }
     }
-
 
     protected function handleTrackImageUpload($result, $request)
     {
@@ -172,19 +190,28 @@ class ImageUploadController extends Controller
     /**
      * Handle favicon upload
      */
-    protected function handleFaviconUpload(array $result): void
+    private function handleFaviconUpload(array $result): void
     {
-        $oldFavicon = DB::table('configs')->where('key', 'favicon')->value('value');
-        if ($oldFavicon && Storage::disk('public')->exists($oldFavicon)) {
-            Storage::disk('public')->delete($oldFavicon);
+        $relative = ltrim($result['path'] ?? '', '/');
+        $abs      = public_path($relative);
+
+        if (!is_file($abs)) {
+            \Log::warning('Favicon upload: optimized file not found at '.$abs);
+            return;
         }
 
-        DB::table('configs')->updateOrInsert(
-            ['key' => 'favicon'],
-            ['value' => $result['path'], 'updated_at' => now()]
-        );
+        $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
 
-        $this->regenerateThemeCSS();
+        // Save path to config so your layout can reference it
+        $config = \App\Models\Config::current() ?? \App\Models\Config::create();
+        $config->update(['favicon_path' => $relative]);
+
+        // Also copy to the conventional public root, if appropriate
+        if ($ext === 'ico') {
+            @copy($abs, public_path('favicons/favicon.ico'));
+        } elseif ($ext === 'png') {
+            @copy($abs, public_path('faivcons/favicon.png'));
+        }
     }
 
     /**

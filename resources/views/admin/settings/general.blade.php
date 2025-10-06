@@ -598,19 +598,44 @@ function updateToggle(chk){
   }).catch(()=>{ chk.checked=before; toast('Network error','error'); });
 }
 
-function uploadFile(input,type){
-  const f=input.files?.[0]; if(!f) return;
-  const fd=new FormData(); fd.append(type,f);
-  toast(`Uploading ${type}…`,'info');
-  form(API.file(type),fd,'POST').then(r=>{
-    if(r&&r.success){
-      toast(`${type} uploaded`,'success');
-      if (type==='logo' && document.getElementById('logoImg')) document.getElementById('logoImg').src = r.url;
-      if (type==='favicon' && document.getElementById('faviconImg')) document.getElementById('faviconImg').src = r.url;
+async function uploadFile(input, type) {
+  const f = input.files?.[0];
+  if (!f) return;
+
+  const fd = new FormData();
+  fd.append('image', f);       // <- must be 'image'
+  fd.append('type', type);     // e.g. 'favicon', 'logo', ...
+
+  toast(`Uploading ${type}…`, 'info');
+
+  try {
+    const res = await fetch('/admin/upload/image', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+      },
+      body: fd,
+      credentials: 'same-origin'
+    });
+
+    const r = await res.json();
+
+    if (res.ok && r?.success) {
+      toast(`${type} uploaded`, 'success');
+      if (type === 'logo'    && document.getElementById('logoImg'))    document.getElementById('logoImg').src = r.url;
+      if (type === 'favicon' && document.getElementById('faviconImg')) document.getElementById('faviconImg').src = r.url;
       if (r.css_version) hotSwapThemeCss(r.css_version);
-    } else toast(r?.message||'Upload failed','error');
-  }).catch(()=>toast('Upload error','error'));
+    } else {
+      toast(r?.message || `Upload failed (${res.status})`, 'error');
+    }
+  } catch (e) {
+    toast('Upload error', 'error');
+  } finally {
+    input.value = ''; // reset file input
+  }
 }
+
 
 function deleteFile(type){
   if(!confirm(`Delete ${type}?`)) return;
