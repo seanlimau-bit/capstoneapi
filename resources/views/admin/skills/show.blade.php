@@ -256,67 +256,83 @@
                 @foreach($skill->tracks as $track)
                 <div class="list-group-item d-flex justify-content-between align-items-center px-0">
                     <div>
-                        <strong>{{ $track->track }}</strong>
-                        @if($track->level)
-                        <br><small class="text-muted">Level {{ $track->level->level }} - {{ $track->level->description }}</small>
-                        @endif
-                    </div>
-                    <button class="btn btn-sm btn-outline-danger" onclick="SkillManager.removeTrack({{ $skill->id }}, {{ $track->id }})" title="Remove track">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                @endforeach
-            </div>
-            @else
-            @include('admin.components.empty-state', [
-            'icon' => 'route',
-            'title' => 'No tracks assigned',
-            'message' => ''
-            ])
-            @endif
-        </div>
-    </div>
+                      <strong>{{ $track->track }}</strong>
+                      @if($track->level)
+                      @php
+                      // define your badge colors
+                      $statusColors = [
+                      'Only Me'    => 'badge bg-secondary',   // grey
+                      'Restricted' => 'badge bg-warning text-dark', // yellow
+                      'Public'     => 'badge bg-success',     // green
+                      'Draft'      => 'badge bg-info text-dark',    // light blue
+                      ];
+                      $statusClass = $statusColors[$track->status->status] ?? 'badge bg-light text-dark';
+                      @endphp
 
-    {{-- Video Links Card --}}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Video Resources</h5>
-            <button class="btn btn-sm btn-outline-primary" onclick="SkillManager.showAddVideo()">
-                <i class="fas fa-plus"></i> Add
-            </button>
-        </div>
-        <div class="card-body">
-            @if($skill->links && $skill->links->count() > 0)
-            @foreach($skill->links as $link)
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="flex-grow-1">
-                    <div class="editable-field" data-field="video_title" data-type="text" data-link-id="{{ $link->id }}">
-                        <span class="field-display">
-                            {{ $link->title ?? 'Video ' . $loop->iteration }}
-                        </span>
-                        <i class="fas fa-edit edit-icon text-muted ms-2"></i>
-                    </div>
-                    <small class="text-muted">{{ basename($link->link) }}</small>
-                </div>
-                <div class="btn-group btn-group-sm">
-                    <a href="{{ asset($link->link) }}" class="btn btn-outline-primary" target="_blank">
-                        <i class="fas fa-play"></i>
-                    </a>
-                    <button class="btn btn-outline-danger" onclick="SkillManager.deleteVideo({{ $link->id }})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
+                      <br>
+                      <small class="text-muted">
+                          Level {{ $track->level->level }} - {{ $track->level->description }}
+                          <span class="{{ $statusClass }}">{{ $track->status->status }}</span>
+                      </small>
+                      @endif
+                  </div>
+
+                  <button class="btn btn-sm btn-outline-danger" onclick="SkillManager.removeTrack({{ $skill->id }}, {{ $track->id }})" title="Remove track">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             @endforeach
-            @else
-            @include('admin.components.empty-state', [
-            'icon' => 'video',
-            'title' => 'No videos uploaded',
-            'message' => ''
-            ])
-            @endif
         </div>
+        @else
+        @include('admin.components.empty-state', [
+        'icon' => 'route',
+        'title' => 'No tracks assigned',
+        'message' => ''
+        ])
+        @endif
     </div>
+</div>
+
+{{-- Video Links Card --}}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Video Resources</h5>
+        <button class="btn btn-sm btn-outline-primary" onclick="SkillManager.showAddVideo()">
+            <i class="fas fa-plus"></i> Add
+        </button>
+    </div>
+    <div class="card-body">
+        @if($skill->links && $skill->links->count() > 0)
+        @foreach($skill->links as $link)
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="flex-grow-1">
+                <div class="editable-field" data-field="video_title" data-type="text" data-link-id="{{ $link->id }}">
+                    <span class="field-display">
+                        {{ $link->title ?? 'Video ' . $loop->iteration }}
+                    </span>
+                    <i class="fas fa-edit edit-icon text-muted ms-2"></i>
+                </div>
+                <small class="text-muted">{{ basename($link->link) }}</small>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <a href="{{ asset($link->link) }}" class="btn btn-outline-primary" target="_blank">
+                    <i class="fas fa-play"></i>
+                </a>
+                <button class="btn btn-outline-danger" onclick="SkillManager.deleteVideo({{ $link->id }})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+        @endforeach
+        @else
+        @include('admin.components.empty-state', [
+        'icon' => 'video',
+        'title' => 'No videos uploaded',
+        'message' => ''
+        ])
+        @endif
+    </div>
+</div>
 </div>
 </div>
 </div>
