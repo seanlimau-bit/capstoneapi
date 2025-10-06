@@ -16,62 +16,52 @@ class ImageOptimizationService
     
     protected array $config = [
         'question_image' => [
-            'max_width' => 800,
-            'max_height' => 800,
-            'quality' => 85,
-            'format' => 'webp',
-            'max_size_kb' => 500,
+            'max_width' => 1600, 'max_height' => 1600,
+            'quality' => 82, 'format' => 'webp',
+            'max_size_kb' => 6144, // 6 MB
+        ],
+        'answer_image' => [ // ← add this
+            'max_width' => 1600, 'max_height' => 1600,
+            'quality' => 82, 'format' => 'webp',
+            'max_size_kb' => 6144, // 6 MB
         ],
         'logo' => [
-            'max_width' => 400,
-            'max_height' => 200,
-            'quality' => 90,
-            'format' => 'png',
+            'max_width' => 400, 'max_height' => 200,
+            'quality' => 90, 'format' => 'png',
             'max_size_kb' => 200,
         ],
         'favicon' => [
-            'max_width' => 64,
-            'max_height' => 64,
-            'quality' => 90,
-            'format' => 'png',
+            'max_width' => 64, 'max_height' => 64,
+            'quality' => 90, 'format' => 'png',
             'max_size_kb' => 50,
         ],
         'login_background' => [
-            'max_width' => 1920,
-            'max_height' => 1080,
-            'quality' => 85,
-            'format' => 'webp',
-            'max_size_kb' => 800,
+            'max_width' => 2560, 'max_height' => 1440,
+            'quality' => 80, 'format' => 'webp',
+            'max_size_kb' => 8192, // 8 MB
         ],
         'profile_picture' => [
-            'max_width' => 300,
-            'max_height' => 300,
-            'quality' => 85,
-            'format' => 'webp',
-            'max_size_kb' => 150,
+            'max_width' => 1024, 'max_height' => 1024,
+            'quality' => 82, 'format' => 'webp',
+            'max_size_kb' => 2048, // 2 MB
         ],
-        'skill_image' => [ 
-            'max_width' => 600,
-            'max_height' => 400,
-            'quality' => 85,
-            'format' => 'webp',
-            'max_size_kb' => 500,
+        'skill_image' => [
+            'max_width' => 1200, 'max_height' => 1200,
+            'quality' => 82, 'format' => 'webp',
+            'max_size_kb' => 2048,
         ],
         'track_image' => [
-            'max_width' => 600,
-            'max_height' => 400,
-            'quality' => 85,
-            'format' => 'webp',
-            'max_size_kb' => 500,
+            'max_width' => 1200, 'max_height' => 1200,
+            'quality' => 82, 'format' => 'webp',
+            'max_size_kb' => 2048,
         ],
         'default' => [
-            'max_width' => 1200,
-            'max_height' => 1200,
-            'quality' => 85,
-            'format' => 'webp',
-            'max_size_kb' => 500,
+            'max_width' => 1200, 'max_height' => 1200,
+            'quality' => 82, 'format' => 'webp',
+            'max_size_kb' => 6144,
         ],
     ];
+
 
     public function __construct()
     {
