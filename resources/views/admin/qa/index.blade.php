@@ -263,6 +263,11 @@ $human = function ($d, $fallback = 'Unknown') {
                 </a>
               </td>
               <td>
+                @if($question->is_diagnostic)
+                <span class="badge text-danger">
+                  Sentinel
+                </span>
+                @endif
                 <span class="badge text-bg-{{ $question->type_id == 1 ? 'primary' : 'info' }}">
                   {{ $question->type_id == 1 ? 'Multiple Choice' : 'Fill in Blank' }}
                 </span>

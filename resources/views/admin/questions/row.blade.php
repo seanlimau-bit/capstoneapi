@@ -24,19 +24,37 @@ $qid = $question->id;
 
   {{-- Question Details --}}
   <td>
-    <div class="fw-semibold mb-1">{{ Str::limit(strip_tags($question->question ?? ''), 60) }}</div>
+    <div class="fw-semibold mb-1 d-flex align-items-start gap-2">
+      <span>{{ Str::limit(strip_tags($question->question ?? ''), 60) }}</span>
+
+      @if($question->is_diagnostic)
+        <span class="badge bg-warning text-dark" title="Diagnostic sentinel">SENTINEL</span>
+      @endif
+
+      @if(($question->source ?? null) === 'auto:sentinel')
+        <span class="badge bg-secondary" title="Auto-generated sentinel">auto</span>
+      @endif
+    </div>
 
     @if(!empty($question->correct_answer))
-    <small class="text-success">Answer: {{ Str::limit($question->correct_answer, 40) }}</small>
+      <small class="text-success">Answer: {{ Str::limit($question->correct_answer, 40) }}</small>
     @endif
 
-    <div class="mt-1">
+    <div class="mt-1 d-flex align-items-center gap-2">
       <small class="text-muted">ID: {{ $qid }}</small>
+
       @if($question->type)
-      <span class="badge bg-info ms-2">{{ $question->type->description ?? $question->type->type }}</span>
+        <span class="badge bg-info">{{ $question->type->description ?? $question->type->type }}</span>
+      @endif
+
+      @if($question->is_diagnostic)
+        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+          diagnostic
+        </span>
       @endif
     </div>
   </td>
+
 
   {{-- Skill & Difficulty --}}
   <td>

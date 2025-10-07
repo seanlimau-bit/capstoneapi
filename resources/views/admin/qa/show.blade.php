@@ -53,16 +53,23 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
   .badge-status { font-size:.9rem; padding:.4rem .6rem; }
   .katex-block { margin: 8px 0; }
   .form-text code { background:#f6f6f6; padding:.1rem .25rem; border-radius:4px; }
+  .sentinel-bg {
+    background-color: #fff8e1; /* pale amber */
+  }
+
+  .dark-mode .sentinel-bg {
+    background-color: #3b2f00; /* deeper tone for dark themes if needed */
+  }
 </style>
 @endpush
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid {{ $question->is_diagnostic ? 'sentinel-bg' : '' }}">
   {{-- Header --}}
   <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-start gap-2">
       <div>
-        <h2 class="mb-1">Review Question #{{ $question->id }}</h2>
+        <h2 class="mb-1">Review Question #{{ $question->id }} {{$question->is_diagnostic ? ' ⚡' : ''}} </h2>
         <div class="small text-muted">
           Created: {{ $question->created_at ? $question->created_at->format('M d, Y') : 'Unknown' }}
           @if(!empty($question->published_at))
@@ -114,6 +121,10 @@ $difficultyColor = $difficultyColors[$question->difficulty_id ?? 0] ?? 'secondar
               <span class="badge badge-status {{ $isPublic ? 'bg-success' : 'bg-secondary' }}">
                 {{ $isPublic ? 'Public' : 'Draft' }}
               </span>
+              @if($question->is_diagnostic)
+              <span class="badge badge-status bg-info">Sentinel
+              </span>
+              @endif
             </div>
             <div class="text-muted small">
               @if($question->skill)

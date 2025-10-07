@@ -33,26 +33,39 @@
   }
   .rich-toolbar { display:flex; gap:.5rem; align-items:center; justify-content:space-between; margin-bottom:.25rem; }
   .rich-toolbar .btn { padding: .15rem .5rem; }
+  .sentinel-bg {
+    background-color: #fff8e1; /* pale amber */
+  }
+
+  .dark-mode .sentinel-bg {
+    background-color: #3b2f00; /* deeper tone for dark themes if needed */
+  }
+
 </style>
 @endpush
 
 @section('content')
-<div class="container-fluid" data-question-id="{{ $question->id }}">
+<div class="container-fluid {{ $question->is_diagnostic ? 'sentinel-bg' : '' }}" data-question-id="{{ $question->id }}">
   {{-- Page Header --}}
   @include('admin.components.page-header', [
-    'title' => 'View Question',
-    'subtitle' => 'Question ID: ' . $question->id . ' | Type: ' . ($question->type->type ?? 'Unknown'),
-    'breadcrumbs' => [
-      ['title' => 'Dashboard', 'url' => url('/admin')],
-      ['title' => 'Questions', 'url' => route('admin.questions.index')],
-      ['title' => 'View Question']
-    ],
-    'actions' => [
-      ['text' => 'QA Review', 'url' => route('admin.qa.questions.review', $question), 'icon' => 'clipboard-check', 'style' => 'warning'],
-      ['text' => 'Duplicate Question', 'onclick' => 'duplicateQuestion(' . $question->id . ')', 'icon' => 'copy', 'style' => 'info'],
-      ['text' => 'Delete Question', 'onclick' => 'deleteQuestion(' . $question->id . ')', 'icon' => 'trash', 'style' => 'danger']
-    ]
+  'title' => 'View Question' . ($question->is_diagnostic ? ' ⚡' : ''),
+  'subtitle' => 
+  'Question ID: ' . $question->id .
+  ' | Type: ' . ($question->type->type ?? 'Unknown') .
+  ($question->is_diagnostic ? ' | ' .
+  '<span class="badge bg-warning text-dark ms-2" title="Diagnostic sentinel">SENTINEL</span>' : ''),
+  'breadcrumbs' => [
+  ['title' => 'Dashboard', 'url' => url('/admin')],
+  ['title' => 'Questions', 'url' => route('admin.questions.index')],
+  ['title' => 'View Question']
+  ],
+  'actions' => [
+  ['text' => 'QA Review', 'url' => route('admin.qa.questions.review', $question), 'icon' => 'clipboard-check', 'style' => 'warning'],
+  ['text' => 'Duplicate Question', 'onclick' => 'duplicateQuestion(' . $question->id . ')', 'icon' => 'copy', 'style' => 'info'],
+  ['text' => 'Delete Question', 'onclick' => 'deleteQuestion(' . $question->id . ')', 'icon' => 'trash', 'style' => 'danger']
+  ]
   ])
+
 
   <div class="row gy-4">
     {{-- MAIN --}}
@@ -73,22 +86,22 @@
           <div class="mb-4" id="question-image-section">
             <label class="form-label text-muted small">QUESTION IMAGE</label>
             @if($question->question_image)
-              <div class="image-container">
-                <div class="image-wrapper">
-                  <img src="{{ Storage::url($question->question_image) }}" alt="Question Image" class="question-image">
-                  <div class="image-overlay">
-                    <button class="btn btn-light btn-sm" onclick="changeQuestionImage({{ $question->id }})" title="Change Image"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-danger btn-sm" onclick="removeQuestionImage({{ $question->id }})" title="Remove Image"><i class="fas fa-trash"></i></button>
-                  </div>
+            <div class="image-container">
+              <div class="image-wrapper">
+                <img src="{{ Storage::url($question->question_image) }}" alt="Question Image" class="question-image">
+                <div class="image-overlay">
+                  <button class="btn btn-light btn-sm" onclick="changeQuestionImage({{ $question->id }})" title="Change Image"><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-danger btn-sm" onclick="removeQuestionImage({{ $question->id }})" title="Remove Image"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
+            </div>
             @else
-              <div class="upload-area" onclick="addQuestionImage({{ $question->id }})">
-                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                <h5 class="text-muted mb-2">Upload Question Image</h5>
-                <p class="text-muted small mb-3">Click to browse or drag and drop</p>
-                <p class="text-muted small">Supports: JPG, PNG, GIF, WebP (Max 6MB)</p>
-              </div>
+            <div class="upload-area" onclick="addQuestionImage({{ $question->id }})">
+              <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted mb-2">Upload Question Image</h5>
+              <p class="text-muted small mb-3">Click to browse or drag and drop</p>
+              <p class="text-muted small">Supports: JPG, PNG, GIF, WebP (Max 6MB)</p>
+            </div>
             @endif
           </div>
 
@@ -100,6 +113,7 @@
                 <button class="btn btn-sm btn-outline-secondary rich-toggle" type="button">
                   <i class="fas fa-pencil me-1"></i>Edit
                 </button>
+                @if($question->type->type != "MCQ")
                 <button class="btn btn-sm btn-outline-primary" id="fib-add-blank" type="button">
                   <i class="fas fa-plus me-1"></i>Add Blank
                 </button>
@@ -107,6 +121,7 @@
                   <i class="fas fa-minus me-1"></i>Remove Last Blank
                 </button>
                 <small class="text-muted">Blanks: <span id="fib-blank-count">0</span> / 4</small>
+                @endif
               </div>
             </div>
             <div class="rich-view question-field border rounded p-2">
@@ -118,96 +133,38 @@
 
           {{-- ANSWERS --}}
           @if((int)$question->type_id === 1)
-            {{-- ===== Type 1: MCQ with answer images ===== --}}
+          {{-- ===== Type 1: MCQ with answer images ===== --}}
+          @php
+          $options = [
+          ['label'=>'A','key'=>'answer0','index'=>0],
+          ['label'=>'B','key'=>'answer1','index'=>1],
+          ['label'=>'C','key'=>'answer2','index'=>2],
+          ['label'=>'D','key'=>'answer3','index'=>3],
+          ['label'=>'E','key'=>'answer4','index'=>4],
+          ];
+          @endphp
+
+          <div class="mb-4">
+            <label class="form-label text-muted small">MULTIPLE CHOICE OPTIONS</label>
+
+            @foreach($options as $o)
             @php
-              $options = [
-                ['label'=>'A','key'=>'answer0','index'=>0],
-                ['label'=>'B','key'=>'answer1','index'=>1],
-                ['label'=>'C','key'=>'answer2','index'=>2],
-                ['label'=>'D','key'=>'answer3','index'=>3],
-                ['label'=>'E','key'=>'answer4','index'=>4],
-              ];
+            $val = $question->{$o['key']} ?? '';
+            $img = $question->{$o['key'].'_image'} ?? null;
+            $isCorrect = (string)$question->correct_answer === (string)$o['index'];
             @endphp
 
-            <div class="mb-4">
-              <label class="form-label text-muted small">MULTIPLE CHOICE OPTIONS</label>
-
-              @foreach($options as $o)
-                @php
-                  $val = $question->{$o['key']} ?? '';
-                  $img = $question->{$o['key'].'_image'} ?? null;
-                  $isCorrect = (string)$question->correct_answer === (string)$o['index'];
-                @endphp
-
-                <div class="mcq-option {{ $isCorrect ? 'border-success' : '' }}" data-option-index="{{ $o['index'] }}">
-                  <div class="mcq-option-label {{ $isCorrect ? 'bg-success text-white' : 'bg-light' }}">
-                    {{ $o['label'] }}
-                    @if($isCorrect)
-                      <i class="fas fa-check position-absolute small" style="top:3px;right:3px;"></i>
-                    @endif
-                  </div>
-
-                  <div class="flex-grow-1">
-                    {{-- Rich text / KaTeX --}}
-                    <div class="rich-field" data-id="{{ $question->id }}" data-field="{{ $o['key'] }}">
-                      <div class="rich-toolbar">
-                        <button class="btn btn-sm btn-outline-secondary rich-toggle"><i class="fas fa-pencil me-1"></i>Edit</button>
-                      </div>
-                      <div class="rich-view editable-field">
-                        <div class="rich-content math-render">{!! $val !!}</div>
-                      </div>
-                      <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $val !!}</textarea>
-                    </div>
-
-                    {{-- Optional image --}}
-                    @if($img)
-                      <div class="mt-2 image-wrapper-small">
-                        <img src="{{ Storage::url($img) }}" class="answer-image" alt="Option {{ $o['label'] }}">
-                        <div class="image-overlay-small">
-                          <button class="btn btn-light btn-sm" onclick="changeAnswerImage({{ $question->id }}, {{ $o['index'] }})"><i class="fas fa-edit"></i></button>
-                          <button class="btn btn-danger btn-sm" onclick="removeAnswerImage({{ $question->id }}, {{ $o['index'] }})"><i class="fas fa-trash"></i></button>
-                        </div>
-                      </div>
-                    @else
-                      <div class="upload-area-small mt-2" onclick="addAnswerImage({{ $question->id }}, {{ $o['index'] }})">
-                        <i class="fas fa-plus me-1"></i>Add Image for {{ $o['label'] }}
-                      </div>
-                    @endif
-                  </div>
-                </div>
-              @endforeach
-
-              {{-- Correct answer dropdown --}}
-              <div class="mt-3">
-                <label class="form-label text-muted small">CORRECT ANSWER</label>
-                <select class="form-select form-select-sm correct-answer-selector"
-                        data-field="correct_answer"
-                        data-id="{{ $question->id }}"
-                        data-current="{{ $question->correct_answer }}">
-                  <option value="">Select...</option>
-                  @foreach($options as $o)
-                    <option value="{{ $o['index'] }}" {{ $isCorrect ? 'selected' : '' }}>
-                      Option {{ $o['label'] }}
-                    </option>
-                  @endforeach
-                </select>
+            <div class="mcq-option {{ $isCorrect ? 'border-success' : '' }}" data-option-index="{{ $o['index'] }}">
+              <div class="mcq-option-label {{ $isCorrect ? 'bg-success text-white' : 'bg-light' }}">
+                {{ $o['label'] }}
+                @if($isCorrect)
+                <i class="fas fa-check position-absolute small" style="top:3px;right:3px;"></i>
+                @endif
               </div>
-            </div>
 
-          @elseif((int)$question->type_id === 2)
-            {{-- ===== Type 2: FIB – text only, no images or correct_answer ===== --}}
-            @php
-              $plain = html_entity_decode(strip_tags($question->question ?? ''), ENT_QUOTES | ENT_HTML5);
-              preg_match_all('/(\[\?\])|(_{3,})|(\[blank\])/u', $plain, $m);
-              $blankCount = min(max(count($m[0]), 1), 4);
-            @endphp
-
-            <div class="mb-4">
-              <label class="form-label text-muted small">EXPECTED ANSWERS ({{ $blankCount }})</label>
-
-              @for($i = 0; $i < $blankCount; $i++)
-                @php $val = $question->{'answer'.$i} ?? ''; @endphp
-                <div class="rich-field mb-2" data-id="{{ $question->id }}" data-field="answer{{ $i }}">
+              <div class="flex-grow-1">
+                {{-- Rich text / KaTeX --}}
+                <div class="rich-field" data-id="{{ $question->id }}" data-field="{{ $o['key'] }}">
                   <div class="rich-toolbar">
                     <button class="btn btn-sm btn-outline-secondary rich-toggle"><i class="fas fa-pencil me-1"></i>Edit</button>
                   </div>
@@ -216,319 +173,377 @@
                   </div>
                   <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $val !!}</textarea>
                 </div>
-              @endfor
-            </div>
-          @endif
 
-          {{-- Settings --}}
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label text-muted small">QA STATUS</label>
-              <select class="form-select form-select-sm qa-status-selector"
-                      data-field="qa_status"
-                      data-id="{{ $question->id }}"
-                      data-current="{{ $question->qa_status }}">
-                <option value="">Select status...</option>
-                @foreach($qaStatuses as $status)
-                  <option value="{{ $status['value'] }}" {{ $status['value'] == ($question->qa_status ?? '') ? 'selected' : '' }}>
-                    {{ $status['label'] }}
-                  </option>
-                @endforeach
-              </select>
+                {{-- Optional image --}}
+                @if($img)
+                <div class="mt-2 image-wrapper-small">
+                  <img src="{{ Storage::url($img) }}" class="answer-image" alt="Option {{ $o['label'] }}">
+                  <div class="image-overlay-small">
+                    <button class="btn btn-light btn-sm" onclick="changeAnswerImage({{ $question->id }}, {{ $o['index'] }})"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="removeAnswerImage({{ $question->id }}, {{ $o['index'] }})"><i class="fas fa-trash"></i></button>
+                  </div>
+                </div>
+                @else
+                <div class="upload-area-small mt-2" onclick="addAnswerImage({{ $question->id }}, {{ $o['index'] }})">
+                  <i class="fas fa-plus me-1"></i>Add Image for {{ $o['label'] }}
+                </div>
+                @endif
+              </div>
             </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label text-muted small">DIFFICULTY</label>
-              <select class="form-select form-select-sm"
-                      data-field="difficulty_id"
-                      data-id="{{ $question->id }}"
-                      data-current="{{ $question->difficulty_id }}">
-                <option value="">Select difficulty...</option>
-                @foreach($difficulties as $difficulty)
-                  <option value="{{ $difficulty->id }}" {{ $difficulty->id == ($question->difficulty_id ?? '') ? 'selected' : '' }}>
-                    {{ $difficulty->short_description }}
-                  </option>
-                @endforeach
-              </select>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label text-muted small">TYPE</label>
-              <select class="form-select form-select-sm"
-                      data-field="type_id"
-                      data-id="{{ $question->id }}"
-                      data-current="{{ $question->type_id }}">
-                <option value="">Select type...</option>
-                @foreach($types as $type)
-                  <option value="{{ $type->id }}" {{ $type->id == ($question->type_id ?? '') ? 'selected' : '' }}>
-                    {{ $type->type }}
-                  </option>
-                @endforeach
-              </select>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label text-muted small">STATUS</label>
-              <select class="form-select form-select-sm"
-                      data-field="status_id"
-                      data-id="{{ $question->id }}"
-                      data-current="{{ $question->status_id }}">
-                @foreach($statuses as $st)
-                  <option value="{{ $st->id }}" {{ (int)$st->id === (int)$question->status_id ? 'selected' : '' }}>
-                    {{ $st->status }}
-                  </option>
-                @endforeach
-              </select>
-            </div>
+            @endforeach
+
+            {{-- Correct answer dropdown --}}
+            <div class="mt-3">
+              <label class="form-label text-muted small">CORRECT ANSWER</label>
+              <select class="form-select form-select-sm correct-answer-selector"
+              data-field="correct_answer"
+              data-id="{{ $question->id }}"
+              data-current="{{ $question->correct_answer }}">
+              <option value="">Select...</option>
+              @foreach($options as $o)
+              <option value="{{ $o['index'] }}" {{ $isCorrect ? 'selected' : '' }}>
+                Option {{ $o['label'] }}
+              </option>
+              @endforeach
+            </select>
           </div>
+        </div>
 
+        @elseif((int)$question->type_id === 2)
+        {{-- ===== Type 2: FIB – text only, no images or correct_answer ===== --}}
+        @php
+        $plain = html_entity_decode(strip_tags($question->question ?? ''), ENT_QUOTES | ENT_HTML5);
+        preg_match_all('/(\[\?\])|(_{3,})|(\[blank\])/u', $plain, $m);
+        $blankCount = min(max(count($m[0]), 1), 4);
+        @endphp
+
+        <div class="mb-4">
+          <label class="form-label text-muted small">EXPECTED ANSWERS ({{ $blankCount }})</label>
+
+          @for($i = 0; $i < $blankCount; $i++)
+          @php $val = $question->{'answer'.$i} ?? ''; @endphp
+          <div class="rich-field mb-2" data-id="{{ $question->id }}" data-field="answer{{ $i }}">
+            <div class="rich-toolbar">
+              <button class="btn btn-sm btn-outline-secondary rich-toggle"><i class="fas fa-pencil me-1"></i>Edit</button>
+            </div>
+            <div class="rich-view editable-field">
+              <div class="rich-content math-render">{!! $val !!}</div>
+            </div>
+            <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $val !!}</textarea>
+          </div>
+          @endfor
+        </div>
+        @endif
+
+        {{-- Settings --}}
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label text-muted small">QA STATUS</label>
+            <select class="form-select form-select-sm qa-status-selector"
+            data-field="qa_status"
+            data-id="{{ $question->id }}"
+            data-current="{{ $question->qa_status }}">
+            <option value="">Select status...</option>
+            @foreach($qaStatuses as $status)
+            <option value="{{ $status['value'] }}" {{ $status['value'] == ($question->qa_status ?? '') ? 'selected' : '' }}>
+              {{ $status['label'] }}
+            </option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label text-muted small">DIFFICULTY</label>
+          <select class="form-select form-select-sm"
+          data-field="difficulty_id"
+          data-id="{{ $question->id }}"
+          data-current="{{ $question->difficulty_id }}">
+          <option value="">Select difficulty...</option>
+          @foreach($difficulties as $difficulty)
+          <option value="{{ $difficulty->id }}" {{ $difficulty->id == ($question->difficulty_id ?? '') ? 'selected' : '' }}>
+            {{ $difficulty->short_description }}
+          </option>
+          @endforeach
+        </select>
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label text-muted small">TYPE</label>
+        <select class="form-select form-select-sm"
+        data-field="type_id"
+        data-id="{{ $question->id }}"
+        data-current="{{ $question->type_id }}">
+        <option value="">Select type...</option>
+        @foreach($types as $type)
+        <option value="{{ $type->id }}" {{ $type->id == ($question->type_id ?? '') ? 'selected' : '' }}>
+          {{ $type->type }}
+        </option>
+        @endforeach
+      </select>
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label text-muted small">STATUS</label>
+      <select class="form-select form-select-sm"
+      data-field="status_id"
+      data-id="{{ $question->id }}"
+      data-current="{{ $question->status_id }}">
+      @foreach($statuses as $st)
+      <option value="{{ $st->id }}" {{ (int)$st->id === (int)$question->status_id ? 'selected' : '' }}>
+        {{ $st->status }}
+      </option>
+      @endforeach
+    </select>
+  </div>
+</div>
+
+</div>
+</div>
+
+{{-- Explanation / Hints / Solutions --}}
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="card-title mb-0"><i class="fas fa-lightbulb me-2"></i>Explanation, Hints & Solutions</h5>
+  </div>
+  <div class="card-body">
+    {{-- Explanation --}}
+    <div class="mb-4">
+      <div class="rich-field" data-id="{{ $question->id }}" data-field="explanation">
+        <div class="rich-toolbar">
+          <label class="form-label text-muted small m-0">EXPLANATION</label>
+          <button class="btn btn-sm btn-outline-secondary rich-toggle" type="button"><i class="fas fa-pencil me-1"></i> Edit</button>
+        </div>
+        <div class="rich-view editable-field">
+          <div class="rich-content math-render">{!! $question->explanation !!}</div>
+        </div>
+        <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $question->explanation !!}</textarea>
+      </div>
+    </div>
+
+    {{-- Hints --}}
+    <div class="mb-4">
+      <label class="form-label text-muted small">HINTS</label>
+      @if($question->hints && $question->hints->count() > 0)
+      @foreach($question->hints->sortBy('hint_level') as $hint)
+      <div class="mb-2 p-2 border-start border-3 border-info bg-light" data-hint-id="{{ $hint->id }}">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info">Level</span>
+            <input type="number" class="form-control form-control-sm"
+            style="width: 90px"
+            value="{{ $hint->hint_level }}"
+            data-hint-id="{{ $hint->id }}"
+            onblur="updateHintLevel(this)">
+          </div>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteHint({{ $hint->id }})" title="Delete hint"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="rich-field" data-id="{{ $question->id }}" data-field="hint_text" data-hint-id="{{ $hint->id }}">
+          <div class="rich-toolbar">
+            <small class="text-muted">Hint Text</small>
+            <button class="btn btn-sm btn-outline-secondary rich-toggle" type="button"><i class="fas fa-pencil me-1"></i> Edit</button>
+          </div>
+          <div class="rich-view editable-field">
+            <div class="rich-content math-render">{!! $hint->hint_text !!}</div>
+          </div>
+          <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $hint->hint_text !!}</textarea>
+        </div>
+
+        @if($hint->user)
+        <small class="text-muted">Added by {{ $hint->user->name }}</small>
+        @endif
+      </div>
+      @endforeach
+      @else
+      <p class="text-muted">No hints available</p>
+      @endif
+
+      {{-- Add hint --}}
+      <div id="add-hint-box" class="inline-add-box mt-2">
+        <div class="row g-2">
+          <div class="col-12 col-md-3">
+            <label class="form-label small">Hint Level</label>
+            <select class="form-select form-select-sm" id="new-hint-level">
+              <option value="1">1 (easy nudge)</option>
+              <option value="2">2 (medium clue)</option>
+              <option value="3">3 (almost reveals)</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-9">
+            <label class="form-label small">Hint Text</label>
+            <textarea class="form-control form-control-sm" id="new-hint-text" rows="3" placeholder="Short, progressive hint (HTML/KaTeX allowed)..."></textarea>
+          </div>
+        </div>
+        <div class="d-flex justify-content-end mt-2 inline-actions">
+          <button class="btn btn-sm btn-secondary" id="cancel-add-hint">Cancel</button>
+          <button class="btn btn-sm btn-primary" id="save-new-hint">Save Hint</button>
         </div>
       </div>
+      <button class="btn btn-sm btn-outline-primary mt-2" id="toggle-add-hint"><i class="fas fa-plus me-1"></i>Add Hint</button>
+    </div>
 
-      {{-- Explanation / Hints / Solutions --}}
-      <div class="card mb-4">
-        <div class="card-header">
-          <h5 class="card-title mb-0"><i class="fas fa-lightbulb me-2"></i>Explanation, Hints & Solutions</h5>
+    {{-- Solutions --}}
+    <div class="mb-2">
+      <label class="form-label text-muted small">SOLUTIONS</label>
+      @if($question->solutions && $question->solutions->count() > 0)
+      @foreach($question->solutions as $solution)
+      <div class="solution-item mb-3 p-3 border rounded bg-light">
+        <div class="rich-field" data-id="{{ $question->id }}" data-field="solution" data-solution-id="{{ $solution->id }}">
+          <div class="rich-toolbar">
+            <small class="text-muted">Solution</small>
+            <button class="btn btn-sm btn-outline-secondary rich-toggle" type="button"><i class="fas fa-pencil me-1"></i> Source</button>
+          </div>
+          <div class="rich-view editable-field">
+            <div class="rich-content math-render">{!! $solution->solution !!}</div>
+          </div>
+          <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $solution->solution !!}</textarea>
         </div>
-        <div class="card-body">
-          {{-- Explanation --}}
-          <div class="mb-4">
-            <div class="rich-field" data-id="{{ $question->id }}" data-field="explanation">
-              <div class="rich-toolbar">
-                <label class="form-label text-muted small m-0">EXPLANATION</label>
-                <button class="btn btn-sm btn-outline-secondary rich-toggle" type="button"><i class="fas fa-pencil me-1"></i> Edit</button>
-              </div>
-              <div class="rich-view editable-field">
-                <div class="rich-content math-render">{!! $question->explanation !!}</div>
-              </div>
-              <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $question->explanation !!}</textarea>
-            </div>
-          </div>
 
-          {{-- Hints --}}
-          <div class="mb-4">
-            <label class="form-label text-muted small">HINTS</label>
-            @if($question->hints && $question->hints->count() > 0)
-              @foreach($question->hints->sortBy('hint_level') as $hint)
-                <div class="mb-2 p-2 border-start border-3 border-info bg-light" data-hint-id="{{ $hint->id }}">
-                  <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="badge bg-info">Level</span>
-                      <input type="number" class="form-control form-control-sm"
-                             style="width: 90px"
-                             value="{{ $hint->hint_level }}"
-                             data-hint-id="{{ $hint->id }}"
-                             onblur="updateHintLevel(this)">
-                    </div>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteHint({{ $hint->id }})" title="Delete hint"><i class="fas fa-times"></i></button>
-                  </div>
+        <div class="mt-2 d-flex justify-content-between align-items-center">
+          <small class="text-muted">
+            <i class="fas fa-user me-1"></i>
+            By {{ $solution->user->name ?? 'Unknown' }} on {{ optional($solution->created_at)->format('M d, Y') }}
+          </small>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteSolution({{ $solution->id }})" title="Delete solution"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>
+      @endforeach
+      @else
+      <p class="text-muted">No solutions available</p>
+      @endif
 
-                  <div class="rich-field" data-id="{{ $question->id }}" data-field="hint_text" data-hint-id="{{ $hint->id }}">
-                    <div class="rich-toolbar">
-                      <small class="text-muted">Hint Text</small>
-                      <button class="btn btn-sm btn-outline-secondary rich-toggle" type="button"><i class="fas fa-pencil me-1"></i> Edit</button>
-                    </div>
-                    <div class="rich-view editable-field">
-                      <div class="rich-content math-render">{!! $hint->hint_text !!}</div>
-                    </div>
-                    <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $hint->hint_text !!}</textarea>
-                  </div>
+      {{-- Add solution --}}
+      <div id="add-solution-box" class="inline-add-box mt-2">
+        <div class="mb-2">
+          <label class="form-label small">Solution</label>
+          <textarea class="form-control form-control-sm" id="new-solution-text" rows="6" placeholder="Type the solution (HTML/KaTeX allowed)..."></textarea>
+        </div>
+        <div class="d-flex justify-content-end inline-actions">
+          <button class="btn btn-sm btn-secondary" id="cancel-add-solution">Cancel</button>
+          <button class="btn btn-sm btn-primary" id="save-new-solution">Save Solution</button>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-primary mt-2" id="toggle-add-solution"><i class="fas fa-plus me-1"></i>Add Solution</button>
+    </div>
 
-                  @if($hint->user)
-                    <small class="text-muted">Added by {{ $hint->user->name }}</small>
-                  @endif
-                </div>
-              @endforeach
-            @else
-              <p class="text-muted">No hints available</p>
-            @endif
+  </div>
+</div>
+</div>
 
-            {{-- Add hint --}}
-            <div id="add-hint-box" class="inline-add-box mt-2">
-              <div class="row g-2">
-                <div class="col-12 col-md-3">
-                  <label class="form-label small">Hint Level</label>
-                  <select class="form-select form-select-sm" id="new-hint-level">
-                    <option value="1">1 (easy nudge)</option>
-                    <option value="2">2 (medium clue)</option>
-                    <option value="3">3 (almost reveals)</option>
-                  </select>
-                </div>
-                <div class="col-12 col-md-9">
-                  <label class="form-label small">Hint Text</label>
-                  <textarea class="form-control form-control-sm" id="new-hint-text" rows="3" placeholder="Short, progressive hint (HTML/KaTeX allowed)..."></textarea>
-                </div>
-              </div>
-              <div class="d-flex justify-content-end mt-2 inline-actions">
-                <button class="btn btn-sm btn-secondary" id="cancel-add-hint">Cancel</button>
-                <button class="btn btn-sm btn-primary" id="save-new-hint">Save Hint</button>
-              </div>
-            </div>
-            <button class="btn btn-sm btn-outline-primary mt-2" id="toggle-add-hint"><i class="fas fa-plus me-1"></i>Add Hint</button>
-          </div>
-
-          {{-- Solutions --}}
-          <div class="mb-2">
-            <label class="form-label text-muted small">SOLUTIONS</label>
-            @if($question->solutions && $question->solutions->count() > 0)
-              @foreach($question->solutions as $solution)
-                <div class="solution-item mb-3 p-3 border rounded bg-light">
-                  <div class="rich-field" data-id="{{ $question->id }}" data-field="solution" data-solution-id="{{ $solution->id }}">
-                    <div class="rich-toolbar">
-                      <small class="text-muted">Solution</small>
-                      <button class="btn btn-sm btn-outline-secondary rich-toggle" type="button"><i class="fas fa-pencil me-1"></i> Source</button>
-                    </div>
-                    <div class="rich-view editable-field">
-                      <div class="rich-content math-render">{!! $solution->solution !!}</div>
-                    </div>
-                    <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $solution->solution !!}</textarea>
-                  </div>
-
-                  <div class="mt-2 d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                      <i class="fas fa-user me-1"></i>
-                      By {{ $solution->user->name ?? 'Unknown' }} on {{ optional($solution->created_at)->format('M d, Y') }}
-                    </small>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteSolution({{ $solution->id }})" title="Delete solution"><i class="fas fa-trash"></i></button>
-                  </div>
-                </div>
-              @endforeach
-            @else
-              <p class="text-muted">No solutions available</p>
-            @endif
-
-            {{-- Add solution --}}
-            <div id="add-solution-box" class="inline-add-box mt-2">
-              <div class="mb-2">
-                <label class="form-label small">Solution</label>
-                <textarea class="form-control form-control-sm" id="new-solution-text" rows="6" placeholder="Type the solution (HTML/KaTeX allowed)..."></textarea>
-              </div>
-              <div class="d-flex justify-content-end inline-actions">
-                <button class="btn btn-sm btn-secondary" id="cancel-add-solution">Cancel</button>
-                <button class="btn btn-sm btn-primary" id="save-new-solution">Save Solution</button>
-              </div>
-            </div>
-            <button class="btn btn-sm btn-outline-primary mt-2" id="toggle-add-solution"><i class="fas fa-plus me-1"></i>Add Solution</button>
-          </div>
-
+{{-- SIDEBAR --}}
+<div class="col-lg-4">
+  <div class="sticky-top" style="top:84px;">
+    {{-- Stats --}}
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Question Statistics</h5></div>
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-4"><h4 class="text-primary">{{ $question->id }}</h4><small class="text-muted">Question ID</small></div>
+          <div class="col-4"><h4 class="text-success">0</h4><small class="text-muted">Times Used</small></div>
+          <div class="col-4"><h4 class="text-info">0%</h4><small class="text-muted">Accuracy</small></div>
         </div>
       </div>
     </div>
 
-    {{-- SIDEBAR --}}
-    <div class="col-lg-4">
-      <div class="sticky-top" style="top:84px;">
-        {{-- Stats --}}
-        <div class="card mb-4">
-          <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Question Statistics</h5></div>
-          <div class="card-body">
-            <div class="row text-center">
-              <div class="col-4"><h4 class="text-primary">{{ $question->id }}</h4><small class="text-muted">Question ID</small></div>
-              <div class="col-4"><h4 class="text-success">0</h4><small class="text-muted">Times Used</small></div>
-              <div class="col-4"><h4 class="text-info">0%</h4><small class="text-muted">Accuracy</small></div>
-            </div>
-          </div>
+    {{-- Quick Actions --}}
+    <div class="card">
+      <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-tools me-2"></i>Quick Actions</h5></div>
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <a href="{{ route('admin.qa.questions.review', $question) }}" class="btn btn-warning"><i class="fas fa-clipboard-check me-1"></i>QA Review</a>
+          <button class="btn btn-info" onclick="duplicateQuestion({{ $question->id }})"><i class="fas fa-copy me-1"></i>Duplicate Question</button>
+          <button class="btn btn-success" onclick="previewQuestion({{ $question->id }})"><i class="fas fa-eye me-1"></i>Preview Question</button>
+          <button class="btn btn-danger" onclick="deleteQuestion({{ $question->id }})"><i class="fas fa-trash me-1"></i>Delete Question</button>
         </div>
-        
-        {{-- Quick Actions --}}
-        <div class="card">
-          <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-tools me-2"></i>Quick Actions</h5></div>
-          <div class="card-body">
-            <div class="d-grid gap-2">
-              <a href="{{ route('admin.qa.questions.review', $question) }}" class="btn btn-warning"><i class="fas fa-clipboard-check me-1"></i>QA Review</a>
-              <button class="btn btn-info" onclick="duplicateQuestion({{ $question->id }})"><i class="fas fa-copy me-1"></i>Duplicate Question</button>
-              <button class="btn btn-success" onclick="previewQuestion({{ $question->id }})"><i class="fas fa-eye me-1"></i>Preview Question</button>
-              <button class="btn btn-danger" onclick="deleteQuestion({{ $question->id }})"><i class="fas fa-trash me-1"></i>Delete Question</button>
-            </div>
-            @include('admin.components.math-help')
-          </div>
-        </div>
+        @include('admin.components.math-help')
+      </div>
+    </div>
 
-        {{-- Skill --}}
-        <div class="card mb-4">
-          <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-brain me-2"></i>Associated Skill</h5></div>
-          <div class="card-body">
-            @if($question->skill)
-              <div class="d-flex align-items-start">
-                @if($question->skill->image)
-                  <img src="{{ asset($question->skill->image) }}" alt="{{ $question->skill->skill }}" class="rounded me-3" width="60" height="60" style="object-fit:cover;">
-                @endif
-                <div class="flex-grow-1">
-                  <h6 class="mb-1 d-flex align-items-center justify-content-between">
-                    <span>{{ $question->skill->skill }}</span>
-                    <a href="{{ route('admin.skills.show', $question->skill) }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-eye me-1"></i>View Skill</a>
-                  </h6>
-                  <p class="text-muted small mb-2">
-                    {{ strlen($question->skill->description) > 100 ? substr($question->skill->description, 0, 100) . '...' : $question->skill->description }}
-                  </p>
-                  <div class="skill-change-box border border-success rounded p-3">
-                    <div class="d-flex align-items-center justify-content-between">
-                      <div><i class="fas fa-exchange-alt text-success me-2"></i><span class="fw-semibold text-success">Change Skill</span></div>
-                      <div class="skill-dropdown" style="min-width:200px;">
-                        <select class="form-select form-select-sm"
-                                data-field="skill_id"
-                                data-id="{{ $question->id }}"
-                                data-current="{{ $question->skill_id ?? '' }}">
-                          <option value="">Select a skill...</option>
-                          @foreach($skills as $skillOption)
-                            <option value="{{ $skillOption->id }}" {{ $skillOption->id == ($question->skill_id ?? '') ? 'selected' : '' }}>
-                              {{ $skillOption->skill }}
-                            </option>
-                          @endforeach
-                        </select>
-                      </div>
-                    </div>
-                    <small class="text-muted mt-2 d-block">Select a new skill to assign to this question</small>
-                  </div>
-                </div>
+    {{-- Skill --}}
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-brain me-2"></i>Associated Skill</h5></div>
+      <div class="card-body">
+        @if($question->skill)
+        <div class="d-flex align-items-start">
+          @if($question->skill->image)
+          <img src="{{ asset($question->skill->image) }}" alt="{{ $question->skill->skill }}" class="rounded me-3" width="60" height="60" style="object-fit:cover;">
+          @endif
+          <div class="flex-grow-1">
+            <h6 class="mb-1 d-flex align-items-center justify-content-between">
+              <span>{{ $question->skill->skill }}</span>
+              <a href="{{ route('admin.skills.show', $question->skill) }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-eye me-1"></i>View Skill</a>
+            </h6>
+            <p class="text-muted small mb-2">
+              {{ strlen($question->skill->description) > 100 ? substr($question->skill->description, 0, 100) . '...' : $question->skill->description }}
+            </p>
+            <div class="skill-change-box border border-success rounded p-3">
+              <div class="d-flex align-items-center justify-content-between">
+                <div><i class="fas fa-exchange-alt text-success me-2"></i><span class="fw-semibold text-success">Change Skill</span></div>
+                <div class="skill-dropdown" style="min-width:200px;">
+                  <select class="form-select form-select-sm"
+                  data-field="skill_id"
+                  data-id="{{ $question->id }}"
+                  data-current="{{ $question->skill_id ?? '' }}">
+                  <option value="">Select a skill...</option>
+                  @foreach($skills as $skillOption)
+                  <option value="{{ $skillOption->id }}" {{ $skillOption->id == ($question->skill_id ?? '') ? 'selected' : '' }}>
+                    {{ $skillOption->skill }}
+                  </option>
+                  @endforeach
+                </select>
               </div>
-            @else
-              <div class="text-center py-3">
-                <i class="fas fa-unlink fa-2x text-muted mb-2"></i>
-                <p class="text-muted">No skill associated</p>
-              </div>
-            @endif
-          </div>
-        </div>
-
-        {{-- QA Issues --}}
-        <div class="card mb-4" id="qa-issues-card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0"><i class="fas fa-bug me-2"></i>QA Issues</h5>
-            <span class="badge bg-secondary">{{ $question->qaIssues->count() }}</span>
-          </div>
-          <div class="card-body">
-            @if($question->qaIssues->isEmpty())
-              <p class="text-muted mb-0">No QA issues recorded for this question.</p>
-            @else
-              <div class="list-group small">
-                @foreach($question->qaIssues as $issue)
-                  <div class="list-group-item d-flex justify-content-between align-items-start flex-wrap" data-issue-id="{{ $issue->id }}">
-                    <div class="me-2 flex-grow-1">
-                      <span class="badge bg-primary text-light me-2 text-capitalize">{{ $issue->status }}</span>
-                      <span class="badge bg-info text-dark me-2 text-capitalize">{{ str_replace('_',' ', $issue->issue_type) }}</span>
-                      <span class="fw-semibold">{{ $issue->description }}</span><br>
-                      <small class="text-muted">
-                        Reported by {{ optional($issue->reviewer)->name ?? 'Reviewer '.$issue->reviewer_id }}
-                        on {{ optional($issue->created_at)->format('M j, Y') }}
-                      </small>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                      <button type="button" class="btn btn-sm {{ $issue->status === 'resolved' ? 'btn-success' : 'btn-outline-success' }}"
-                              title="Mark as resolved" onclick="updateQaIssueStatus({{ $issue->id }}, 'resolved', this)">
-                        <i class="fas fa-check"></i>
-                      </button>
-                      <button type="button" class="btn btn-sm {{ $issue->status === 'dismissed' ? 'btn-danger' : 'btn-outline-danger' }}"
-                              title="Dismiss issue" onclick="updateQaIssueStatus({{ $issue->id }}, 'dismissed', this)">
-                        <i class="fas fa-times"></i>
-                      </button>
-                    </div>
-                  </div>
-                @endforeach
-              </div>
-            @endif
+            </div>
+            <small class="text-muted mt-2 d-block">Select a new skill to assign to this question</small>
           </div>
         </div>
       </div>
+      @else
+      <div class="text-center py-3">
+        <i class="fas fa-unlink fa-2x text-muted mb-2"></i>
+        <p class="text-muted">No skill associated</p>
+      </div>
+      @endif
     </div>
   </div>
+
+  {{-- QA Issues --}}
+  <div class="card mb-4" id="qa-issues-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="card-title mb-0"><i class="fas fa-bug me-2"></i>QA Issues</h5>
+      <span class="badge bg-secondary">{{ $question->qaIssues->count() }}</span>
+    </div>
+    <div class="card-body">
+      @if($question->qaIssues->isEmpty())
+      <p class="text-muted mb-0">No QA issues recorded for this question.</p>
+      @else
+      <div class="list-group small">
+        @foreach($question->qaIssues as $issue)
+        <div class="list-group-item d-flex justify-content-between align-items-start flex-wrap" data-issue-id="{{ $issue->id }}">
+          <div class="me-2 flex-grow-1">
+            <span class="badge bg-primary text-light me-2 text-capitalize">{{ $issue->status }}</span>
+            <span class="badge bg-info text-dark me-2 text-capitalize">{{ str_replace('_',' ', $issue->issue_type) }}</span>
+            <span class="fw-semibold">{{ $issue->description }}</span><br>
+            <small class="text-muted">
+              Reported by {{ optional($issue->reviewer)->name ?? 'Reviewer '.$issue->reviewer_id }}
+              on {{ optional($issue->created_at)->format('M j, Y') }}
+            </small>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm {{ $issue->status === 'resolved' ? 'btn-success' : 'btn-outline-success' }}"
+              title="Mark as resolved" onclick="updateQaIssueStatus({{ $issue->id }}, 'resolved', this)">
+              <i class="fas fa-check"></i>
+            </button>
+            <button type="button" class="btn btn-sm {{ $issue->status === 'dismissed' ? 'btn-danger' : 'btn-outline-danger' }}"
+              title="Dismiss issue" onclick="updateQaIssueStatus({{ $issue->id }}, 'dismissed', this)">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        @endforeach
+      </div>
+      @endif
+    </div>
+  </div>
+</div>
+</div>
+</div>
 </div>
 
 {{-- Image Preview Modal --}}
@@ -855,7 +870,7 @@
         const isResolve = b.title.includes('resolved');
         b.classList.remove('btn-success','btn-outline-success','btn-danger','btn-outline-danger');
         b.classList.add(isResolve ? (newStatus==='resolved'?'btn-success':'btn-outline-success')
-                                  : (newStatus==='dismissed'?'btn-danger':'btn-outline-danger'));
+          : (newStatus==='dismissed'?'btn-danger':'btn-outline-danger'));
       });
       row.querySelector('.badge.bg-primary').textContent = newStatus;
     }catch(err){ showToast(err.message || 'Failed to update issue', 'error'); }
@@ -976,15 +991,15 @@
       const label = document.getElementById('fib-blank-count'); if(label) label.textContent = String(n);
     }
   }
- async function fibAddBlank(){
-  const parts = ensureQuestionSourceVisible(); if(!parts) return;
-  const src = parts.edit.value || '';
-  const blanks = countBlanks(src);
-  if (blanks >= 4){ showToast('Maximum of 4 blanks supported', 'error'); return; }
+  async function fibAddBlank(){
+    const parts = ensureQuestionSourceVisible(); if(!parts) return;
+    const src = parts.edit.value || '';
+    const blanks = countBlanks(src);
+    if (blanks >= 4){ showToast('Maximum of 4 blanks supported', 'error'); return; }
 
-  const next = (/\S$/.test(src) ? src + ' ' : src) + '[?]';
-  await saveQuestionSource(next);
-  showToast('Blank added', 'success');
+    const next = (/\S$/.test(src) ? src + ' ' : src) + '[?]';
+    await saveQuestionSource(next);
+    showToast('Blank added', 'success');
 
   // --- highlight the new blank visually ---
   const renderArea = document.querySelector('.fib-content, .question-field');
@@ -1010,24 +1025,24 @@
   }
 }
 
-  async function fibRemoveLastBlank(){
-    const parts = ensureQuestionSourceVisible(); if(!parts) return;
-    const src = parts.edit.value || '';
-    if(!countBlanks(src)){ showToast('No blanks to remove', 'info'); return; }
+async function fibRemoveLastBlank(){
+  const parts = ensureQuestionSourceVisible(); if(!parts) return;
+  const src = parts.edit.value || '';
+  if(!countBlanks(src)){ showToast('No blanks to remove', 'info'); return; }
 
-    let next = src;
-    const rxs = [/\[\?\](?!.*\[\?\])/s, /_{3,}(?!.*_{3,})/s, /\[blank\](?!.*\[blank\])/s];
-    for(const rx of rxs){ if(rx.test(next)){ next = next.replace(rx,'').replace(/\s{2,}/g,' ').trim(); break; } }
+  let next = src;
+  const rxs = [/\[\?\](?!.*\[\?\])/s, /_{3,}(?!.*_{3,})/s, /\[blank\](?!.*\[blank\])/s];
+  for(const rx of rxs){ if(rx.test(next)){ next = next.replace(rx,'').replace(/\s{2,}/g,' ').trim(); break; } }
 
     await saveQuestionSource(next);
-    showToast('Last blank removed', 'success');
+  showToast('Last blank removed', 'success');
 
-    try{
-      const before = countBlanks(src);
-      const indexToClear = Math.min(before - 1, 3);
-      const csrf = document.querySelector('meta[name="csrf-token"]').content;
-      await updateQuestionField(`answer${indexToClear}`, '', csrf);
-    }catch(e){}
+  try{
+    const before = countBlanks(src);
+    const indexToClear = Math.min(before - 1, 3);
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    await updateQuestionField(`answer${indexToClear}`, '', csrf);
+  }catch(e){}
 
     // ✨ Refresh to hide the extra answer box
     setTimeout(() => location.reload(), 600);
