@@ -273,9 +273,12 @@ CSS;
     }
 
     /** Branding uploads */
-    public function updateLogo(Request $request)            { return $this->uploadBranding($request, 'logo', 'images', 'site_logo'); }
-    public function deleteLogo()                            { return $this->deleteBranding('site_logo', 'images'); }
-    public function updateFavicon(Request $request)         { return $this->uploadBranding($request, 'favicon', 'favicons', 'favicon'); }
+    public function updateLogo(Request $request)         
+    { return $this->uploadBranding($request, 'logo', 'images', 'site_logo'); }
+    public function deleteLogo()
+    { return $this->deleteBranding('site_logo', 'images'); }
+    public function updateFavicon(Request $request)
+    {  return $this->uploadBranding($request, 'favicon', 'favicons', 'favicon'); }
     public function deleteFavicon()                         { return $this->deleteBranding('favicon', 'favicons'); }
     public function updateLoginBackground(Request $request) { return $this->uploadBranding($request, 'login_background', 'backgrounds', 'login_background'); }
     public function deleteLoginBackground()                 { return $this->deleteBranding('login_background', 'backgrounds'); }

@@ -9,6 +9,29 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ asset('css/admin-styles.css') }}">
+    @php
+        use Illuminate\Support\Facades\DB;
+        use Illuminate\Support\Facades\Storage;
+        use Illuminate\Support\Str;
+
+        $site = $site ?? DB::table('configs')->first();
+
+        $resolve = function (?string $path) {
+        if (!$path) return null;
+        if (Str::startsWith($path, ['http://','https://','//'])) return $path;
+        if (Storage::disk('public')->exists($path)) return Storage::url($path);     // /storage/...
+        if (file_exists(public_path($path))) return asset($path);                    // /public/...
+        return null;
+        };
+
+        $logoUrl    = $resolve($site->site_logo ?? null);
+        $faviconUrl = $resolve($site->favicon   ?? null);
+    @endphp
+        @if($faviconUrl)
+          <link rel="icon" href="{{ $faviconUrl }}">
+          <link rel="shortcut icon" href="{{ $faviconUrl }}">
+          <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
+        @endif
     
     <style>
         body {

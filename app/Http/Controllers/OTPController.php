@@ -3,363 +3,195 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
-use App\Mail\SendOtpMail;
 use App\Models\User;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Carbon;
+use App\Services\OtpService;
 
 class OTPController extends Controller
 {
-    public function requestOtp(Request $request)
-    {
-        $request->validate(['contact' => 'required|string']);
-        
-        $contact = $request->contact;
-        $isEmail = filter_var($contact, FILTER_VALIDATE_EMAIL);
-        
-        // Find or create user
-        $user = User::where($isEmail ? 'email' : 'phone_number', $contact)->first()
-        ?? $this->createTelcoUser($contact);
-        
-        if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
-        }
-        
-        // Handle potential telco users
-        if ($user->status === 'potential') {
-            return $this->handleTelcoOtp($user);
-        }
-        
-        // Check registration completion
-        if (!$user->email_verified_at || !$user->date_of_birth) {
-            return response()->json([
-                'message' => 'Please complete registration first',
-                'requires_registration' => true,
-                'user_id' => $user->id
-            ], 422);
-        }
-        
-        return $this->sendOtpToEmail($user);
-    }
-
-    public function verifyOtp(Request $request)
+    /**
+     * Send OTP to user's contact (email or phone)
+     */
+    public function sendOtp(Request $request, OtpService $otp)
     {
         $request->validate([
-            'contact'  => 'required|string',
-            'otp_code' => 'required|string',
+            'contact' => 'required|string',
+            'channel' => 'nullable|string',
         ]);
 
-        $contact = $request->contact;
-        $field = filter_var($contact, FILTER_VALIDATE_EMAIL) ? 'email' : 'phone_number';
+        // Normalize contact & validate channel pairing
+        $norm    = $otp->normalize((string) $request->contact);
+        $channel = $otp->validateChannel($request->input('channel'), $norm['type']);
 
-        $user = User::where($field, $contact)
-        ->where('otp_code', $request->otp_code)
-        ->where('otp_expires_at', '>', now())
-        ->first();
+        // Find or create user
+        $user = $otp->findOrCreateUser($norm['type'], $norm['value']);
 
-        if (!$user) {
-            return response()->json(['message' => 'Invalid or expired OTP'], 401);
-        }
-    // Set email as verified if contact is email and not already verified
-        if ($field === 'email' && !$user->email_verified) {
-            $user->update([
-                'email_verified' => 1,
-                'email_verified_at' => now()
-            ]);
-        }
-    // Clear OTP
-        $user->update(['otp_code' => null, 'otp_expires_at' => null]);
+        // Throttle, issue, dispatch
+        $otp->throttle($user, $norm['type'] === 'email');
+        $code = $otp->issue($user, 5);
+        $otp->dispatch($user, $code, $channel);
 
-    // HARD GATE: require DOB before issuing tokens
-        if (empty($user->date_of_birth)) {
+        return response()->json([
+            'channel'    => $channel,
+            'email_hint' => $otp->maskedEmail($user->email),
+            'phone_hint' => $otp->maskedPhone($user->phone_number),
+            'user_id'    => $user->id,
+            'message'    => 'OTP sent.',
+        ], 200);
+    }
+
+    /**
+     * Verify OTP and authenticate user
+     */
+    public function verifyOtp(Request $request, OtpService $otp)
+    {
+        // Accept either "identifier" (legacy) or "contact" (new)
+        $request->validate([
+            'identifier' => 'nullable|string',
+            'contact'    => 'nullable|string',
+            'otp_code'   => 'required|string|size:6',
+        ]);
+
+        $contact = (string) ($request->input('contact') ?? $request->input('identifier'));
+        if ($contact === '') {
             return response()->json([
-                'requires_profile_completion' => true,
-                'user_id' => $user->id,
-                'message' => 'Please complete your profile (date of birth required).',
-                'contact' => $user->email ?? $user->phone_number,
+                'message' => 'The contact/identifier field is required.',
+                'errors'  => ['contact' => ['The contact/identifier field is required.']],
             ], 422);
         }
 
-    // If DOB exists, proceed to normal login response (issues token)
-        $resp = $this->loginResponse($user)->getData(true);
+        // Verify OTP and update user
+        $result = $otp->verifyAndUpdate($contact, (string) $request->otp_code);
 
-        $resp['requires_profile_completion'] = empty($user->date_of_birth);
+        if (!$result['ok']) {
+            return response()->json(['message' => 'Invalid or expired OTP'], 401);
+        }
+
+        /** @var \App\Models\User $user */
+        $user = $result['user'];
+
+        // Check if user needs Kiasu screen:
+        // - No prior diagnostic (last_test_date null AND maxile_level <= 0)
+        // - AND no age anchor (dob null AND birth_year null)
+        $noPriorDiagnostic = is_null($user->last_test_date) && ((float) $user->maxile_level <= 0.0);
+        $noAgeAnchor       = is_null($user->date_of_birth) && is_null($user->birth_year);
+        $kiasuRecommended  = ($noPriorDiagnostic && $noAgeAnchor);
+
+        // Create token for the user (needed for subsequent API calls)
+        $token = $user->createToken('login')->plainTextToken;
+
+        // If minimal profile missing → return profile completion response
+        if ($result['needs_profile']) {
+            return response()->json([
+                'requires_profile_completion' => true,
+                'is_new_user'       => $result['is_new_user'],
+                'kiasu_recommended' => $kiasuRecommended,
+                'user_id'           => $user->id,
+                'contact'           => $user->email ?? $user->phone_number,
+                'first_name'        => $user->firstname ?? null,
+                'dob'               => $user->date_of_birth ?? null,
+                'birth_year'        => $user->birth_year ?? null,
+                'pc_token'          => $result['pc_token'],
+                'token'             => $token,  // ← NOW RETURNS A REAL TOKEN!
+                'message'           => 'Tell us a birth year (or date of birth) to calibrate your starting level.',
+            ], 200);
+        }
+
+        // Happy path → full login response
+        $resp = $this->loginResponse($user)->getData(true);
+        $resp['requires_profile_completion'] = false;
+        $resp['is_new_user']       = $result['is_new_user'];
+        $resp['kiasu_recommended'] = $kiasuRecommended;
 
         return response()->json($resp, 200);
     }
 
-
-    public function completeRegistration(Request $request)
-    {
-        $user = $request->user(); // comes from Sanctum token
-
-        $validated = $request->validate([
-            // dob required — this is the key for gating the app
-            'date_of_birth' => 'required|date|before:today|after:1900-01-01',
-            // optional fields, only update if provided
-            'firstname'     => 'sometimes|string|max:255',
-            'lastname'      => 'sometimes|string|max:255',
-            'email'         => [
-                'sometimes',
-                'email',
-                Rule::unique('users', 'email')->ignore($user->id),
-            ],
-            'phone_number'  => 'sometimes|string|max:32',
-        ]);
-
-        // Update only provided fields
-        if (array_key_exists('firstname', $validated)) {
-            $user->firstname = $validated['firstname'];
-        }
-        if (array_key_exists('lastname', $validated)) {
-            $user->lastname = $validated['lastname'];
-        }
-        if (array_key_exists('email', $validated)) {
-            $user->email = $validated['email'];
-        }
-        if (array_key_exists('phone_number', $validated)) {
-            $user->phone_number = $validated['phone_number'];
-        }
-
-        // Required
-        $user->date_of_birth = Carbon::parse($validated['date_of_birth'])->toDateString();
-        $user->name = trim(($user->firstname ?? '').' '.($user->lastname ?? ''));
-        $user->status = 'active'; // if that’s your desired end state
-
-        $user->save();
-
-        // You already have a valid token, but returning a canonical payload keeps FE simple
-        $response = $this->loginResponse($user)->getData(true);
-        $response['requires_profile_completion'] = false;
-
-        return response()->json($response, 200);
-    }
-
-
-    public function verifyEmail(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'verification_code' => 'required|string'
-        ]);
-
-        $user = User::where('email', $request->email)
-        ->where('otp_code', $request->verification_code)
-        ->where('otp_expires_at', '>', now())
-        ->first();
-
-        if (!$user) {
-            return response()->json(['message' => 'Invalid or expired verification code'], 401);
-        }
-
-        $user->update([
-            'email_verified_at' => now(),
-            'otp_code' => null,
-            'otp_expires_at' => null
-        ]);
-
-        return response()->json(['message' => 'Email verified successfully']);
-    }
-
-    // Private helper methods
-    private function createTelcoUser($contact)
-    {
-        $telcoData = $this->checkTelcoSubscriber($contact);
-
-        return $telcoData ? User::create([
-            'phone_number' => $telcoData['phone'],
-            'telco_provider' => $telcoData['provider'],
-            'telco_subscriber_id' => $telcoData['subscriber_id'],
-            'status' => 'potential',
-            'email_verified_at' => null,
-            'name' => 'Telco Subscriber',
-            'signup_channel' => 'telco_otp_login'
-        ]) : null;
-    }
-
-    private function handleTelcoOtp($user)
-    {
-        $otp = $this->generateAndSaveOtp($user);
-        $this->sendSMS($user->phone_number, "Your All Gifted verification code: {$otp}");
-
-        return response()->json([
-            'message' => "Activating All Gifted Math Premium on your " . ucfirst($user->telco_provider ?? 'telco') . " bill. Enter the verification code sent to your phone.",
-            'is_telco_activation' => true,
-            'telco_provider' => $user->telco_provider,
-            'phone' => $user->phone_number
-        ]);
-    }
-
-    private function sendOtpToEmail($user)
-    {
-        $otp = $this->generateAndSaveOtp($user);
-
-        try {
-            Mail::to($user->email)->send(new SendOtpMail($otp));
-
-            return response()->json([
-                'message' => 'OTP sent to your email',
-                'email_hint' => substr($user->email, 0, 2) . '***@' . explode('@', $user->email)[1]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to send OTP'], 500);
-        }
-    }
-
-    private function generateAndSaveOtp($user)
-    {
-        $otp = rand(100000, 999999);
-        $user->update([
-            'otp_code' => $otp,
-            'otp_expires_at' => now()->addMinutes(5)
-        ]);
-        return $otp;
-    }
-
-    private function activateTelcoUser($user)
-    {
-        try {
-            $this->activateTelcoService($user);
-
-            $user->update([
-                'status' => 'active',
-                'payment_method' => 'telco_billing',
-                'activated_at' => now(),
-                'email_verified_at' => now(),
-                'lives' => 5
-            ]);
-
-            $enrollmentId = $this->createMathEnrollment($user);
-            $token = $user->createToken('login')->plainTextToken;
-
-            return response()->json([
-                'message' => 'All Gifted Math Premium activated! Welcome!',
-                'token' => $token,
-                'user_id' => $user->id,
-                'first_name' => $user->name,
-                'is_subscriber' => true,
-                'maxile_level' => (int) $user->maxile_level,
-                'game_level' => (int) $user->game_level,
-                'lives' => (int) $user->lives,
-                'has_math_access' => true,
-                'telco_provider' => $user->telco_provider,
-                'enrollment' => [
-                    'program' => 'K-6 Singapore Math',
-                    'billing' => '$3/month via ' . ucfirst($user->telco_provider),
-                    'enrollment_id' => $enrollmentId
-                ],
-                'is_new_activation' => true
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Telco activation failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
-            return response()->json(['message' => 'Activation failed. Please try again.'], 500);
-        }
-    }
-
+    /**
+     * Generate login response with user data
+     */
     private function loginResponse(User $user)
     {
         $mathEnrollment = $this->checkMathEnrollment($user);
         $hasAccess = $mathEnrollment && $mathEnrollment->expiry_date >= now()->toDateString();
         $token = $user->createToken('login')->plainTextToken;
 
-    // Format DOB safely to YYYY-MM-DD, allow null
+        // Format DOB safely to YYYY-MM-DD, allow null
         $dob = $user->date_of_birth
-        ? \Illuminate\Support\Carbon::parse($user->date_of_birth)->toDateString()
-        : null;
+            ? \Illuminate\Support\Carbon::parse($user->date_of_birth)->toDateString()
+            : null;
 
-    // The FE wants 'first_name' (not 'firstname')
         $firstName = $user->firstname ?? null;
 
         $response = [
-            'message'        => 'OTP verified. Login successful.',
-            'token'          => $token,
-            'user_id'        => $user->id,
-            'first_name'     => $firstName,
-        'dob'            => $dob,                                // <- string or null
-        'contact'        => $user->email ?? $user->phone_number, // <- handy for FE
-        'is_subscriber'  => !is_null($dob) && !is_null($firstName),
+            'message'         => 'OTP verified. Login successful.',
+            'token'           => $token,
+            'user_id'         => $user->id,
+            'first_name'      => $firstName,
+            'dob'             => $dob,
+            'contact'         => $user->email ?? $user->phone_number,
+            'is_subscriber'   => !is_null($dob) && !is_null($firstName),
+            'maxile_level'    => (int) $user->maxile_level,
+            'game_level'      => (int) $user->game_level,
+            'lives'           => (int) $user->lives,
+            'has_math_access' => $hasAccess,
+            'telco_provider'  => $user->telco_provider,
+            'enrollment'      => $hasAccess ? [
+                'program'     => 'K-6 Singapore Math',
+                'expiry_date' => $mathEnrollment->expiry_date,
+                'progress'    => $mathEnrollment->progress,
+            ] : null,
+        ];
 
-        // game/meta stuff you already return
-        'maxile_level'   => (int) $user->maxile_level,
-        'game_level'     => (int) $user->game_level,
-        'lives'          => (int) $user->lives,
-        'has_math_access'=> $hasAccess,
-        'telco_provider' => $user->telco_provider,
-        'enrollment'     => $hasAccess ? [
-            'program'     => 'K-6 Singapore Math',
-            'expiry_date' => $mathEnrollment->expiry_date,
-            'progress'    => $mathEnrollment->progress,
-        ] : null,
-    ];
-
-    return response()->json($response, 200);
-}
-
-
-private function checkTelcoSubscriber($contact)
-{
-    return str_starts_with($contact, '+659') ? [
-        'phone' => $contact,
-        'provider' => 'simba',
-        'subscriber_id' => 'SIMBA_' . time() . '_' . rand(1000, 9999),
-        'is_subscriber' => true
-    ] : null;
-}
-
-private function checkMathEnrollment($user)
-{
-    return DB::table('house_role_user')
-    ->where('user_id', $user->id)
-    ->where('house_id', 1)
-    ->where('role_id', 6)
-    ->where('payment_status', '!=', 'cancelled')
-    ->first();
-}
-
-private function createMathEnrollment($user)
-{
-    return DB::table('house_role_user')->insertGetId([
-        'house_id' => 1,
-        'role_id' => 6,
-        'user_id' => $user->id,
-        'progress' => 0,
-        'transaction_id' => 'TELCO_' . strtoupper($user->telco_provider) . '_' . time(),
-        'payment_email' => 'billing@allgifted.com',
-        'purchaser_id' => $user->id,
-        'start_date' => now()->toDateString(),
-        'expiry_date' => now()->addMonth()->toDateString(),
-        'places_alloted' => 1,
-        'amount_paid' => 3.00,
-        'currency_code' => 'SGD',
-        'payment_status' => 'ACTIVE_TELCO',
-        'created_at' => now(),
-        'updated_at' => now()
-    ]);
-}
-
-private function activateTelcoService($user)
-{
-    \Log::info("Activating telco service for user {$user->id} on {$user->telco_provider}");
-    return true;
-}
-
-private function sendSMS($phone, $message)
-{
-    \Log::info("SMS to {$phone}: {$message}");
-    return true;
-}
-
-private function sendEmailVerification($user)
-{
-    $otp = $this->generateAndSaveOtp($user, 15);
-
-    try {
-        Mail::to($user->email)->send(new SendOtpMail($otp));
-    } catch (\Exception $e) {
-        \Log::error('Failed to send verification email', ['error' => $e->getMessage()]);
+        return response()->json($response, 200);
     }
-}
+
+    /**
+     * Check if user is a telco subscriber
+     */
+    private function checkTelcoSubscriber($contact)
+    {
+        return str_starts_with($contact, '+659') ? [
+            'phone'         => $contact,
+            'provider'      => 'simba',
+            'subscriber_id' => 'SIMBA_' . time() . '_' . rand(1000, 9999),
+            'is_subscriber' => true
+        ] : null;
+    }
+
+    /**
+     * Check user's math enrollment status
+     */
+    private function checkMathEnrollment($user)
+    {
+        return DB::table('house_role_user')
+            ->where('user_id', $user->id)
+            ->where('house_id', 1)
+            ->where('role_id', 6)
+            ->where('payment_status', '!=', 'cancelled')
+            ->first();
+    }
+
+    /**
+     * Create math enrollment for user
+     */
+    private function createMathEnrollment($user)
+    {
+        return DB::table('house_role_user')->insertGetId([
+            'house_id'        => 1,
+            'role_id'         => 6,
+            'user_id'         => $user->id,
+            'progress'        => 0,
+            'transaction_id'  => 'TELCO_' . strtoupper($user->telco_provider) . '_' . time(),
+            'payment_email'   => 'billing@allgifted.com',
+            'purchaser_id'    => $user->id,
+            'start_date'      => now()->toDateString(),
+            'expiry_date'     => now()->addMonth()->toDateString(),
+            'places_alloted'  => 1,
+            'amount_paid'     => 3.00,
+            'currency_code'   => 'SGD',
+            'payment_status'  => 'ACTIVE_TELCO',
+            'created_at'      => now(),
+            'updated_at'      => now()
+        ]);
+    }
 }

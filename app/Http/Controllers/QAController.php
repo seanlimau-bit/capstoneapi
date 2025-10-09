@@ -331,7 +331,7 @@ class QAController extends Controller
     }
 
     /**
-     * Resolve an issue
+     * Resolve or Dismiss an issue
      */
     public function issueStatus(\App\Models\QaIssue $issue, \Illuminate\Http\Request $request)
     {

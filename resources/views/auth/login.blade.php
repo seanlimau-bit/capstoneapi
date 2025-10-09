@@ -3,35 +3,7 @@
 
 @section('title', 'Login')
 @section('subtitle', 'Administration Portal')
-
-@php
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-
-$site = $site ?? DB::table('configs')->first();
-
-$resolve = function (?string $path) {
-if (!$path) return null;
-if (Str::startsWith($path, ['http://','https://','//'])) return $path;
-if (Storage::disk('public')->exists($path)) return Storage::url($path);     // /storage/...
-if (file_exists(public_path($path))) return asset($path);                    // /public/...
-return null;
-};
-
-$logoUrl    = $resolve($site->site_logo ?? null);
-$faviconUrl = $resolve($site->favicon   ?? null);
-@endphp
-
-@push('head') {{-- ensure @stack('head') exists in layouts.auth <head> --}}
-  @if($faviconUrl)
-  <link rel="icon" type="image/png" href="{{ $faviconUrl }}">
-  <link rel="shortcut icon" href="{{ $faviconUrl }}">
-  <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-  @endif
-  @endpush
-
-  @push('styles')
+@push('styles')
   <style>
     .auth-page { min-height: 100vh; display: grid; place-items: center; padding: var(--spacing-2xl); background: var(--background-color); }
     .auth-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; }

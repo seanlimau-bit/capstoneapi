@@ -3,9 +3,6 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Configuration\Exceptions;
-use App\Http\Middleware\Auth0Middleware;
-use App\Http\Middleware\CorsImageMiddleware;
-use App\Http\Middleware\AdminMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,17 +10,18 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        apiPrefix: 'api',  // Changed from '/api' to 'api'
+        apiPrefix: 'api',
     )
     ->withMiddleware(function (Middleware $middleware) {
- //       $middleware->api(prepend: [
- //           \App\Http\Middleware\CorsMiddleware::class,
-   //     ]);
+        // ✅ CRITICAL: Enable Sanctum stateful API authentication
+        $middleware->statefulApi();
         
+        // Disable CSRF for API routes
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
         
+        // Register middleware aliases
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
@@ -37,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->renderable(function (Throwable $e, $request) {
             // Optional custom rendering
         });
+        
         $exceptions->reportable(function (Throwable $e) {
             // Optional custom reporting
         });
