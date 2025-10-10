@@ -60,7 +60,7 @@ $qid = $question->id;
   <td>
     <div class="d-flex flex-column gap-1">
       @if($question->skill)
-      <div><strong>Skill:</strong> {{ Str::limit($question->skill->skill ?? 'Unknown', 25) }}</div>
+      <div><strong>Skill - </strong> {{ Str::limit($question->skill->id . ': ' . $question->skill->skill ?? 'Unknown', 25) }}</div>
 
       @if($question->skill->tracks && $question->skill->tracks->count())
       <div class="d-flex flex-wrap gap-1">

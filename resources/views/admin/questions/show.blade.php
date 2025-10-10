@@ -484,7 +484,7 @@
                   <option value="">Select a skill...</option>
                   @foreach($skills as $skillOption)
                   <option value="{{ $skillOption->id }}" {{ $skillOption->id == ($question->skill_id ?? '') ? 'selected' : '' }}>
-                    {{ $skillOption->skill }}
+                    {{ $skillOption->id . ': ' . $skillOption->skill }}
                   </option>
                   @endforeach
                 </select>

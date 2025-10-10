@@ -158,6 +158,7 @@
                             <table class="table table-hover mb-0">
                                 <thead class="table-light">
                                     <tr>
+                                        <th>Id</th>
                                         <th>Skill</th>
                                         <th width="120">Questions</th>
                                         <th width="120">Status</th>
@@ -167,6 +168,11 @@
                                 <tbody>
                                     @foreach($track->skills as $skill)
                                     <tr>
+                                        <td>
+                                            <div>
+                                                <h6 class="mb-0">{{ $skill->id }}</h6>
+                                            </div>
+                                        </td>
                                         <td>
                                             <div>
                                                 <h6 class="mb-0">{{ $skill->skill }}</h6>

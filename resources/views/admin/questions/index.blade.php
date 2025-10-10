@@ -200,7 +200,7 @@
             <select class="form-select" name="skill_id" id="cq-skill">
               <option value="">— Select Skill —</option>
               @foreach(($filterOptions['skills'] ?? []) as $s)
-                <option value="{{ $s->id }}">{{ $s->skill }}</option>
+                <option value="{{ $s->id }}">{{ $s->id . ': ' . $s->skill }}</option>
               @endforeach
             </select>
           </div>
