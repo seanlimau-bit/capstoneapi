@@ -211,17 +211,13 @@
 
         @elseif((int)$question->type_id === 2)
         {{-- ===== Type 2: FIB – text only, no images or correct_answer ===== --}}
-        @php
-        $plain = html_entity_decode(strip_tags($question->question ?? ''), ENT_QUOTES | ENT_HTML5);
-        preg_match_all('/(\[\?\])|(_{3,})|(\[blank\])/u', $plain, $m);
-        $blankCount = min(max(count($m[0]), 1), 4);
-        @endphp
 
         <div class="mb-4">
-          <label class="form-label text-muted small">EXPECTED ANSWERS ({{ $blankCount }})</label>
+          <label class="form-label text-muted small">EXPECTED ANSWERS</label>
 
-          @for($i = 0; $i < $blankCount; $i++)
+          @for($i = 0; $i < 3; $i++)
           @php $val = $question->{'answer'.$i} ?? ''; @endphp
+          @if ($val)
           <div class="rich-field mb-2" data-id="{{ $question->id }}" data-field="answer{{ $i }}">
             <div class="rich-toolbar">
               <button class="btn btn-sm btn-outline-secondary rich-toggle"><i class="fas fa-pencil me-1"></i>Edit</button>
@@ -231,6 +227,7 @@
             </div>
             <textarea class="rich-edit form-control d-none" spellcheck="false">{!! $val !!}</textarea>
           </div>
+          @endif
           @endfor
         </div>
         @endif
