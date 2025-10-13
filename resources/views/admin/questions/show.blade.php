@@ -215,7 +215,7 @@
         <div class="mb-4">
           <label class="form-label text-muted small">EXPECTED ANSWERS</label>
 
-          @for($i = 0; $i < 3; $i++)
+          @for($i = 0; $i < 4; $i++)
           @php $val = $question->{'answer'.$i} ?? ''; @endphp
           @if ($val)
           <div class="rich-field mb-2" data-id="{{ $question->id }}" data-field="answer{{ $i }}">
