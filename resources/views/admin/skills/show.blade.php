@@ -86,9 +86,9 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Skill Name</label>
+                            <label class="form-label fw-bold">Skill Id/Name</label>
                             <div class="editable-field" data-field="skill" data-type="text">
-                                <span class="field-display">{{ $skill->skill }}</span>
+                                <span class="field-display">{{ $skill->id. ': '. $skill->skill }}</span>
                                 <i class="fas fa-edit edit-icon text-muted ms-2"></i>
                             </div>
                         </div>

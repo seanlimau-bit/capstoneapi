@@ -229,16 +229,16 @@
           </div>
           <div class="col-md-6" id="grp-answer1">
             <label class="form-label">Answer 1 <span class="text-danger" id="req-answer1" style="display:none">*</span></label>
-            <input type="text" class="form-control" name="answer1" id="cq-answer1">
+            <input type="text" class="form-control" name="answer1" id="cq-answer1" placeholder=NULL>
           </div>
 
           <div class="col-md-6" id="grp-answer2">
             <label class="form-label">Answer 2</label>
-            <input type="text" class="form-control" name="answer2" id="cq-answer2">
+            <input type="text" class="form-control" name="answer2" id="cq-answer2" placeholder=NULL>
           </div>
           <div class="col-md-6" id="grp-answer3">
             <label class="form-label">Answer 3</label>
-            <input type="text" class="form-control" name="answer3" id="cq-answer3">
+            <input type="text" class="form-control" name="answer3" id="cq-answer3" placeholder=NULL>
           </div>
 
           <div class="col-md-6" id="grp-correct">
