@@ -165,17 +165,12 @@
                                 <tr>
                                     <td><span class="badge bg-light text-dark">#{{ $question->id }}</span></td>
                                     <td>
-                                        <div class="fw-bold">
+                                        <div class="fw-bold rich-content fib-content">
                                             @php
                                             $plainText = strip_tags($question->question);
                                             $shouldTruncate = strlen($plainText) > 80;
                                             @endphp
-
-                                            @if($shouldTruncate)
-                                            {{ substr($plainText, 0, 80) }}...
-                                            @else
                                             {!! $question->question !!}
-                                            @endif
                                         </div>
                                         @if($question->question_image)
                                         <small class="text-muted"><i class="fas fa-image"></i> Has image</small>

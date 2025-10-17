@@ -32,6 +32,7 @@ class QuestionGenerationService
         $samples = $this->getSampleQuestions($skill);
         $prompt  = $this->buildAuthorPrompt($skill, $count, $ageBand, $readingLvl, $focus, $samples);
 
+
         $json      = $this->callOpenAIJson($prompt, $this->systemJsonInstruction());
         $questions = $this->parseQuestionsOrFail($json);
 
@@ -193,7 +194,7 @@ class QuestionGenerationService
         $prompt .= "- Use KaTeX $$...$$ sparingly, only where it clarifies notation\n";
         $prompt .= "- Difficulty ids must be 1, 2, or 3 only\n";
         $prompt .= "- MCQ: exactly 4 options in 'answers', 'correct_answer' is index 0..3\n";
-        $prompt .= "- FIB: 'answers' array of numeric strings, 'correct_answer' must be numeric\n";
+        $prompt .= "- FIB: 'answers' array of numeric strings, all values must be integers\n";
         $prompt .= "- Keep contexts culturally neutral and age-appropriate for {$ageBand}\n\n";
         $prompt .= "- FIB numbers: 'answers' must be an array of numeric strings for the blanks, 'correct_answer' must be numeric. Provide solutions with steps.\n";
         $prompt .= "- Keep contexts culturally neutral and age appropriate.\n\n";
