@@ -218,8 +218,8 @@
             <label class="form-label">Question <span class="text-danger">*</span></label>
             <textarea class="form-control" name="question" id="cq-question" rows="3" required></textarea>
             <div id="cq-blank-hint" class="form-text d-none">
-              For fill-in-the-blank: insert a blank like <code>[[blank]]</code> or <code>____</code>.
-              <button type="button" class="btn btn-link p-0 ms-1" id="cq-insert-blank">Insert [[blank]]</button>
+              For fill-in-the-blank: insert a blank like <code>____</code>.
+              <button type="button" class="btn btn-link p-0 ms-1" id="cq-insert-blank">Insert blank</button>
             </div>
             <div id="cq-answer-hint" class="form-text d-none">
               For questions with multiple answers, click this button:
@@ -686,7 +686,7 @@
   }
   function insertBlankToken(){
     const ta = document.getElementById('cq-question'); if(!ta) return;
-    const token = '[[blank]]';
+    const token = '____';
     const start = ta.selectionStart ?? ta.value.length;
     const end   = ta.selectionEnd ?? ta.value.length;
     ta.value = ta.value.slice(0,start) + token + ta.value.slice(end);
@@ -721,7 +721,8 @@ function submitCreate(e){
   }
   if (typeId === 2) {
     const q = (data.get('question') || '').trim();
-    if (!/\[\[blank\]\]|_{3,}/i.test(q)) return showModalMessage(alertId,'warning','For fill-in-the-blank, include [[blank]] or ____ in the question.');
+    if (!/\[\[blank\]\]|_{3,}/i.test(q)) return showModalMessage(alertId,'warning','For fill-in-the-blank, include ____ in the question.');
+    data.set('question', q.replace('____', '<input min="0" type="number" id="imp1pg004q1_1" class="lineinput" placeholder="?">'))
     data.set('correct_answer','');
   }
 
