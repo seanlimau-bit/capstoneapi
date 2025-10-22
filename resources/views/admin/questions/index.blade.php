@@ -196,7 +196,7 @@
         <div class="alert d-none" id="cq-alert" role="alert"></div>
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label">Skill (optional)</label>
+            <label class="form-label">`</label>
             <select class="form-select" name="skill_id" id="cq-skill">
               <option value="">— Select Skill —</option>
               @foreach(($filterOptions['skills'] ?? []) as $s)
@@ -220,6 +220,10 @@
             <div id="cq-blank-hint" class="form-text d-none">
               For fill-in-the-blank: insert a blank like <code>[[blank]]</code> or <code>____</code>.
               <button type="button" class="btn btn-link p-0 ms-1" id="cq-insert-blank">Insert [[blank]]</button>
+            </div>
+            <div id="cq-answer-hint" class="form-text d-none">
+              For questions with multiple answers, click this button:
+              <button type="button" class="btn btn-link p-0 ms-1" id="cq-insert-answer">Insert answer field</button>
             </div>
           </div>
 
@@ -351,6 +355,7 @@
     document.getElementById('createQuestionForm')?.addEventListener('submit', submitCreate);
     document.getElementById('cq-type')?.addEventListener('change', onTypeChange);
     document.getElementById('cq-insert-blank')?.addEventListener('click', insertBlankToken);
+    document.getElementById('cq-insert-answer')?.addEventListener('click', insertAnswerField);
 
     document.getElementById('genQForm')?.addEventListener('submit', submitGenerate);
 
@@ -667,6 +672,8 @@
     setRequired('cq-correct', isMcq);
 
     const hint = document.getElementById('cq-blank-hint'); if (hint) hint.classList.toggle('d-none', !isBlank);
+
+    const answer = document.getElementById('cq-answer-hint'); if (answer) answer.classList.toggle('d-none', !isBlank);
   }
   function toggleBlock(id, show){
     const el = document.getElementById(id); if(!el) return;
@@ -685,6 +692,19 @@
     ta.value = ta.value.slice(0,start) + token + ta.value.slice(end);
     ta.focus();
     ta.setSelectionRange(start + token.length, start + token.length);
+  }
+  function insertAnswerField(){
+    var ans;
+    for (let i = 1; i<=3; i++) {
+      ans = document.getElementById('grp-answer'+i);
+      if (ans.classList.contains('d-none')) {
+        toggleBlock('grp-answer'+i, true);
+        break;
+      }
+      else {
+        continue;
+      }
+    }
   }
 function submitCreate(e){
   e.preventDefault();
