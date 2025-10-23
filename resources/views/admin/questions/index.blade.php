@@ -722,7 +722,7 @@ function submitCreate(e){
   if (typeId === 2) {
     const q = (data.get('question') || '').trim();
     if (!/\[\[blank\]\]|_{3,}/i.test(q)) return showModalMessage(alertId,'warning','For fill-in-the-blank, include ____ in the question.');
-    data.set('question', q.replace('____', '<input min="0" type="number" id="imp1pg004q1_1" class="lineinput" placeholder="?">'))
+    data.set('question', q.replace('____', '<input min="0" type="number" class="lineinput" placeholder="?">'))
     data.set('correct_answer','');
   }
 
